@@ -8,10 +8,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# TODO: Нужно сделать класс, с запуском соединения к БД. Вызываться должно только там, где нужно, а не всегда.
-engine = create_engine(f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
-Session = sessionmaker(bind=engine)
-session = Session()
 Base = declarative_base()
 
 
@@ -21,6 +17,52 @@ class Sap(Base):
     mandant_num = Column(String(3), primary_key=True)
     user_id = Column(String(10), primary_key=True)
     password = Column(String(55))
+
+
+class Database(object):
+    def __init__(self):
+
+        if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}.db"):
+            engine = create_engine(f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
+            Session = sessionmaker(bind=engine)
+            self.session = Session()
+        else:
+            print('Базы данных не существует. Для создания запустите команду "db" ')
+            input('нажмите Enter')
+            sys.exit()
+
+    def query(self, system='', mandant='', user=''):
+
+        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
+        if system:
+            query = query.filter_by(system_id=system)
+        if mandant:
+            query = query.filter_by(mandant_num=mandant)
+        if user:
+            query = query.filter_by(user_id=user)
+
+        return query.all()
+
+    def add(self, system, mandant, user, password):
+        sap_info = Sap(
+            system_id=system, mandant_num=mandant, user_id=user, password=password)
+
+        self.session.add(sap_info)
+        self.session.commit()
+
+    def update(self, system, mandant, user, password):
+        query = self.session.query(Sap)
+        result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
+                              Sap.user_id == user).first()
+        result.password = password
+        self.session.commit()
+
+    def delete(self, system, mandant, user):
+        query = self.session.query(Sap)
+        result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
+                              Sap.user_id == user).one()
+        self.session.delete(result)
+        self.session.commit()
 
 
 class Config(object):
@@ -80,16 +122,10 @@ def run(system, mandant, u='', p='', l='RU', v=''):
     cfg = Config()
     cfg.get_config()
 
-    query = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
-                          Sap.password)
-    if system:
-        query = query.filter_by(system_id=system)
-    if mandant:
-        query = query.filter_by(mandant_num=mandant)
-    if u:
-        query = query.filter_by(user_id=u)
+    # Подсоединяемся к базе данных и запрашиваем данные
+    db = Database()
+    sap_data = db.query(system, mandant, u)
 
-    sap_data = query.all()
     if v:
         print(sap_data[0])
         answer = input('press Enter to continue or type something to stop: ')
@@ -170,13 +206,8 @@ def add(system, mandant, user, password):
     print('\nadding system to db')
     print(system, mandant, user, password)
 
-    # Base = declarative_base()
-
-    sap_info = Sap(
-        system_id=system, mandant_num=mandant, user_id=user, password=password)
-
-    session.add(sap_info)
-    session.commit()
+    db = Database()
+    db.add(system, mandant, user, password)
 
 
 @cli.command('update')
@@ -188,17 +219,14 @@ def add(system, mandant, user, password):
     '-password',
     help='password',
     prompt=True,
-    confirmation_prompt=True
-    # , hide_input=True
+    confirmation_prompt=True,
+    hide_input=True
 )
 def update(system, mandant, user, password):
     """ Update password for system, mandant and user """
 
-    query = session.query(Sap)
-    result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
-                          Sap.user_id == user).first()
-    result.password = password
-    session.commit()
+    db = Database()
+    db.update(system, mandant, user, password)
 
 
 @cli.command('delete')
@@ -209,16 +237,8 @@ def update(system, mandant, user, password):
 def delete(system, mandant, user):
     """ Deleting specific system """
 
-    query = session.query(Sap)
-    result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
-                          Sap.user_id == user).one()
-    session.delete(result)
-    session.commit()
-
-    del_res = query.first()
-    print('del_res', del_res)
-
-    print('\nSystem', system, '-', mandant, 'deleted succesfully for user', user)
+    db = Database()
+    db.delete(system, mandant, user)
 
 
 @cli.command('ini')
@@ -264,16 +284,16 @@ def show(all, s):
     """ Show available systems in db """
 
     if all:
-        sap_data = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
-                                 Sap.password).all()
+        # Подсоединяемся к базе данных и запрашиваем данные
+        db = Database()
+        sap_data = db.query()
         for system in sap_data:
             print(system)
         input('нажмите Enter ...')
     elif s:
-        query = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
-                              Sap.password)
-        query = query.filter_by(system_id=s)
-        sap_data = query.all()
+        # Подсоединяемся к базе данных и запрашиваем данные
+        db = Database()
+        sap_data = db.query(s)
         for system in sap_data:
             print(system)
         input('нажмите Enter ...')
