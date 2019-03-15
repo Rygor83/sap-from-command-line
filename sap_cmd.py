@@ -66,7 +66,7 @@ def cli():
 def logon():
 	''' Starting SAPLogon '''
 
-	click.launch('zzz')
+	click.launch(cfg.config['APPLICATION']['sap'])
 
 
 @cli.command('run')
