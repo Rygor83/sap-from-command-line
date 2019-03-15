@@ -1,24 +1,15 @@
-import click
+import configparser
 import os
 import subprocess
 import sys
-import sqlalchemy
-from sqlalchemy import Table, Column, Integer, Numeric, String
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
-from sqlalchemy import DateTime
-from sqlalchemy import PrimaryKeyConstraint, UniqueConstraint, CheckConstraint, ForeignKeyConstraint
-from sqlalchemy import ForeignKey, Boolean
-from sqlalchemy.orm import relationship, backref, sessionmaker
+import click
+from sqlalchemy import Column, String
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-try:
-    import ConfigParser as configparser
-except ImportError:
-    import configparser
-
-engine = create_engine(
-    f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
+# TODO: Нужно сделать класс, с запуском соединения к БД. Вызываться должно только там, где нужно, а не всегда.
+engine = create_engine(f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
 Session = sessionmaker(bind=engine)
 session = Session()
 Base = declarative_base()
@@ -34,24 +25,20 @@ class Sap(Base):
 
 class Config(object):
     def __init__(self):
-        self.config = {}
-        self.config['CONNECTION'] = {}
-        self.config['APPLICATION'] = {}
-        self.config['KEYS'] = {}
+        self.config = {'CONNECTION': {}, 'APPLICATION': {}, 'KEYS': {}}
 
     def get_config(self):
-
-
-        config = configparser.ConfigParser()
 
         if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini"):
             path = os.path.join(
                 os.path.dirname(__file__),
                 f"{os.path.splitext(os.path.basename(__file__))[0]}.ini")
         else:
-            print('ini file does not exist. To create - run command "ini"')
-            input('press Enter')
+            print('ini файла не существует. Для создания запустите команду "ini" ')
+            input('нажмите Enter')
             sys.exit()
+
+        config = configparser.ConfigParser()
 
         read = config.read(path)
         if not read:
@@ -62,20 +49,20 @@ class Config(object):
             self.config['KEYS'] = config['KEYS']
 
 
-cfg = Config()
-cfg.get_config()
-
-
 @click.group()
-# @click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True, help='Version of script')
 def cli():
     """ SAP command line """
 
 
 @cli.command('logon')
 def logon():
-    ''' Starting SAPLogon '''
+    """ Starting SAPLogon """
 
+    # Считываем конфигурационный файл
+    cfg = Config()
+    cfg.get_config()
+
+    # Запускаем saplogon.exe
     click.launch(cfg.config['APPLICATION']['sap'])
 
 
@@ -89,6 +76,10 @@ def logon():
 def run(system, mandant, u='', p='', l='RU', v=''):
     """ Start SAP system """
 
+    # Считываем конфигурационный файл
+    cfg = Config()
+    cfg.get_config()
+
     query = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
                           Sap.password)
     if system:
@@ -101,8 +92,8 @@ def run(system, mandant, u='', p='', l='RU', v=''):
     sap_data = query.all()
     if v:
         print(sap_data[0])
-        exit = input('press Enter to continue or type something to stop: ')
-        if exit:
+        answer = input('press Enter to continue or type something to stop: ')
+        if answer:
             sys.exit()
 
     argument = [cfg.config['APPLICATION']['command_line']]
@@ -113,7 +104,8 @@ def run(system, mandant, u='', p='', l='RU', v=''):
     item = '-client=' + sap_data[0][1].upper()
     argument.append(item)
 
-    item = '-language=' + 'RU'
+    # язык для входа. по умолчанию подставляется RU, если не указано другое.
+    item = '-language=' + l
     argument.append(item)
 
     # можно вводить пользователя самостоятельно отличного от пользователя в БД
@@ -134,10 +126,14 @@ def run(system, mandant, u='', p='', l='RU', v=''):
 
     ret = subprocess.call(argument)
 
+    if ret:
+        print(ret)
+        input('нажмите Enter ...')
+
 
 @cli.command('db')
 def database():
-    ''' Create database '''
+    """ Create database """
 
     # check if db exists
     file_exists = False
@@ -146,15 +142,15 @@ def database():
             file_exists = True
 
     if file_exists:
-        print('Database already exists')
-        input('press Enter')
+        print('База данных уже существует.')
+        input('нажмите Enter ...')
     else:
         db_name = f"{os.path.splitext(os.path.basename(__file__))[0]}.db"
 
-        engine = create_engine(f"sqlite:///{db_name}")
-        Base.metadata.create_all(engine)
-        print('Database', db_name, 'created')
-        input('press Enter')
+        eng = create_engine(f"sqlite:///{db_name}")
+        Base.metadata.create_all(eng)
+        print('База данных', db_name, 'создана.')
+        input('нажмите Enter ...')
 
 
 @cli.command('add')
@@ -166,11 +162,11 @@ def database():
     '-password',
     help='password',
     prompt=True,
-    confirmation_prompt=True
-    # , hide_input=True
+    confirmation_prompt=True,
+    hide_input=True
 )
 def add(system, mandant, user, password):
-    ''' Add SAP system to database '''
+    """ Add SAP system to database """
     print('\nadding system to db')
     print(system, mandant, user, password)
 
@@ -196,7 +192,7 @@ def add(system, mandant, user, password):
     # , hide_input=True
 )
 def update(system, mandant, user, password):
-    ''' Update password for system, mandant and user '''
+    """ Update password for system, mandant and user """
 
     query = session.query(Sap)
     result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
@@ -211,7 +207,7 @@ def update(system, mandant, user, password):
     '-mandant', prompt=True, help='mandant num', type=click.IntRange(1, 999))
 @click.option('-user', prompt=True, help='user id')
 def delete(system, mandant, user):
-    ''' Deleting specific system '''
+    """ Deleting specific system """
 
     query = session.query(Sap)
     result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
@@ -227,7 +223,7 @@ def delete(system, mandant, user):
 
 @cli.command('ini')
 def ini():
-    ''' Create ini file '''
+    """ Create ini file """
 
     file_exists = False
     for fname in os.listdir('.'):
@@ -235,8 +231,8 @@ def ini():
             file_exists = True
 
     if file_exists:
-        print('ini fule already exists')
-        input('press Enter')
+        print('ini файл уже существует.')
+        input('нажмите Enter ...')
     else:
         config = configparser.ConfigParser()
         config['CONNECTION'] = {
@@ -258,20 +254,21 @@ def ini():
             config.write(configfile)
 
         print('Файл sap.ini создан')
-        input('press Enter')
+        input('нажмите Enter ...')
 
 
 @cli.command('show')
 @click.option('-s', required=False)
 @click.option('-all', is_flag=True, required=False)
 def show(all, s):
-    ''' Show available systems in db '''
+    """ Show available systems in db """
 
     if all:
         sap_data = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
                                  Sap.password).all()
         for system in sap_data:
             print(system)
+        input('нажмите Enter ...')
     elif s:
         query = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
                               Sap.password)
@@ -279,6 +276,7 @@ def show(all, s):
         sap_data = query.all()
         for system in sap_data:
             print(system)
+        input('нажмите Enter ...')
 
 
 if __name__ == '__main__':
