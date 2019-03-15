@@ -9,11 +9,15 @@ from sqlalchemy import PrimaryKeyConstraint, UniqueConstraint, CheckConstraint, 
 from sqlalchemy import ForeignKey, Boolean
 from sqlalchemy.orm import relationship, backref, sessionmaker
 from sqlalchemy import create_engine
+try:
+	import ConfigParser as configparser
+except ImportError:
+	import configparser
 
-engine = create_engine('sqlite:///sap_info.db')
+engine = create_engine(
+	f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
 Session = sessionmaker(bind=engine)
 session = Session()
-
 Base = declarative_base()
 
 
@@ -25,10 +29,44 @@ class Sap(Base):
 	password = Column(String(55))
 
 
+class Config(object):
+	def __init__(self):
+		self.config = {}
+		self.config['CONNECTION'] = {}
+		self.config['APPLICATION'] = {}
+		self.config['KEYS'] = {}
+
+	def get_config(self):
+		config = configparser.ConfigParser()
+
+		path = os.path.join(
+			os.path.dirname(__file__),
+			f"{os.path.splitext(os.path.basename(__file__))[0]}.ini")
+
+		read = config.read(path)
+		if not read:
+			print('File with config parameters')
+		else:
+			self.config['CONNECTION'] = config['CONNECTION']
+			self.config['APPLICATION'] = config['APPLICATION']
+			self.config['KEYS'] = config['KEYS']
+
+
+cfg = Config()
+cfg.get_config()
+
+
 @click.group()
 # @click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True, help='Version of script')
 def cli():
 	""" SAP command line """
+
+
+@cli.command('logon')
+def logon():
+	''' Starting SAPLogon '''
+
+	click.launch('zzz')
 
 
 @cli.command('run')
@@ -55,8 +93,7 @@ def run(system, mandant, u='', p='', l='RU', v=''):
 
 
 @cli.command('db')
-@click.argument('db_name', default='sap_info')
-def database(db_name):
+def database():
 	''' Create database '''
 
 	# check if db exists
@@ -67,10 +104,14 @@ def database(db_name):
 
 	if file_exists:
 		print('Database already exists')
+		input('press Enter')
 	else:
-		engine = create_engine(f"sqlite:///{db_name}.db")
+		db_name = f"{os.path.splitext(os.path.basename(__file__))[0]}.db"
+
+		engine = create_engine(f"sqlite:///{db_name}")
 		Base.metadata.create_all(engine)
 		print('Database', db_name, 'created')
+		input('press Enter')
 
 
 @cli.command('add')
@@ -90,7 +131,7 @@ def add(system, mandant, user, password):
 	print('\nadding system to db')
 	print(system, mandant, user, password)
 
-	Base = declarative_base()
+	# Base = declarative_base()
 
 	sap_info = Sap(
 		system_id=system, mandant_num=mandant, user_id=user, password=password)
@@ -134,14 +175,47 @@ def delete(system, mandant, user):
 																							Sap.user_id == user).one()
 	session.delete(result)
 	session.commit()
-	
+
+	del_res = query.first()
+	print('del_res', del_res)
+
 	print('\nSystem', system, '-', mandant, 'deleted succesfully for user', user)
 
 
 @cli.command('ini')
 def ini():
 	''' Create ini file '''
-	print('creating ini file')
+
+	file_exists = False
+	for fname in os.listdir('.'):
+		if fname.endswith('.ini'):
+			file_exists = True
+
+	if file_exists:
+		print('ini fule already exists')
+		input('press Enter')
+	else:
+		config = configparser.ConfigParser()
+		config['CONNECTION'] = {
+			'user': 'user_name',
+			'password': 'password',
+			'database': 'db',
+			'host': 'host',
+			'port': 'port',
+			'charset': 'ch'
+		}
+
+		config['APPLICATION'] = {'command_line': 'cmd', 'sap': 'sap'}
+
+		config['KEYS'] = {'public_key': 'pbk', 'privat_key': 'pvk'}
+
+		print(os.path.basename(__file__))
+		with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini",
+												'w') as configfile:
+			config.write(configfile)
+
+		print('Файл sap.ini создан')
+		input('press Enter')
 
 
 @cli.command('show')
@@ -149,18 +223,19 @@ def ini():
 @click.option('-all', is_flag=True, required=False)
 def show(all, s):
 	''' Show available systems in db '''
+
 	if all:
 		sap_data = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
 																											Sap.password).all()
-		for item in sap_data:
-			print(item)
+		for system in sap_data:
+			print(system)
 	elif s:
 		query = session.query(Sap.system_id, Sap.mandant_num, Sap.user_id,
 																								Sap.password)
 		query = query.filter_by(system_id=s)
 		sap_data = query.all()
-		for item in sap_data:
-			print(item)
+		for system in sap_data:
+			print(system)
 
 
 if __name__ == '__main__':
