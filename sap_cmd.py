@@ -183,8 +183,6 @@ def logon():
 def run(system, mandant, u='', p='', l='RU', v='', t=''):
     """ Start SAP system """
 
-    # TODO: Добавить возможность выбора мандантов, если была указана только система
-
     # Считываем конфигурационный файл
     cfg = Config()
     cfg.get_config()
@@ -193,8 +191,28 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
     db = Database()
     sap_data = db.query(system, mandant, u)
 
+    if len(sap_data) >= 2:
+        i = 0
+        message = ''
+        for item in sap_data:
+            i += 1
+            message += f"{str(i)}. {item[0]}-{item[1]}: {item[2]} \n"
+        print('Выбраны следующие пользователи: ')
+        print(message)
+        print(f"Выберите пользователя под которым хотим войти в систему.")
+        ans = input(f"Допустимый ввод - индекс от 1 до {str(len(sap_data))}: ")
+        while not ans.isdigit() or int(ans) > len(sap_data) or int(ans) < 1:
+            print(f"\nВозможно вводить значения только от 1 до {str(len(sap_data))}.")
+            ans = input(f"Выберите пользователя под которым хотим войти в систему: ")
+        ans = int(ans) - 1
+    else:
+        ans = 0
+
     if v:
-        print(sap_data[0])
+        print('Система:\t', sap_data[ans][0])
+        print('Мандант:\t', sap_data[ans][1])
+        print('Пользователь:\t', sap_data[ans][2])
+        print('Пароль:\t', Crypto.decrypto(sap_data[ans][3]))
         answer = input('press Enter to continue or type something to stop: ')
         if answer:
             sys.exit()
@@ -203,11 +221,11 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
     argument = [cfg.config['APPLICATION']['command_line']]
 
     # Добавляем номер системы
-    item = '-system=' + sap_data[0][0].upper()
+    item = '-system=' + sap_data[ans][0].upper()
     argument.append(item)
 
     # Добавляем номер манданта
-    item = '-client=' + sap_data[0][1].upper()
+    item = '-client=' + sap_data[ans][1].upper()
     argument.append(item)
 
     # Добавляем язык для входа. по умолчанию подставляется RU, если не указано другое.
@@ -220,7 +238,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         item = '-user=' + u
         argument.append(item)
     else:
-        item = '-user=' + sap_data[0][2].upper()
+        item = '-user=' + sap_data[ans][2].upper()
         argument.append(item)
 
     # Добавляем пароль
@@ -229,7 +247,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         item = '-pw=' + p
         argument.append(item)
     else:
-        item = '-pw=' + Crypto.decrypto(sap_data[0][3])
+        item = '-pw=' + Crypto.decrypto(sap_data[ans][3])
         argument.append(item)
 
     # Добавляем код транзакции
