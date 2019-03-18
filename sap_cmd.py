@@ -3,10 +3,15 @@ import os
 import subprocess
 import sys
 import click
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 
 Base = declarative_base()
 
@@ -16,7 +21,7 @@ class Sap(Base):
     system_id = Column(String(3), primary_key=True)
     mandant_num = Column(String(3), primary_key=True)
     user_id = Column(String(10), primary_key=True)
-    password = Column(String(55))
+    password = Column(BLOB)
 
 
 class Database(object):
@@ -71,10 +76,9 @@ class Config(object):
 
     def get_config(self):
 
-        if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini"):
-            path = os.path.join(
-                os.path.dirname(__file__),
-                f"{os.path.splitext(os.path.basename(__file__))[0]}.ini")
+        ini_file = f"{os.path.splitext(os.path.basename(__file__))[0]}.ini"
+        if os.path.isfile(ini_file) and os.stat(ini_file).st_size != 0:
+            path = os.path.join(os.path.dirname(__file__), ini_file)
         else:
             print('ini файла не существует. Для создания запустите команду "ini" ')
             input('нажмите Enter')
@@ -89,6 +93,66 @@ class Config(object):
             self.config['CONNECTION'] = config['CONNECTION']
             self.config['APPLICATION'] = config['APPLICATION']
             self.config['KEYS'] = config['KEYS']
+
+
+class Crypto(object):
+    @staticmethod
+    def generate_keys():
+        if not os.path.isfile(f"{os.path.dirname(__file__)}\public_key.txt"):
+            private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+            pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption())
+            for item in pem.splitlines():
+                print(item)
+            with open("private_key.txt", "w") as file:
+                for item in pem.splitlines():
+                    file.write(item.decode() + '\n')
+
+            public_key = private_key.public_key()
+            pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
+                                          format=serialization.PublicFormat.SubjectPublicKeyInfo)
+            for item in pem.splitlines():
+                print(item)
+            with open("public_key.txt", "w") as file:
+                for item in pem.splitlines():
+                    file.write(item.decode() + '\n')
+            print("Ключи шифрования созданы.")
+            input("нажмите Enter")
+        else:
+            print("Ключи шифрования уже созданы")
+            input("нажмите Enter ...")
+
+    @staticmethod
+    def encrypto(password):
+        cfg = Config()
+        cfg.get_config()
+        with open(cfg.config['KEYS']['public_key'], "rb") as key_file:
+            public_key = serialization.load_pem_public_key(key_file.read(), backend=default_backend())
+
+        encrypted_data = public_key.encrypt(
+            password,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return encrypted_data
+
+    @staticmethod
+    def decrypto(encrypted_password):
+        cfg = Config()
+        cfg.get_config()
+        with open(cfg.config['KEYS']['private_key'], "rb") as key_file:
+            private_key = serialization.load_pem_private_key(key_file.read(), password=None, backend=default_backend())
+
+        decrypted_data = private_key.decrypt(encrypted_password,
+                                             padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                                          algorithm=hashes.SHA256(),
+                                                          label=None)).decode()
+        return decrypted_data
 
 
 @click.group()
@@ -115,8 +179,11 @@ def logon():
 @click.option('-p', help='password')
 @click.option('-l', help='language', default='RU')
 @click.option('-v', help='verbose', is_flag=True)
-def run(system, mandant, u='', p='', l='RU', v=''):
+@click.option('-t', help='transaction code')
+def run(system, mandant, u='', p='', l='RU', v='', t=''):
     """ Start SAP system """
+
+    # TODO: Добавить возможность выбора мандантов, если была указана только система
 
     # Считываем конфигурационный файл
     cfg = Config()
@@ -132,18 +199,22 @@ def run(system, mandant, u='', p='', l='RU', v=''):
         if answer:
             sys.exit()
 
+    # Добавляем путь к командному файлу
     argument = [cfg.config['APPLICATION']['command_line']]
 
+    # Добавляем номер системы
     item = '-system=' + sap_data[0][0].upper()
     argument.append(item)
 
+    # Добавляем номер манданта
     item = '-client=' + sap_data[0][1].upper()
     argument.append(item)
 
-    # язык для входа. по умолчанию подставляется RU, если не указано другое.
+    # Добавляем язык для входа. по умолчанию подставляется RU, если не указано другое.
     item = '-language=' + l
     argument.append(item)
 
+    # Добавляем пользователя.
     # можно вводить пользователя самостоятельно отличного от пользователя в БД
     if u:
         item = '-user=' + u
@@ -152,14 +223,23 @@ def run(system, mandant, u='', p='', l='RU', v=''):
         item = '-user=' + sap_data[0][2].upper()
         argument.append(item)
 
+    # Добавляем пароль
     # можно вводить пароль самостоятельно отличный от пароля в БД
     if p:
         item = '-pw=' + p
         argument.append(item)
     else:
-        item = '-pw=' + sap_data[0][3]
+        item = '-pw=' + Crypto.decrypto(sap_data[0][3])
         argument.append(item)
 
+    # Добавляем код транзакции
+    if t:
+        item = '-command=' + t
+        argument.append(item)
+        item = '-type=transaction'
+        argument.append(item)
+
+    # Запускаем SAP
     ret = subprocess.call(argument)
 
     if ret:
@@ -207,7 +287,7 @@ def add(system, mandant, user, password):
     print(system, mandant, user, password)
 
     db = Database()
-    db.add(system, mandant, user, password)
+    db.add(system, mandant, user, Crypto.encrypto(str.encode(password)))
 
 
 @cli.command('update')
@@ -226,7 +306,7 @@ def update(system, mandant, user, password):
     """ Update password for system, mandant and user """
 
     db = Database()
-    db.update(system, mandant, user, password)
+    db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
 
 
 @cli.command('delete')
@@ -266,7 +346,7 @@ def ini():
 
         config['APPLICATION'] = {'command_line': 'cmd', 'sap': 'sap'}
 
-        config['KEYS'] = {'public_key': 'pbk', 'privat_key': 'pvk'}
+        config['KEYS'] = {'public_key': 'pbk', 'private_key': 'pvk'}
 
         print(os.path.basename(__file__))
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini",
@@ -278,25 +358,36 @@ def ini():
 
 
 @cli.command('show')
-@click.option('-s', required=False)
-@click.option('-all', is_flag=True, required=False)
-def show(all, s):
+@click.option('-s', required=False, help='Показать выбранную систему')
+@click.option('-all', is_flag=True, required=False, help='показать все системы')
+@click.option('-v', help='показать пароль', is_flag=True)
+def show(all, s, v):
     """ Show available systems in db """
 
     if all:
-        # Подсоединяемся к базе данных и запрашиваем данные
+        # Подсоединяемся к базе данных и запрашиваем данные по всем системам
         db = Database()
         sap_data = db.query()
-        for system in sap_data:
-            print(system)
-        input('нажмите Enter ...')
     elif s:
-        # Подсоединяемся к базе данных и запрашиваем данные
+        # Подсоединяемся к базе данных и запрашиваем данные по выбранной системе
         db = Database()
         sap_data = db.query(s)
-        for system in sap_data:
-            print(system)
-        input('нажмите Enter ...')
+
+    for system in sap_data:
+        print('Система:\t', system[0])
+        print('Мандант:\t', system[1])
+        print('Пользователь:\t', system[2])
+        if v:
+            print('Пароль:\t', Crypto.decrypto(system[3]))
+        print('\n')
+    input('нажмите Enter ...')
+
+
+@cli.command('key')
+def key():
+    """ Создание ключей шифрования """
+
+    Crypto().generate_keys()
 
 
 if __name__ == '__main__':
