@@ -29,8 +29,8 @@ class Database(object):
 
         if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}.db"):
             engine = create_engine(f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
-            Session = sessionmaker(bind=engine)
-            self.session = Session()
+            session = sessionmaker(bind=engine)
+            self.session = session()
         else:
             print('Базы данных не существует. Для создания запустите команду "db" ')
             input('нажмите Enter')
@@ -46,7 +46,17 @@ class Database(object):
         if user:
             query = query.filter_by(user_id=user)
 
-        return query.all()
+        result = query.all()
+
+        if result:
+            return result
+        else:
+            print('По указанным данным найти ничего не получилось')
+            print('Система:\t', system)
+            print('Мандант:\t', mandant)
+            print('Пользователь:\t', user)
+            input('нажмите Enter ...')
+            sys.exit()
 
     def add(self, system, mandant, user, password):
         sap_info = Sap(
@@ -301,11 +311,20 @@ def database():
 )
 def add(system, mandant, user, password):
     """ Add SAP system to database """
-    print('\nadding system to db')
-    print(system, mandant, user, password)
 
     db = Database()
     db.add(system, mandant, user, Crypto.encrypto(str.encode(password)))
+
+    result = db.query(system, mandant, user)
+
+    for item in result:
+        print('Добавлена следующая система:')
+        print('Система:\t', item[0])
+        print('Мандант:\t', item[1])
+        print('Пользователь:\t', item[2])
+        input('нажмите Enter ...')
+    else:
+        print('Что-то пошло не так ...')
 
 
 @cli.command('update')
@@ -325,6 +344,8 @@ def update(system, mandant, user, password):
 
     db = Database()
     db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
+    print('Пароль обновлен')
+    input('нажмите Enter ...')
 
 
 @cli.command('delete')
@@ -337,6 +358,15 @@ def delete(system, mandant, user):
 
     db = Database()
     db.delete(system, mandant, user)
+
+    result = db.query(system, mandant, user)
+
+    if not result:
+        print('\nУдалена следующая система:')
+        print('Система:\t', system)
+        print('Мандант:\t', mandant)
+        print('Пользователь:\t', user)
+        input('нажмите Enter ...')
 
 
 @cli.command('ini')
@@ -382,6 +412,7 @@ def ini():
 def show(all, s, v):
     """ Show available systems in db """
 
+    sap_data = []
     if all:
         # Подсоединяемся к базе данных и запрашиваем данные по всем системам
         db = Database()
@@ -392,12 +423,9 @@ def show(all, s, v):
         sap_data = db.query(s)
 
     for system in sap_data:
-        print('Система:\t', system[0])
-        print('Мандант:\t', system[1])
-        print('Пользователь:\t', system[2])
-        if v:
-            print('Пароль:\t', Crypto.decrypto(system[3]))
-        print('\n')
+        print('Система: ', str(system[0]).upper(), '\tМандант: ', str(system[1]).upper(),
+              '\tПользователь: ', str(system[2]).upper(),
+              '\tПароль: ' if v else '', Crypto.decrypto(system[3]) if v else '')
     input('нажмите Enter ...')
 
 
@@ -406,6 +434,10 @@ def key():
     """ Создание ключей шифрования """
 
     Crypto().generate_keys()
+    print('Ключи шифрования созданы: public_key.txt и private_key.txt')
+    print('Необходимо указать их расположение в файле *.ini')
+    print('Файл private_key.txt должен находиться в зашифрованном хранилище')
+    input('нажмите Enter ...')
 
 
 if __name__ == '__main__':
