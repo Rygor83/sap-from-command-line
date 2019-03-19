@@ -8,6 +8,7 @@ setup(
 	install_requires=[
 		'click',
 		'sqlalchemy',
+		'cryptography',
 	],
 	entry_points='''
 		[console_scripts]
