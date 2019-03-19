@@ -90,15 +90,17 @@ class Config(object):
         if os.path.isfile(ini_file) and os.stat(ini_file).st_size != 0:
             path = os.path.join(os.path.dirname(__file__), ini_file)
         else:
-            print('ini файла не существует. Для создания запустите команду "ini" ')
-            input('нажмите Enter')
+            print('Не удалось получить нужные параметры т.к. ini файла не существует.')
+            print('Для создания запустите команду "ini" и укажите в созданном файле все требуетмые параметры')
+            input('нажмите Enter ...')
             sys.exit()
 
         config = configparser.ConfigParser()
 
         read = config.read(path)
         if not read:
-            print('File with config parameters')
+            print('Не удалось прочитать ini файл')
+            input('нажмите Enter ...')
         else:
             self.config['CONNECTION'] = config['CONNECTION']
             self.config['APPLICATION'] = config['APPLICATION']
@@ -138,7 +140,14 @@ class Crypto(object):
     def encrypto(password):
         cfg = Config()
         cfg.get_config()
-        with open(cfg.config['KEYS']['public_key'], "rb") as key_file:
+
+        public_key_file = cfg.config['KEYS']['public_key']
+        if not public_key_file.endswith('.txt'):
+            print('в ini файле не найден путь к публичному ключу шифрования')
+            input('нажмите Enter ...')
+            sys.exit()
+
+        with open(public_key_file, "rb") as key_file:
             public_key = serialization.load_pem_public_key(key_file.read(), backend=default_backend())
 
         encrypted_data = public_key.encrypt(
@@ -155,7 +164,14 @@ class Crypto(object):
     def decrypto(encrypted_password):
         cfg = Config()
         cfg.get_config()
-        with open(cfg.config['KEYS']['private_key'], "rb") as key_file:
+
+        private_key_file = cfg.config['KEYS']['private_key']
+        if not private_key_file.endswith('.txt'):
+            print('в ini файле не найден путь к приватному ключу шифрования')
+            input('нажмите Enter ...')
+            sys.exit()
+
+        with open(private_key_file, "rb") as key_file:
             private_key = serialization.load_pem_private_key(key_file.read(), password=None, backend=default_backend())
 
         decrypted_data = private_key.decrypt(encrypted_password,
@@ -167,35 +183,50 @@ class Crypto(object):
 
 @click.group()
 def cli():
-    """ SAP command line """
+    """ Скрипт для запуска SAP систем из командной строки """
 
 
 @cli.command('logon')
 def logon():
-    """ Starting SAPLogon """
+    """ Запуск SAPLogon """
 
     # Считываем конфигурационный файл
     cfg = Config()
     cfg.get_config()
 
     # Запускаем saplogon.exe
-    click.launch(cfg.config['APPLICATION']['sap'])
+    saplogon_exe_path = cfg.config['APPLICATION']['sap']
+    if not saplogon_exe_path.endswith('.exe'):
+        print('\nв ini файле не найден путь к saplogon.exe')
+        input('нажмите Enter ...')
+        sys.exit()
+
+    click.launch(saplogon_exe_path)
 
 
 @cli.command('run')
 @click.argument('system')
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', help='user id')
-@click.option('-p', help='password')
-@click.option('-l', help='language', default='RU')
-@click.option('-v', help='verbose', is_flag=True)
-@click.option('-t', help='transaction code')
+@click.option('-u', help='пользователь')
+@click.option('-p', help='пароль')
+@click.option('-l', help='язык входа', default='RU')
+@click.option('-v', help='показать параметры запуска', is_flag=True)
+@click.option('-t', help='код транзакции')
 def run(system, mandant, u='', p='', l='RU', v='', t=''):
-    """ Start SAP system """
+    """ Запуск указанной SAP системы \n
+        Обязательные параметры: \n
+        1. система
+        2. мандант (не обязательно) """
 
     # Считываем конфигурационный файл
     cfg = Config()
     cfg.get_config()
+
+    sapshcut_exe_path = cfg.config['APPLICATION']['command_line']
+    if not sapshcut_exe_path.endswith('.exe'):
+        print('\nв ini файле не найден путь к sapshcut.exe')
+        input('нажмите Enter ...')
+        sys.exit()
 
     # Подсоединяемся к базе данных и запрашиваем данные
     db = Database()
@@ -228,7 +259,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
             sys.exit()
 
     # Добавляем путь к командному файлу
-    argument = [cfg.config['APPLICATION']['command_line']]
+    argument = [sapshcut_exe_path]
 
     # Добавляем номер системы
     item = '-system=' + sap_data[ans][0].upper()
@@ -277,7 +308,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
 
 @cli.command('db')
 def database():
-    """ Create database """
+    """ Создание базы данных для хранеия информкции о SAP системах """
 
     # check if db exists
     file_exists = False
@@ -298,19 +329,19 @@ def database():
 
 
 @cli.command('add')
-@click.option('-system', prompt=True, help='system id')
+@click.option('-system', prompt=True, help='система')
 @click.option(
-    '-mandant', prompt=True, help='mandant num', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='user id')
+    '-mandant', prompt=True, help='мандант', type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help='пользователь')
 @click.option(
     '-password',
-    help='password',
+    help='пароль',
     prompt=True,
     confirmation_prompt=True,
     hide_input=True
 )
 def add(system, mandant, user, password):
-    """ Add SAP system to database """
+    """ Добавление SAP систем в базу данных """
 
     db = Database()
     db.add(system, mandant, user, Crypto.encrypto(str.encode(password)))
@@ -318,7 +349,7 @@ def add(system, mandant, user, password):
     result = db.query(system, mandant, user)
 
     for item in result:
-        print('Добавлена следующая система:')
+        print('\nДобавлена следующая система:')
         print('Система:\t', item[0])
         print('Мандант:\t', item[1])
         print('Пользователь:\t', item[2])
@@ -328,33 +359,33 @@ def add(system, mandant, user, password):
 
 
 @cli.command('update')
-@click.option('-system', prompt=True, help='system id')
+@click.option('-system', prompt=True, help='система')
 @click.option(
-    '-mandant', prompt=True, help='mandant num', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='user id')
+    '-mandant', prompt=True, help='мандант', type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help='пользователь')
 @click.option(
     '-password',
-    help='password',
+    help='пароль',
     prompt=True,
     confirmation_prompt=True,
     hide_input=True
 )
 def update(system, mandant, user, password):
-    """ Update password for system, mandant and user """
+    """ Обновление пароля для SAP системы """
 
     db = Database()
     db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
-    print('Пароль обновлен')
+    print('\nПароль обновлен')
     input('нажмите Enter ...')
 
 
 @cli.command('delete')
-@click.option('-system', prompt=True, help='system id')
+@click.option('-system', prompt=True, help='система')
 @click.option(
-    '-mandant', prompt=True, help='mandant num', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='user id')
+    '-mandant', prompt=True, help='мандант', type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help='пользователь')
 def delete(system, mandant, user):
-    """ Deleting specific system """
+    """ Удаление указанной SAP системы из базы данных """
 
     db = Database()
     db.delete(system, mandant, user)
@@ -371,7 +402,7 @@ def delete(system, mandant, user):
 
 @cli.command('ini')
 def ini():
-    """ Create ini file """
+    """ Создание конфигурационного ini файла """
 
     file_exists = False
     for fname in os.listdir('.'):
@@ -379,7 +410,7 @@ def ini():
             file_exists = True
 
     if file_exists:
-        print('ini файл уже существует.')
+        print('\nini файл уже существует.')
         input('нажмите Enter ...')
     else:
         config = configparser.ConfigParser()
@@ -392,25 +423,28 @@ def ini():
             'charset': 'ch'
         }
 
-        config['APPLICATION'] = {'command_line': 'cmd', 'sap': 'sap'}
+        config['APPLICATION'] = {'command_line': 'путь до файла sapshcut.exe',
+                                 'sap': 'путь до файла saplogon.exe'}
 
-        config['KEYS'] = {'public_key': 'pbk', 'private_key': 'pvk'}
+        config['KEYS'] = {'public_key': 'путь до публичного ключа',
+                          'private_key': 'путь до приватного ключа. ключ хранить в защищенном хранилище'}
 
         print(os.path.basename(__file__))
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini",
                   'w') as configfile:
             config.write(configfile)
 
-        print('Файл sap.ini создан')
+        print('\nФайл sap.ini создан')
+        print('!!! Заполните все требуемые параметры в файле !!!')
         input('нажмите Enter ...')
 
 
 @cli.command('show')
-@click.option('-s', required=False, help='Показать выбранную систему')
+@click.option('-s', required=False, help='показать выбранную систему')
 @click.option('-all', is_flag=True, required=False, help='показать все системы')
-@click.option('-v', help='показать пароль', is_flag=True)
+@click.option('-v', help='показать пароли', is_flag=True)
 def show(all, s, v):
-    """ Show available systems in db """
+    """ Информация о SAP системах находящихся в базе данных """
 
     sap_data = []
     if all:
@@ -426,7 +460,7 @@ def show(all, s, v):
         print('Система: ', str(system[0]).upper(), '\tМандант: ', str(system[1]).upper(),
               '\tПользователь: ', str(system[2]).upper(),
               '\tПароль: ' if v else '', Crypto.decrypto(system[3]) if v else '')
-    input('нажмите Enter ...')
+    input('\nнажмите Enter ...')
 
 
 @cli.command('key')
@@ -434,7 +468,7 @@ def key():
     """ Создание ключей шифрования """
 
     Crypto().generate_keys()
-    print('Ключи шифрования созданы: public_key.txt и private_key.txt')
+    print('\nКлючи шифрования созданы: public_key.txt и private_key.txt')
     print('Необходимо указать их расположение в файле *.ini')
     print('Файл private_key.txt должен находиться в зашифрованном хранилище')
     input('нажмите Enter ...')
