@@ -2,6 +2,7 @@ import configparser
 import os
 import subprocess
 import sys
+import gettext
 import click
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
@@ -52,9 +53,9 @@ class Database(object):
             return result
         else:
             print(_('По указанным данным найти ничего не получилось'))
-            print(_('Система:\t', system))
-            print(_('Мандант:\t', mandant))
-            print(_('Пользователь:\t', user))
+            print(_('Система:'), '\t', system)
+            print(_('Мандант:'), '\t', mandant)
+            print(_('Пользователь:'), '\t', user)
             input(_('нажмите Enter ...'))
             sys.exit()
 
@@ -82,7 +83,7 @@ class Database(object):
 
 class Config(object):
     def __init__(self):
-        self.config = {'CONNECTION': {}, 'APPLICATION': {}, 'KEYS': {}}
+        self.config = {'CONNECTION': {}, 'APPLICATION': {}, 'KEYS': {}, 'LANGUAGE': {}}
 
     def get_config(self):
 
@@ -105,8 +106,10 @@ class Config(object):
             self.config['CONNECTION'] = config['CONNECTION']
             self.config['APPLICATION'] = config['APPLICATION']
             self.config['KEYS'] = config['KEYS']
+            self.config['LANGUAGE'] = config['LANGUAGE']
 
 
+# noinspection PyShadowingNames
 class Crypto(object):
     @staticmethod
     def generate_keys():
@@ -117,7 +120,7 @@ class Crypto(object):
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption())
             for item in pem.splitlines():
-                print(_(item))
+                print(item)
             with open("private_key.txt", "w") as file:
                 for item in pem.splitlines():
                     file.write(item.decode() + '\n')
@@ -126,12 +129,12 @@ class Crypto(object):
             pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
                                           format=serialization.PublicFormat.SubjectPublicKeyInfo)
             for item in pem.splitlines():
-                print(_(item))
+                print(item)
             with open("public_key.txt", "w") as file:
                 for item in pem.splitlines():
                     file.write(item.decode() + '\n')
             print(_("Ключи шифрования созданы."))
-            input(_("нажмите Enter"))
+            input(_("нажмите Enter ..."))
         else:
             print(_("Ключи шифрования уже созданы"))
             input(_("нажмите Enter ..."))
@@ -181,6 +184,13 @@ class Crypto(object):
         return decrypted_data
 
 
+cfg = Config()
+cfg.get_config()
+lang = cfg.config['LANGUAGE']['language']
+lng = gettext.translation('sap_cmd', localedir='locale', languages=[lang], fallback=True)
+lng.install()
+
+
 @click.group()
 def cli():
     _(""" Скрипт для запуска SAP систем из командной строки """)
@@ -197,7 +207,7 @@ def logon():
     # Запускаем saplogon.exe
     saplogon_exe_path = cfg.config['APPLICATION']['sap']
     if not saplogon_exe_path.endswith('.exe'):
-        print(_('\nв ini файле не найден путь к saplogon.exe'))
+        print('\n', _('в ini файле не найден путь к saplogon.exe'))
         input(_('нажмите Enter ...'))
         sys.exit()
 
@@ -214,9 +224,7 @@ def logon():
 @click.option('-t', help='_(код транзакции)')
 def run(system, mandant, u='', p='', l='RU', v='', t=''):
     _(""" Запуск указанной SAP системы \n
-        Обязательные параметры: \n
-        1. система
-        2. мандант (не обязательно) """)
+        Обязательные параметры: 1. система, 2. мандант (не обязательно) """)
 
     # Считываем конфигурационный файл
     cfg = Config()
@@ -224,7 +232,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
 
     sapshcut_exe_path = cfg.config['APPLICATION']['command_line']
     if not sapshcut_exe_path.endswith('.exe'):
-        print(_('\nв ini файле не найден путь к sapshcut.exe'))
+        print('\n', _('в ini файле не найден путь к sapshcut.exe'))
         input(_('нажмите Enter ...'))
         sys.exit()
 
@@ -242,7 +250,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
             message += f"{str(i)}. {item[0]}-{item[1]}: {item[2]} \n"
         print(_('Выбраны следующие пользователи: '))
         print(message)
-        print(_(f"Выберите пользователя под которым хотим войти в систему."))
+        print(_('Выберите пользователя под которым хотим войти в систему.'))
         print(_('Допустимый ввод - индекс от 1 до'), str(len(sap_data)), ': "')
         ans = input(': ')
         while not ans.isdigit() or int(ans) > len(sap_data) or int(ans) < 1:
@@ -253,11 +261,11 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         ans = 0
 
     if v:
-        print(_('Система:\t'), sap_data[ans][0])
-        print(_('Мандант:\t'), sap_data[ans][1])
-        print(_('Пользователь:\t'), sap_data[ans][2])
-        print(_('Пароль:\t'), Crypto.decrypto(sap_data[ans][3]))
-        answer = input(_('press Enter to continue or type something to stop: '))
+        print(_('Система:'), '\t', sap_data[ans][0])
+        print(_('Мандант:'), '\t', sap_data[ans][1])
+        print(_('Пользователь:'), '\t', sap_data[ans][2])
+        print(_('Пароль:'), '\t', Crypto.decrypto(sap_data[ans][3]))
+        answer = input(_('нажмите Enter или любой текст для выхода: '))
         if answer:
             sys.exit()
 
@@ -327,7 +335,7 @@ def database():
 
         eng = create_engine(f"sqlite:///{db_name}")
         Base.metadata.create_all(eng)
-        print(_('База данных'), db_name, _('создана.'))
+        print(_('База данных создана: '), db_name)
         input(_('нажмите Enter ...'))
 
 
@@ -344,7 +352,7 @@ def database():
     hide_input=True
 )
 def add(system, mandant, user, password):
-    """ Добавление SAP систем в базу данных """
+    _(""" Добавление SAP систем в базу данных """)
 
     db = Database()
     db.add(system, mandant, user, Crypto.encrypto(str.encode(password)))
@@ -352,10 +360,10 @@ def add(system, mandant, user, password):
     result = db.query(system, mandant, user)
 
     for item in result:
-        print(_('\nДобавлена следующая система:'))
-        print(_('Система:\t'), item[0])
-        print(_('Мандант:\t'), item[1])
-        print(_('Пользователь:\t'), item[2])
+        print('\n', _('Добавлена следующая система:'))
+        print(_('Система:'), '\t', item[0])
+        print(_('Мандант:'), '\t', item[1])
+        print(_('Пользователь:'), '\t', item[2])
         input(_('нажмите Enter ...'))
     else:
         print(_('Что-то пошло не так ...'))
@@ -378,7 +386,7 @@ def update(system, mandant, user, password):
 
     db = Database()
     db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
-    print(_('\nПароль обновлен'))
+    print('\n', _('Пароль обновлен'))
     input(_('нажмите Enter ...'))
 
 
@@ -396,10 +404,10 @@ def delete(system, mandant, user):
     result = db.query(system, mandant, user)
 
     if not result:
-        print(_('\nУдалена следующая система:'))
-        print(_('Система:\t', system))
-        print(_('Мандант:\t', mandant))
-        print(_('Пользователь:\t', user))
+        print('\n', _('Удалена следующая система:'))
+        print(_('Система:'), '\t', system)
+        print(_('Мандант:'), '\t', mandant)
+        print(_('Пользователь:'), '\t', user)
         input(_('нажмите Enter ...'))
 
 
@@ -413,7 +421,7 @@ def ini():
             file_exists = True
 
     if file_exists:
-        print(_('\nini файл уже существует.'))
+        print('\n', _('ini файл уже существует.'))
         input(_('нажмите Enter ...'))
     else:
         config = configparser.ConfigParser()
@@ -429,14 +437,16 @@ def ini():
         config['APPLICATION'] = {'command_line': _('путь до файла sapshcut.exe'),
                                  'sap': _('путь до файла saplogon.exe')}
 
-        config['KEYS'] = {'public_key': 'путь до публичного ключа',
-                          'private_key': 'путь до приватного ключа. ключ хранить в защищенном хранилище'}
+        config['KEYS'] = {'public_key': _('путь до публичного ключа'),
+                          'private_key': _('путь до приватного ключа. ключ хранить в защищенном хранилище')}
+
+        config['LANGUAGE'] = {'language': _('язык интерфейса: или RU (русский), или EN (английский язык)')}
 
         print(os.path.basename(__file__))
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini", 'w') as configfile:
             config.write(configfile)
 
-        print(_('\nФайл sap.ini создан'))
+        print('\n', _('Файл sap.ini создан'))
         print(_('!!! Заполните все требуемые параметры в файле !!!'))
         input(_('нажмите Enter ...'))
 
@@ -459,10 +469,11 @@ def show(all, s, v):
         sap_data = db.query(s)
 
     for system in sap_data:
-        print(_('Система: '), str(system[0]).upper(), _('\tМандант: '), str(system[1]).upper(),
-              _('\tПользователь: '), str(system[2]).upper(),
-              _('\tПароль: ') if v else '', Crypto.decrypto(system[3]) if v else '')
-    input(_('\nнажмите Enter ...'))
+        print(_('Система: '), str(system[0]).upper(), '\t', _('Мандант: '), str(system[1]).upper(),
+              '\t', _('Пользователь: '), str(system[2]).upper(),
+              '\t', _('Пароль: ') if v else '', Crypto.decrypto(system[3]) if v else '')
+    print('\n')
+    input(_('нажмите Enter ...'))
 
 
 @cli.command('key')
@@ -470,7 +481,7 @@ def key():
     _(""" Создание ключей шифрования """)
 
     Crypto().generate_keys()
-    print(_('\nКлючи шифрования созданы: public_key.txt и private_key.txt'))
+    print('\n', _('Ключи шифрования созданы: public_key.txt и private_key.txt'))
     print(_('Необходимо указать их расположение в файле *.ini'))
     print(_('Файл private_key.txt должен находиться в зашифрованном хранилище'))
     input(_('нажмите Enter ...'))
@@ -478,3 +489,6 @@ def key():
 
 if __name__ == '__main__':
     cli()
+
+# функция перевода через модуль gettext
+_ = lambda s: s
