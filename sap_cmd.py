@@ -8,6 +8,8 @@ from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -25,6 +27,21 @@ class Sap(Base):
     password = Column(BLOB)
 
 
+def log_about_system(message, system, mandant, user, password='', stop=''):
+    print('\n')
+    print(message)
+    print(_('Система:'), '\t', system)
+    print(_('Мандант:'), '\t', mandant)
+    print(_('Пользователь:'), '\t', user)
+    if password:
+        print(_('Пароль:'), '\t', password)
+    print('\n')
+    if stop:
+        return input(_('нажмите Enter или любой текст для выхода: '))
+    else:
+        return input(_('нажмите Enter ...'))
+
+
 class Database(object):
     def __init__(self):
 
@@ -37,7 +54,7 @@ class Database(object):
             input(_('нажмите Enter ...'))
             sys.exit()
 
-    def query(self, system='', mandant='', user=''):
+    def query(self, system='', mandant='', user='', check=''):
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
         if system:
@@ -52,19 +69,19 @@ class Database(object):
         if result:
             return result
         else:
-            print(_('По указанным данным найти ничего не получилось'))
-            print(_('Система:'), '\t', system)
-            print(_('Мандант:'), '\t', mandant)
-            print(_('Пользователь:'), '\t', user)
-            input(_('нажмите Enter ...'))
-            sys.exit()
+            if not check:
+                log_about_system(_('По указанным данным найти ничего не получилось'), system, mandant, user)
+                sys.exit()
 
     def add(self, system, mandant, user, password):
         sap_info = Sap(
             system_id=system, mandant_num=mandant, user_id=user, password=password)
 
         self.session.add(sap_info)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except IntegrityError:
+            log_about_system(_('Данные уже существуют в базе данных:'), system, mandant, user)
 
     def update(self, system, mandant, user, password):
         query = self.session.query(Sap)
@@ -75,8 +92,12 @@ class Database(object):
 
     def delete(self, system, mandant, user):
         query = self.session.query(Sap)
-        result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
-                              Sap.user_id == user).one()
+        try:
+            result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
+                                  Sap.user_id == user).one()
+        except NoResultFound:
+            log_about_system(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
+            sys.exit()
         self.session.delete(result)
         self.session.commit()
 
@@ -138,6 +159,7 @@ class Crypto(object):
         else:
             print(_("Ключи шифрования уже созданы"))
             input(_("нажмите Enter ..."))
+            sys.exit()
 
     @staticmethod
     def encrypto(password):
@@ -193,12 +215,13 @@ lng.install()
 
 @click.group()
 def cli():
-    _(""" Скрипт для запуска SAP систем из командной строки """)
+    """ Скрипт для запуска SAP систем из командной строки """
 
 
+# noinspection PyShadowingNames
 @cli.command('logon')
 def logon():
-    _(""" Запуск SAPLogon """)
+    """ Запуск SAPLogon """
 
     # Считываем конфигурационный файл
     cfg = Config()
@@ -206,33 +229,36 @@ def logon():
 
     # Запускаем saplogon.exe
     saplogon_exe_path = cfg.config['APPLICATION']['sap']
-    if not saplogon_exe_path.endswith('.exe'):
-        print('\n', _('в ini файле не найден путь к saplogon.exe'))
+    if not str(saplogon_exe_path).endswith('saplogon.exe'):
+        print('\n')
+        print(_('в ini файле не найден путь к saplogon.exe'))
         input(_('нажмите Enter ...'))
         sys.exit()
 
     click.launch(saplogon_exe_path)
 
 
+# noinspection PyShadowingNames,PyUnboundLocalVariable
 @cli.command('run')
 @click.argument('system')
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', help='_(пользователь)')
-@click.option('-p', help='_(пароль)')
-@click.option('-l', help='_(язык входа)', default='RU')
-@click.option('-v', help='_(показать параметры запуска)', is_flag=True)
-@click.option('-t', help='_(код транзакции)')
+@click.option('-u', help=_('пользователь'))
+@click.option('-p', help=_('пароль'))
+@click.option('-l', help=_('язык входа'), default='RU')
+@click.option('-v', help=_('показать параметры запуска'), is_flag=True)
+@click.option('-t', help=_('код транзакции'))
 def run(system, mandant, u='', p='', l='RU', v='', t=''):
-    _(""" Запуск указанной SAP системы \n
-        Обязательные параметры: 1. система, 2. мандант (не обязательно) """)
+    """ Запуск указанной SAP системы \n
+        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     # Считываем конфигурационный файл
     cfg = Config()
     cfg.get_config()
 
     sapshcut_exe_path = cfg.config['APPLICATION']['command_line']
-    if not sapshcut_exe_path.endswith('.exe'):
-        print('\n', _('в ini файле не найден путь к sapshcut.exe'))
+    if not sapshcut_exe_path.endswith('sapshcut.exe'):
+        print('\n')
+        print(_('в ini файле не найден путь к sapshcut.exe'))
         input(_('нажмите Enter ...'))
         sys.exit()
 
@@ -261,11 +287,8 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         ans = 0
 
     if v:
-        print(_('Система:'), '\t', sap_data[ans][0])
-        print(_('Мандант:'), '\t', sap_data[ans][1])
-        print(_('Пользователь:'), '\t', sap_data[ans][2])
-        print(_('Пароль:'), '\t', Crypto.decrypto(sap_data[ans][3]))
-        answer = input(_('нажмите Enter или любой текст для выхода: '))
+        answer = log_about_system('', sap_data[ans][0], sap_data[ans][1], sap_data[ans][2],
+                                  Crypto.decrypto(sap_data[ans][3]), 'x')
         if answer:
             sys.exit()
 
@@ -319,7 +342,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
 
 @cli.command('db')
 def database():
-    _(""" Создание базы данных для хранеия информкции о SAP системах """)
+    """ Создание базы данных для хранеия информкции о SAP системах """
 
     # check if db exists
     file_exists = False
@@ -340,80 +363,74 @@ def database():
 
 
 @cli.command('add')
-@click.option('-system', prompt=True, help='_(система)')
+@click.option('-system', prompt=True, help=_('система'))
 @click.option(
-    '-mandant', prompt=True, help='_(мандант)', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='_(пользователь)')
+    '-mandant', prompt=True, help=_('мандант'), type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help=_('пользователь'))
 @click.option(
     '-password',
-    help='_(пароль)',
+    help=_('пароль'),
     prompt=True,
     confirmation_prompt=True,
-    hide_input=True
+    # hide_input=True,
 )
 def add(system, mandant, user, password):
-    _(""" Добавление SAP систем в базу данных """)
+    """ Добавление SAP систем в базу данных """
 
     db = Database()
     db.add(system, mandant, user, Crypto.encrypto(str.encode(password)))
 
     result = db.query(system, mandant, user)
 
-    for item in result:
-        print('\n', _('Добавлена следующая система:'))
-        print(_('Система:'), '\t', item[0])
-        print(_('Мандант:'), '\t', item[1])
-        print(_('Пользователь:'), '\t', item[2])
-        input(_('нажмите Enter ...'))
+    if result:
+        for item in result:
+            log_about_system(_('Добавлена следующая система:'), item[0], item[1], item[2])
     else:
         print(_('Что-то пошло не так ...'))
 
 
 @cli.command('update')
-@click.option('-system', prompt=True, help='_(система)')
+@click.option('-system', prompt=True, help=_('система'))
 @click.option(
-    '-mandant', prompt=True, help='_(мандант)', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='_(пользователь)')
+    '-mandant', prompt=True, help=_('мандант'), type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help=_('пользователь'))
 @click.option(
     '-password',
-    help='_(пароль)',
+    help=_('пароль'),
     prompt=True,
     confirmation_prompt=True,
     hide_input=True
 )
 def update(system, mandant, user, password):
-    _(""" Обновление пароля для SAP системы """)
+    """ Обновление пароля для SAP системы """
 
     db = Database()
     db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
-    print('\n', _('Пароль обновлен'))
+    print('\n')
+    print(_('Пароль обновлен'))
     input(_('нажмите Enter ...'))
 
 
 @cli.command('delete')
-@click.option('-system', prompt=True, help='_(система)')
+@click.option('-system', prompt=True, help=_('система'))
 @click.option(
-    '-mandant', prompt=True, help='_(мандант)', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='_(пользователь)')
+    '-mandant', prompt=True, help=_('мандант'), type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help=_('пользователь'))
 def delete(system, mandant, user):
-    _(""" Удаление указанной SAP системы из базы данных """)
+    """ Удаление указанной SAP системы из базы данных """
 
     db = Database()
     db.delete(system, mandant, user)
 
-    result = db.query(system, mandant, user)
+    result = db.query(system, mandant, user, 'x')
 
     if not result:
-        print('\n', _('Удалена следующая система:'))
-        print(_('Система:'), '\t', system)
-        print(_('Мандант:'), '\t', mandant)
-        print(_('Пользователь:'), '\t', user)
-        input(_('нажмите Enter ...'))
+        log_about_system(_('Удалена следующая система:'), system, mandant, user)
 
 
 @cli.command('ini')
 def ini():
-    _(""" Создание конфигурационного ini файла """)
+    """ Создание конфигурационного ini файла """
 
     file_exists = False
     for fname in os.listdir('.'):
@@ -421,7 +438,8 @@ def ini():
             file_exists = True
 
     if file_exists:
-        print('\n', _('ini файл уже существует.'))
+        print('\n')
+        print(_('ini файл уже существует.'))
         input(_('нажмите Enter ...'))
     else:
         config = configparser.ConfigParser()
@@ -446,17 +464,18 @@ def ini():
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini", 'w') as configfile:
             config.write(configfile)
 
-        print('\n', _('Файл sap.ini создан'))
+        print('\n')
+        print(_('Файл sap.ini создан'))
         print(_('!!! Заполните все требуемые параметры в файле !!!'))
         input(_('нажмите Enter ...'))
 
 
 @cli.command('show')
-@click.option('-s', required=False, help='_(показать выбранную систему)')
-@click.option('-all', is_flag=True, required=False, help='_(показать все системы)')
-@click.option('-v', help='_(показать пароли)', is_flag=True)
+@click.option('-s', required=False, help=_('показать выбранную систему'))
+@click.option('-all', is_flag=True, required=False, help=_('показать все системы'))
+@click.option('-v', help=_('показать пароли'), is_flag=True)
 def show(all, s, v):
-    _(""" Информация о SAP системах находящихся в базе данных """)
+    """ Информация о SAP системах находящихся в базе данных """
 
     sap_data = []
     if all:
@@ -478,10 +497,11 @@ def show(all, s, v):
 
 @cli.command('key')
 def key():
-    _(""" Создание ключей шифрования """)
+    """ Создание ключей шифрования """
 
     Crypto().generate_keys()
-    print('\n', _('Ключи шифрования созданы: public_key.txt и private_key.txt'))
+    print('\n')
+    print(_('Ключи шифрования созданы: public_key.txt и private_key.txt'))
     print(_('Необходимо указать их расположение в файле *.ini'))
     print(_('Файл private_key.txt должен находиться в зашифрованном хранилище'))
     input(_('нажмите Enter ...'))
