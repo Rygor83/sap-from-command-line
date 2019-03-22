@@ -27,12 +27,15 @@ class Sap(Base):
     password = Column(BLOB)
 
 
-def log_about_system(message, system, mandant, user, password='', stop=''):
+def print_log(message, system='', mandant='', user='', password='', stop=''):
     print('\n')
     print(message)
-    print(_('Система:'), '\t', system)
-    print(_('Мандант:'), '\t', mandant)
-    print(_('Пользователь:'), '\t', user)
+    if system:
+        print(_('Система:'), '\t', system)
+    if mandant:
+        print(_('Мандант:'), '\t', mandant)
+    if user:
+        print(_('Пользователь:'), '\t', user)
     if password:
         print(_('Пароль:'), '\t', password)
     print('\n')
@@ -50,8 +53,7 @@ class Database(object):
             session = sessionmaker(bind=engine)
             self.session = session()
         else:
-            print(_('Базы данных не существует. Для создания запустите команду "db" '))
-            input(_('нажмите Enter ...'))
+            print_log(_('Базы данных не существует. Для создания запустите команду "db" '))
             sys.exit()
 
     def query(self, system='', mandant='', user='', check=''):
@@ -70,7 +72,7 @@ class Database(object):
             return result
         else:
             if not check:
-                log_about_system(_('По указанным данным найти ничего не получилось'), system, mandant, user)
+                print_log(_('По указанным данным найти ничего не получилось'), system, mandant, user)
                 sys.exit()
 
     def add(self, system, mandant, user, password):
@@ -81,14 +83,23 @@ class Database(object):
         try:
             self.session.commit()
         except IntegrityError:
-            log_about_system(_('Данные уже существуют в базе данных:'), system, mandant, user)
+            print_log(_('Данные уже существуют в базе данных:'), system, mandant, user)
 
     def update(self, system, mandant, user, password):
         query = self.session.query(Sap)
-        result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
-                              Sap.user_id == user).first()
-        result.password = password
-        self.session.commit()
+        try:
+            result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
+                                  Sap.user_id == user).first()
+        except NoResultFound:
+            print_log(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
+            sys.exit()
+
+        if result:
+            result.password = password
+            self.session.commit()
+        else:
+            print_log(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
+            sys.exit()
 
     def delete(self, system, mandant, user):
         query = self.session.query(Sap)
@@ -96,7 +107,7 @@ class Database(object):
             result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
                                   Sap.user_id == user).one()
         except NoResultFound:
-            log_about_system(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
+            print_log(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
             sys.exit()
         self.session.delete(result)
         self.session.commit()
@@ -112,17 +123,17 @@ class Config(object):
         if os.path.isfile(ini_file) and os.stat(ini_file).st_size != 0:
             path = os.path.join(os.path.dirname(__file__), ini_file)
         else:
-            print(_('Не удалось получить нужные параметры т.к. ini файла не существует.'))
-            print(_('Для создания запустите команду "ini" и укажите в созданном файле все требуетмые параметры'))
-            input(_('нажмите Enter ...'))
+            print_log(_('''
+            Не удалось получить нужные параметры т.к. ini файла не существует. \n
+            Для создания запустите команду "ini" и укажите в созданном файле все требуетмые параметры \n
+            '''))
             sys.exit()
 
         config = configparser.ConfigParser()
 
         read = config.read(path)
         if not read:
-            print(_('Не удалось прочитать ini файл'))
-            input(_('нажмите Enter ...'))
+            print_log(_('Не удалось прочитать ini файл'))
         else:
             self.config['CONNECTION'] = config['CONNECTION']
             self.config['APPLICATION'] = config['APPLICATION']
@@ -154,11 +165,9 @@ class Crypto(object):
             with open("public_key.txt", "w") as file:
                 for item in pem.splitlines():
                     file.write(item.decode() + '\n')
-            print(_("Ключи шифрования созданы."))
-            input(_("нажмите Enter ..."))
+            print_log(_("Ключи шифрования созданы."))
         else:
-            print(_("Ключи шифрования уже созданы"))
-            input(_("нажмите Enter ..."))
+            print_log(_("Ключи шифрования уже созданы"))
             sys.exit()
 
     @staticmethod
@@ -168,8 +177,7 @@ class Crypto(object):
 
         public_key_file = cfg.config['KEYS']['public_key']
         if not public_key_file.endswith('.txt'):
-            print(_('в ini файле не найден путь к публичному ключу шифрования'))
-            input(_('нажмите Enter ...'))
+            print_log(_('в ini файле не найден путь к публичному ключу шифрования'))
             sys.exit()
 
         with open(public_key_file, "rb") as key_file:
@@ -192,8 +200,7 @@ class Crypto(object):
 
         private_key_file = cfg.config['KEYS']['private_key']
         if not private_key_file.endswith('.txt'):
-            print(_('в ini файле не найден путь к приватному ключу шифрования'))
-            input(_('нажмите Enter ...'))
+            print_log(_('в ini файле не найден путь к приватному ключу шифрования'))
             sys.exit()
 
         with open(private_key_file, "rb") as key_file:
@@ -206,10 +213,7 @@ class Crypto(object):
         return decrypted_data
 
 
-cfg = Config()
-cfg.get_config()
-lang = cfg.config['LANGUAGE']['language']
-lng = gettext.translation('sap_cmd', localedir='locale', languages=[lang], fallback=True)
+lng = gettext.translation('sap_cmd', localedir='locale', languages=['ru'], fallback=True)
 lng.install()
 
 
@@ -230,9 +234,7 @@ def logon():
     # Запускаем saplogon.exe
     saplogon_exe_path = cfg.config['APPLICATION']['sap']
     if not str(saplogon_exe_path).endswith('saplogon.exe'):
-        print('\n')
-        print(_('в ini файле не найден путь к saplogon.exe'))
-        input(_('нажмите Enter ...'))
+        print_log(_('в ini файле не найден путь к saplogon.exe'))
         sys.exit()
 
     click.launch(saplogon_exe_path)
@@ -257,9 +259,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
 
     sapshcut_exe_path = cfg.config['APPLICATION']['command_line']
     if not sapshcut_exe_path.endswith('sapshcut.exe'):
-        print('\n')
-        print(_('в ini файле не найден путь к sapshcut.exe'))
-        input(_('нажмите Enter ...'))
+        print_log(_('в ini файле не найден путь к sapshcut.exe'))
         sys.exit()
 
     # Подсоединяемся к базе данных и запрашиваем данные
@@ -287,8 +287,8 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         ans = 0
 
     if v:
-        answer = log_about_system('', sap_data[ans][0], sap_data[ans][1], sap_data[ans][2],
-                                  Crypto.decrypto(sap_data[ans][3]), 'x')
+        answer = print_log('', sap_data[ans][0], sap_data[ans][1], sap_data[ans][2],
+                           Crypto.decrypto(sap_data[ans][3]), 'x')
         if answer:
             sys.exit()
 
@@ -351,15 +351,13 @@ def database():
             file_exists = True
 
     if file_exists:
-        print(_('База данных уже существует.'))
-        input(_('нажмите Enter ...'))
+        print_log(_('База данных уже существует.'))
     else:
         db_name = f"{os.path.splitext(os.path.basename(__file__))[0]}.db"
 
         eng = create_engine(f"sqlite:///{db_name}")
         Base.metadata.create_all(eng)
-        print(_('База данных создана: '), db_name)
-        input(_('нажмите Enter ...'))
+        print_log(_('База данных создана'))
 
 
 @cli.command('add')
@@ -384,9 +382,9 @@ def add(system, mandant, user, password):
 
     if result:
         for item in result:
-            log_about_system(_('Добавлена следующая система:'), item[0], item[1], item[2])
+            print_log(_('Добавлена следующая система:'), item[0], item[1], item[2])
     else:
-        print(_('Что-то пошло не так ...'))
+        print_log(_('Что-то пошло не так ...'))
 
 
 @cli.command('update')
@@ -399,7 +397,7 @@ def add(system, mandant, user, password):
     help=_('пароль'),
     prompt=True,
     confirmation_prompt=True,
-    hide_input=True
+    # hide_input=True
 )
 def update(system, mandant, user, password):
     """ Обновление пароля для SAP системы """
@@ -407,8 +405,7 @@ def update(system, mandant, user, password):
     db = Database()
     db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
     print('\n')
-    print(_('Пароль обновлен'))
-    input(_('нажмите Enter ...'))
+    print_log(_('Пароль обновлен'))
 
 
 @cli.command('delete')
@@ -425,7 +422,7 @@ def delete(system, mandant, user):
     result = db.query(system, mandant, user, 'x')
 
     if not result:
-        log_about_system(_('Удалена следующая система:'), system, mandant, user)
+        print_log(_('Удалена следующая система:'), system, mandant, user)
 
 
 @cli.command('ini')
@@ -438,9 +435,7 @@ def ini():
             file_exists = True
 
     if file_exists:
-        print('\n')
-        print(_('ini файл уже существует.'))
-        input(_('нажмите Enter ...'))
+        print_log(_('ini файл уже существует.'))
     else:
         config = configparser.ConfigParser()
         config['CONNECTION'] = {
@@ -464,10 +459,7 @@ def ini():
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini", 'w') as configfile:
             config.write(configfile)
 
-        print('\n')
-        print(_('Файл sap.ini создан'))
-        print(_('!!! Заполните все требуемые параметры в файле !!!'))
-        input(_('нажмите Enter ...'))
+        print_log(_('ini файл создан. \n !!! Заполните все требуемые параметры в файле !!!'))
 
 
 @cli.command('show')
@@ -501,10 +493,9 @@ def key():
 
     Crypto().generate_keys()
     print('\n')
-    print(_('Ключи шифрования созданы: public_key.txt и private_key.txt'))
-    print(_('Необходимо указать их расположение в файле *.ini'))
-    print(_('Файл private_key.txt должен находиться в зашифрованном хранилище'))
-    input(_('нажмите Enter ...'))
+    print_log(_('''Ключи шифрования созданы: public_key.txt и private_key.txt \n 
+                   Необходимо указать их расположение в файле *.ini \n 
+                   Файл private_key.txt должен находиться в зашифрованном хранилище'''))
 
 
 if __name__ == '__main__':
