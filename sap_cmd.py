@@ -84,15 +84,10 @@ class Database(object):
             self.session.commit()
         except IntegrityError:
             print_log(_('Данные уже существуют в базе данных:'), system, mandant, user)
+            sys.exit()
 
     def update(self, system, mandant, user, password):
-        query = self.session.query(Sap)
-        try:
-            result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
-                                  Sap.user_id == user).first()
-        except NoResultFound:
-            print_log(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
-            sys.exit()
+        result = self.filter(mandant, system, user)
 
         if result:
             result.password = password
@@ -102,6 +97,11 @@ class Database(object):
             sys.exit()
 
     def delete(self, system, mandant, user):
+        result = self.filter(mandant, system, user)
+        self.session.delete(result)
+        self.session.commit()
+
+    def filter(self, mandant, system, user):
         query = self.session.query(Sap)
         try:
             result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
@@ -109,8 +109,7 @@ class Database(object):
         except NoResultFound:
             print_log(_('Ничего не найден для удаления по введенным данным:'), system, mandant, user)
             sys.exit()
-        self.session.delete(result)
-        self.session.commit()
+        return result
 
 
 class Config(object):
@@ -147,41 +146,38 @@ class Crypto(object):
     def generate_keys():
         if not os.path.isfile(f"{os.path.dirname(__file__)}\public_key.txt"):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
-            pem = private_key.private_bytes(
+            private_pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption())
-            for item in pem.splitlines():
-                print(item)
-            with open("private_key.txt", "w") as file:
-                for item in pem.splitlines():
-                    file.write(item.decode() + '\n')
+            Crypto.save_key(private_pem, 'private_key.txt')
 
             public_key = private_key.public_key()
-            pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
-                                          format=serialization.PublicFormat.SubjectPublicKeyInfo)
-            for item in pem.splitlines():
-                print(item)
-            with open("public_key.txt", "w") as file:
-                for item in pem.splitlines():
-                    file.write(item.decode() + '\n')
+            public_pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
+                                                 format=serialization.PublicFormat.SubjectPublicKeyInfo)
+            Crypto.save_key(public_pem, 'public_key.txt')
             print_log(_("Ключи шифрования созданы."))
         else:
             print_log(_("Ключи шифрования уже созданы"))
             sys.exit()
 
     @staticmethod
+    def save_key(pem, file_name):
+        with open(file_name, "w") as file:
+            for item in pem.splitlines():
+                print(item)
+                file.write(item.decode() + '\n')
+
+    @staticmethod
     def encrypto(password):
-        cfg = Config()
-        cfg.get_config()
+        public_key_file = Crypto.get_key('public_key')
 
-        public_key_file = cfg.config['KEYS']['public_key']
-        if not public_key_file.endswith('.txt'):
-            print_log(_('в ini файле не найден путь к публичному ключу шифрования'))
+        try:
+            with open(public_key_file, "rb") as key_file:
+                public_key = serialization.load_pem_public_key(key_file.read(), backend=default_backend())
+        except FileNotFoundError:
+            print_log(_('Приватный ключе не доступен'))
             sys.exit()
-
-        with open(public_key_file, "rb") as key_file:
-            public_key = serialization.load_pem_public_key(key_file.read(), backend=default_backend())
 
         encrypted_data = public_key.encrypt(
             password,
@@ -195,16 +191,15 @@ class Crypto(object):
 
     @staticmethod
     def decrypto(encrypted_password):
-        cfg = Config()
-        cfg.get_config()
+        private_key_file = Crypto.get_key('private_key')
 
-        private_key_file = cfg.config['KEYS']['private_key']
-        if not private_key_file.endswith('.txt'):
-            print_log(_('в ini файле не найден путь к приватному ключу шифрования'))
+        try:
+            with open(private_key_file, "rb") as key_file:
+                private_key = serialization.load_pem_private_key(key_file.read(), password=None,
+                                                                 backend=default_backend())
+        except FileNotFoundError:
+            print_log(_('Приватный ключе не доступен'))
             sys.exit()
-
-        with open(private_key_file, "rb") as key_file:
-            private_key = serialization.load_pem_private_key(key_file.read(), password=None, backend=default_backend())
 
         decrypted_data = private_key.decrypt(encrypted_password,
                                              padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -212,9 +207,28 @@ class Crypto(object):
                                                           label=None)).decode()
         return decrypted_data
 
+    @staticmethod
+    def get_key(key_name):
+        cfg = Config()
+        cfg.get_config()
+        key_file = cfg.config['KEYS'][key_name]
+        if not key_file.endswith('.txt'):
+            print_log(_(f"в ini файле не найден путь к {key_name} ключу шифрования"))
+            sys.exit()
+        return key_file
 
-lng = gettext.translation('sap_cmd', localedir='locale', languages=['ru'], fallback=True)
+
+lng = gettext.translation('sap_cmd', localedir='locale', languages=['en'], fallback=True)
 lng.install()
+
+
+def check_existence(file_extension) -> bool:
+    # check if db exists
+    file_exists = False
+    for fname in os.listdir('.'):
+        if fname.endswith(file_extension):
+            file_exists = True
+    return file_exists
 
 
 @click.group()
@@ -317,7 +331,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         argument.append(item)
 
     # Добавляем пароль
-    # можно вводить пароль самостоятельно отличный от пароля в БД
+    # можно вводить пароль самостоятельно отличный от пароля в БДe
     if p:
         item = '-pw=' + p
         argument.append(item)
@@ -344,11 +358,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
 def database():
     """ Создание базы данных для хранеия информкции о SAP системах """
 
-    # check if db exists
-    file_exists = False
-    for fname in os.listdir('.'):
-        if fname.endswith('.db'):
-            file_exists = True
+    file_exists = check_existence('.db')
 
     if file_exists:
         print_log(_('База данных уже существует.'))
@@ -404,7 +414,6 @@ def update(system, mandant, user, password):
 
     db = Database()
     db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
-    print('\n')
     print_log(_('Пароль обновлен'))
 
 
@@ -429,10 +438,7 @@ def delete(system, mandant, user):
 def ini():
     """ Создание конфигурационного ini файла """
 
-    file_exists = False
-    for fname in os.listdir('.'):
-        if fname.endswith('.ini'):
-            file_exists = True
+    file_exists = check_existence('.ini')
 
     if file_exists:
         print_log(_('ini файл уже существует.'))
@@ -483,8 +489,7 @@ def show(all, s, v):
         print(_('Система: '), str(system[0]).upper(), '\t', _('Мандант: '), str(system[1]).upper(),
               '\t', _('Пользователь: '), str(system[2]).upper(),
               '\t', _('Пароль: ') if v else '', Crypto.decrypto(system[3]) if v else '')
-    print('\n')
-    input(_('нажмите Enter ...'))
+    print_log('')
 
 
 @cli.command('key')
@@ -492,7 +497,6 @@ def key():
     """ Создание ключей шифрования """
 
     Crypto().generate_keys()
-    print('\n')
     print_log(_('''Ключи шифрования созданы: public_key.txt и private_key.txt \n 
                    Необходимо указать их расположение в файле *.ini \n 
                    Файл private_key.txt должен находиться в зашифрованном хранилище'''))
