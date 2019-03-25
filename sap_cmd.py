@@ -1,3 +1,7 @@
+#  ------------------------------------------
+#   Copyright (c) Rygor. 2019.
+#  ------------------------------------------
+
 import configparser
 import os
 import subprocess
@@ -31,19 +35,30 @@ class Sap(Base):
     password = Column(BLOB)
 
 
+def print_sys_table(sys_list: list, v=''):
+    header = [_('Система'), _('Мандант'), _('Пользователь')]
+    if v:
+        header.append(_('Пароль'))
+    t = PrettyTable(header)
+    for item in sys_list:
+        row = [item[0], item[1], item[2]]
+        if v:
+            row.append(Crypto.decrypto(item[3]))
+        t.add_row(row)
+    print(t)
+
+
 def print_log(message, system='', mandant='', user='', password='', stop=''):
     print('\n')
     # TODO: возможно вывода из листа, чтобы они размещались красиво
     #       посмотреть другие возможности вывода текста
     print(message)
     if system:
-        print(_('Система:'), '\t', system)
-    if mandant:
-        print(_('Мандант:'), '\t', mandant)
-    if user:
-        print(_('Пользователь:'), '\t', user)
-    if password:
-        print(_('Пароль:'), '\t', password)
+        sys_list = []
+        item = str(system).upper(), mandant, user, password if password else ''
+        sys_list.append(item)
+        if sys_list:
+            print_sys_table(sys_list)
     print('\n')
     if stop:
         return input(_('нажмите Enter или любой текст для выхода: '))
@@ -171,6 +186,9 @@ class Config(object):
 class Crypto(object):
     @staticmethod
     def generate_keys():
+        """
+        Создание ключей шифрования: публичный ключ и приватный ключа
+        """
         # TODO: нужна возможность проверки пути из ini файла
         if not os.path.isfile(f"{os.path.dirname(__file__)}\{public_file}"):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
@@ -307,10 +325,10 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         sys.exit()
 
     # Подсоединяемся к базе данных и запрашиваем данные
-    print(_('Пробуем запустить'), str(system).upper(), '\n')
+    print(_(f"Пробуем запустить {str(system).upper()}"))
 
     db = Database()
-    sap_data = db.query(system, mandant, u)
+    sap_data = db.query(str(system).upper(), mandant, str(u).upper() if u else '')
 
     if len(sap_data) >= 2:
         i = 0
@@ -340,11 +358,11 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
     argument = [sapshcut_exe_path]
 
     # Добавляем номер системы
-    item = '-system=' + sap_data[ans][0].upper()
+    item = '-system=' + sap_data[ans][0]
     argument.append(item)
 
     # Добавляем номер манданта
-    item = '-client=' + sap_data[ans][1].upper()
+    item = '-client=' + sap_data[ans][1]
     argument.append(item)
 
     # Добавляем язык для входа. по умолчанию подставляется RU, если не указано другое.
@@ -357,7 +375,7 @@ def run(system, mandant, u='', p='', l='RU', v='', t=''):
         item = '-user=' + u
         argument.append(item)
     else:
-        item = '-user=' + sap_data[ans][2].upper()
+        item = '-user=' + sap_data[ans][2]
         argument.append(item)
 
     # Добавляем пароль
@@ -416,9 +434,9 @@ def add(system, mandant, user, password):
     """ Добавление SAP систем в базу данных """
 
     db = Database()
-    db.add(system, mandant, user, Crypto.encrypto(str.encode(password)))
+    db.add(str(system).upper(), mandant, str(user).upper(), Crypto.encrypto(str.encode(password)))
 
-    result = db.query(system, mandant, user)
+    result = db.query(str(system).upper(), mandant, str(user).upper())
 
     if result:
         for item in result:
@@ -443,8 +461,8 @@ def update(system, mandant, user, password):
     """ Обновление пароля для SAP системы """
 
     db = Database()
-    db.update(system, mandant, user, Crypto.encrypto(str.encode(password)))
-    print_log(_('Пароль обновлен'))
+    db.update(str(system).upper(), mandant, str(user).upper(), Crypto.encrypto(str.encode(password)))
+    print_log(_('Пароль обновлен для следующей системы:'), str(system).upper(), mandant, str(user).upper())
 
 
 @cli.command('delete')
@@ -456,12 +474,12 @@ def delete(system, mandant, user):
     """ Удаление указанной SAP системы из базы данных """
 
     db = Database()
-    db.delete(system, mandant, user)
+    db.delete(str(system).upper(), mandant, str(user).upper())
 
     result = db.query(system, mandant, user, 'x')
 
     if not result:
-        print_log(_('Удалена следующая система:'), system, mandant, user)
+        print_log(_('Удалена следующая система:'), str(system).upper(), mandant, str(user).upper())
 
 
 @cli.command('ini')
@@ -514,19 +532,9 @@ def show(all, s, v):
     elif s:
         # Подсоединяемся к базе данных и запрашиваем данные по выбранной системе
         db = Database()
-        sap_data = db.query(s)
+        sap_data = db.query(str(s).upper())
 
-    header = [_('Система'), _('Мандант'), _('Пользователь')]
-    if v:
-        header.append(_('Пароль'))
-
-    t = PrettyTable(header)
-    for system in sap_data:
-        row = [system[0], system[1], system[2]]
-        if v:
-            row.append(Crypto.decrypto(system[3]))
-        t.add_row(row)
-    print(t)
+    print_sys_table(sap_data, v)
     print_log('')
 
 
