@@ -15,6 +15,10 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
+from prettytable import PrettyTable
+
+public_file = 'public_key.txt'
+private_file = 'private_key.txt'
 
 Base = declarative_base()
 
@@ -29,6 +33,8 @@ class Sap(Base):
 
 def print_log(message, system='', mandant='', user='', password='', stop=''):
     print('\n')
+    # TODO: возможно вывода из листа, чтобы они размещались красиво
+    #       посмотреть другие возможности вывода текста
     print(message)
     if system:
         print(_('Система:'), '\t', system)
@@ -46,8 +52,14 @@ def print_log(message, system='', mandant='', user='', password='', stop=''):
 
 
 class Database(object):
+    """
+    Класс для работы с базой данных
+    """
+
     def __init__(self):
 
+        # TODO: нужна проверка нахождения БД из файла и файл может называться как угодно.
+        #       сначла ищем из ini файла, а потом уже файл в папке со скрипотом
         if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}.db"):
             engine = create_engine(f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
             session = sessionmaker(bind=engine)
@@ -57,7 +69,14 @@ class Database(object):
             sys.exit()
 
     def query(self, system='', mandant='', user='', check=''):
-
+        """
+        Методе для запросов информации о SAP системе
+        :param system: номер SAP системы;
+        :param mandant: номер манданта;
+        :param user: пользователь;
+        :param check: флаг проверки выполнена ли операция (добавление, удаление) без уведомлений о результатах поиска;
+        :return: информация о системе (система, мандант, пользователь и пароль);
+        """
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
         if system:
             query = query.filter_by(system_id=system)
@@ -76,6 +95,14 @@ class Database(object):
                 sys.exit()
 
     def add(self, system, mandant, user, password):
+        """
+        Класс для добавления информации о системе
+        :param system:
+        :param mandant:
+        :param user:
+        :param password:
+        :return:
+        """
         sap_info = Sap(
             system_id=system, mandant_num=mandant, user_id=user, password=password)
 
@@ -144,19 +171,22 @@ class Config(object):
 class Crypto(object):
     @staticmethod
     def generate_keys():
-        if not os.path.isfile(f"{os.path.dirname(__file__)}\public_key.txt"):
+        # TODO: нужна возможность проверки пути из ini файла
+        if not os.path.isfile(f"{os.path.dirname(__file__)}\{public_file}"):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
             private_pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption())
-            Crypto.save_key(private_pem, 'private_key.txt')
+            Crypto.save_key(private_pem, private_file)
 
             public_key = private_key.public_key()
             public_pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
                                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
-            Crypto.save_key(public_pem, 'public_key.txt')
-            print_log(_("Ключи шифрования созданы."))
+            Crypto.save_key(public_pem, public_file)
+            print_log(_(f'''Ключи шифрования созданы: {public_file} и {private_file} \n 
+                            Необходимо указать их расположение в файле *.ini \n 
+                            Файл {private_file} должен находиться в зашифрованном хранилище'''))
         else:
             print_log(_("Ключи шифрования уже созданы"))
             sys.exit()
@@ -165,18 +195,18 @@ class Crypto(object):
     def save_key(pem, file_name):
         with open(file_name, "w") as file:
             for item in pem.splitlines():
-                print(item)
+                # print(item)
                 file.write(item.decode() + '\n')
 
     @staticmethod
     def encrypto(password):
-        public_key_file = Crypto.get_key('public_key')
+        public_key_file = Crypto.get_key(public_file)
 
         try:
             with open(public_key_file, "rb") as key_file:
                 public_key = serialization.load_pem_public_key(key_file.read(), backend=default_backend())
         except FileNotFoundError:
-            print_log(_('Приватный ключе не доступен'))
+            print_log(_('Публичный ключ шифрования не доступен. Проверьте доступ'))
             sys.exit()
 
         encrypted_data = public_key.encrypt(
@@ -191,14 +221,14 @@ class Crypto(object):
 
     @staticmethod
     def decrypto(encrypted_password):
-        private_key_file = Crypto.get_key('private_key')
+        private_key_file = Crypto.get_key(private_file)
 
         try:
             with open(private_key_file, "rb") as key_file:
                 private_key = serialization.load_pem_private_key(key_file.read(), password=None,
                                                                  backend=default_backend())
         except FileNotFoundError:
-            print_log(_('Приватный ключе не доступен'))
+            print_log(_('Приватный ключ шифрования не доступен. Проверьте доступ'))
             sys.exit()
 
         decrypted_data = private_key.decrypt(encrypted_password,
@@ -380,7 +410,7 @@ def database():
     help=_('пароль'),
     prompt=True,
     confirmation_prompt=True,
-    # hide_input=True,
+    hide_input=True,
 )
 def add(system, mandant, user, password):
     """ Добавление SAP систем в базу данных """
@@ -407,7 +437,7 @@ def add(system, mandant, user, password):
     help=_('пароль'),
     prompt=True,
     confirmation_prompt=True,
-    # hide_input=True
+    hide_input=True
 )
 def update(system, mandant, user, password):
     """ Обновление пароля для SAP системы """
@@ -438,6 +468,7 @@ def delete(system, mandant, user):
 def ini():
     """ Создание конфигурационного ini файла """
 
+    # TODO: Нужно вести путь до базы данных
     file_exists = check_existence('.ini')
 
     if file_exists:
@@ -456,8 +487,8 @@ def ini():
         config['APPLICATION'] = {'command_line': _('путь до файла sapshcut.exe'),
                                  'sap': _('путь до файла saplogon.exe')}
 
-        config['KEYS'] = {'public_key': _('путь до публичного ключа'),
-                          'private_key': _('путь до приватного ключа. ключ хранить в защищенном хранилище')}
+        config['KEYS'] = {public_file: _('путь до публичного ключа'),
+                          private_file: _('путь до приватного ключа. ключ хранить в защищенном хранилище')}
 
         config['LANGUAGE'] = {'language': _('язык интерфейса: или RU (русский), или EN (английский язык)')}
 
@@ -485,21 +516,25 @@ def show(all, s, v):
         db = Database()
         sap_data = db.query(s)
 
+    header = [_('Система'), _('Мандант'), _('Пользователь')]
+    if v:
+        header.append(_('Пароль'))
+
+    t = PrettyTable(header)
     for system in sap_data:
-        print(_('Система: '), str(system[0]).upper(), '\t', _('Мандант: '), str(system[1]).upper(),
-              '\t', _('Пользователь: '), str(system[2]).upper(),
-              '\t', _('Пароль: ') if v else '', Crypto.decrypto(system[3]) if v else '')
+        row = [system[0], system[1], system[2]]
+        if v:
+            row.append(Crypto.decrypto(system[3]))
+        t.add_row(row)
+    print(t)
     print_log('')
 
 
-@cli.command('key')
-def key():
+@cli.command('keys')
+def keys():
     """ Создание ключей шифрования """
 
     Crypto().generate_keys()
-    print_log(_('''Ключи шифрования созданы: public_key.txt и private_key.txt \n 
-                   Необходимо указать их расположение в файле *.ini \n 
-                   Файл private_key.txt должен находиться в зашифрованном хранилище'''))
 
 
 if __name__ == '__main__':
