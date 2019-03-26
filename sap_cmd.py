@@ -143,7 +143,8 @@ class Database(object):
         except IntegrityError:
             msg.clear()
             msg.append(colored(_('Данные уже существуют в базе данных:'), 'yellow'))
-            print_log(msg, system, mandant, user)
+            sys_list.append([system, mandant, user])
+            print_log(msg, sys_list)
             sys.exit()
 
     def update(self, system, mandant, user, password):
@@ -155,7 +156,8 @@ class Database(object):
         else:
             msg.clear()
             msg.append(colored(_('Ничего не найден для удаления по введенным данным:'), 'yellow'))
-            print_log(msg, system, mandant, user)
+            sys_list.append([system, mandant, user])
+            print_log(msg, sys_list)
             sys.exit()
 
     def delete(self, system, mandant, user):
@@ -171,7 +173,8 @@ class Database(object):
         except NoResultFound:
             msg.clear()
             msg.append(colored(_('Ничего не найден для удаления по введенным данным:'), 'yellow'))
-            print_log(msg, system, mandant, user)
+            sys_list.append([system, mandant, user])
+            print_log(msg, sys_list)
             sys.exit()
         return result
 
