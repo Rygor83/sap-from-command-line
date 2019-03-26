@@ -9,6 +9,6 @@ setup(
         'click',
         'sqlalchemy',
         'cryptography',
-        'prettytable',
+        'prettytable', 'colorama', 'termcolor'
     ],
     entry_points='''[console_scripts]sap=sap:cli''', )
