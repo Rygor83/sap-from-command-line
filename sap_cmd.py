@@ -83,10 +83,11 @@ class Database(object):
 
     def __init__(self):
 
-        # TODO: нужна проверка нахождения БД из файла и файл может называться как угодно.
-        #       сначла ищем из ini файла, а потом уже файл в папке со скрипотом
-        if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}.db"):
-            engine = create_engine(f"sqlite:///{os.path.splitext(os.path.basename(__file__))[0]}.db")
+        if check_existence('.db'):
+            cfg = Config()
+            cfg.get_config()
+            path_db = cfg.config['DATABASE']['path']
+            engine = create_engine(f"sqlite:///{path_db}")
             session = sessionmaker(bind=engine)
             self.session = session()
         else:
@@ -200,7 +201,7 @@ class Config(object):
             msg.append(colored(_('Не удалось прочитать ini файл'), 'yellow'))
             print_log(msg)
         else:
-            self.config['CONNECTION'] = config['CONNECTION']
+            self.config['DATABASE'] = config['DATABASE']
             self.config['APPLICATION'] = config['APPLICATION']
             self.config['KEYS'] = config['KEYS']
             self.config['LANGUAGE'] = config['LANGUAGE']
@@ -213,8 +214,13 @@ class Crypto(object):
         """
         Создание ключей шифрования: публичный ключ и приватный ключа
         """
-        # TODO: нужна возможность проверки пути из ini файла
-        if not os.path.isfile(f"{os.path.dirname(__file__)}\{public_file}"):
+
+        cfg = Config()
+        cfg.get_config()
+        path_public_key = cfg.config['KEYS'][public_file]
+        path_private_key = cfg.config['KEYS'][private_file]
+
+        if not os.path.isfile(path_public_key) and not os.path.isfile(path_private_key):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
             private_pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -301,17 +307,31 @@ class Crypto(object):
         return key_file
 
 
-lng = gettext.translation('sap_cmd', localedir='locale', languages=['en'], fallback=True)
-lng.install()
-
-
 def check_existence(file_extension) -> bool:
-    # check if db exists
-    file_exists = False
-    for fname in os.listdir('.'):
-        if fname.endswith(file_extension):
+    if file_extension == '.db':
+        cfg = Config()
+        cfg.get_config()
+        path_db = cfg.config['DATABASE']['path']
+        if os.path.isfile(path_db):
             file_exists = True
-    return file_exists
+            return file_exists
+
+    if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}{file_extension}"):
+        file_exists = True
+        return file_exists
+    else:
+        file_exists = False
+        return file_exists
+
+
+if check_existence('.ini'):
+    cfg = Config()
+    cfg.get_config()
+    language = cfg.config['LANGUAGE']['language']
+else:
+    language = 'EN'
+lng = gettext.translation('sap_cmd', localedir='locale', languages=[language], fallback=True)
+lng.install()
 
 
 @click.group()
@@ -460,6 +480,7 @@ def database():
         Base.metadata.create_all(eng)
         msg.clear()
         msg.append(colored(_('База данных создана'), 'green'))
+        msg.append(_('Если база данных будет перемещена, то следует указать ее путь в *.ini файле'))
         print_log(msg)
 
 
@@ -543,7 +564,6 @@ def delete(system, mandant, user):
 def ini():
     """ Создание конфигурационного ini файла """
 
-    # TODO: Нужно вести путь до базы данных
     file_exists = check_existence('.ini')
 
     if file_exists:
@@ -552,14 +572,7 @@ def ini():
         print_log(msg)
     else:
         config = configparser.ConfigParser()
-        config['CONNECTION'] = {
-            'user': 'user_name',
-            'password': 'password',
-            'database': 'db',
-            'host': 'host',
-            'port': 'port',
-            'charset': 'ch'
-        }
+        config['DATABASE'] = {'path': f"{os.path.splitext(os.path.basename(__file__))[0]}.db"}
 
         config['APPLICATION'] = {'command_line': _('путь до файла sapshcut.exe'),
                                  'sap': _('путь до файла saplogon.exe')}
@@ -567,7 +580,7 @@ def ini():
         config['KEYS'] = {public_file: _('путь до публичного ключа'),
                           private_file: _('путь до приватного ключа. ключ хранить в защищенном хранилище')}
 
-        config['LANGUAGE'] = {'language': _('язык интерфейса: или RU (русский), или EN (английский язык)')}
+        config['LANGUAGE'] = {'language': 'RU'}
 
         print(os.path.basename(__file__))
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini", 'w') as configfile:
