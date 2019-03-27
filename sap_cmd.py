@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import gettext
+import ctypes
 import click
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
@@ -84,9 +85,9 @@ class Database(object):
     def __init__(self):
 
         if check_existence('.db'):
-            cfg = Config()
-            cfg.get_config()
-            path_db = cfg.config['DATABASE']['path']
+            conf = Config()
+            conf.get_config()
+            path_db = conf.config['DATABASE']['path']
             engine = create_engine(f"sqlite:///{path_db}")
             session = sessionmaker(bind=engine)
             self.session = session()
@@ -218,10 +219,10 @@ class Crypto(object):
         Создание ключей шифрования: публичный ключ и приватный ключа
         """
 
-        cfg = Config()
-        cfg.get_config()
-        path_public_key = cfg.config['KEYS'][public_file]
-        path_private_key = cfg.config['KEYS'][private_file]
+        conf = Config()
+        conf.get_config()
+        path_public_key = conf.config['KEYS'][public_file]
+        path_private_key = conf.config['KEYS'][private_file]
 
         if not os.path.isfile(path_public_key) and not os.path.isfile(path_private_key):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
@@ -299,9 +300,9 @@ class Crypto(object):
 
     @staticmethod
     def get_key(key_name):
-        cfg = Config()
-        cfg.get_config()
-        key_file = cfg.config['KEYS'][key_name]
+        conf = Config()
+        conf.get_config()
+        key_file = conf.config['KEYS'][key_name]
         if not key_file.endswith('.txt'):
             msg.clear()
             msg.append(colored(_(f"в ini файле не найден путь к {key_name} ключу шифрования"), 'yellow'))
@@ -312,9 +313,9 @@ class Crypto(object):
 
 def check_existence(file_extension) -> bool:
     if file_extension == '.db':
-        cfg = Config()
-        cfg.get_config()
-        path_db = cfg.config['DATABASE']['path']
+        conf = Config()
+        conf.get_config()
+        path_db = conf.config['DATABASE']['path']
         if os.path.isfile(path_db):
             file_exists = True
             return file_exists
@@ -328,9 +329,9 @@ def check_existence(file_extension) -> bool:
 
 
 if check_existence('.ini'):
-    cfg = Config()
-    cfg.get_config()
-    language = cfg.config['LANGUAGE']['language']
+    conf = Config()
+    conf.get_config()
+    language = conf.config['LANGUAGE']['language']
 else:
     language = 'EN'
 lng = gettext.translation('sap_cmd', localedir='locale', languages=[language], fallback=True)
@@ -348,11 +349,11 @@ def logon():
     """ Запуск SAPLogon """
 
     # Считываем конфигурационный файл
-    cfg = Config()
-    cfg.get_config()
+    conf = Config()
+    conf.get_config()
 
     # Запускаем saplogon.exe
-    saplogon_exe_path = cfg.config['APPLICATION']['sap']
+    saplogon_exe_path = conf.config['APPLICATION']['sap']
     if not str(saplogon_exe_path).endswith('saplogon.exe'):
         msg.clear()
         msg.append(colored(_('в ini файле не найден путь к saplogon.exe'), 'yellow'))
@@ -376,10 +377,10 @@ def run(system, mandant, u='', p='', l='RU', v=0, t=''):
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     # Считываем конфигурационный файл
-    cfg = Config()
-    cfg.get_config()
+    conf = Config()
+    conf.get_config()
 
-    sapshcut_exe_path = cfg.config['APPLICATION']['command_line']
+    sapshcut_exe_path = conf.config['APPLICATION']['command_line']
     if not sapshcut_exe_path.endswith('sapshcut.exe'):
         msg.clear()
         msg.append(colored(_('в ini файле не найден путь к sapshcut.exe'), 'yellow'))
@@ -583,7 +584,14 @@ def ini():
         config['KEYS'] = {public_file: _('путь до публичного ключа'),
                           private_file: _('путь до приватного ключа. ключ хранить в защищенном хранилище')}
 
-        config['LANGUAGE'] = {'language': 'RU'}
+        # Определение языка
+        windll = ctypes.windll.kernel32
+        lng_code = windll.GetUserDefaultUILanguage()
+        if lng_code == 1049:
+            ini_lang = 'RU'
+        else:
+            ini_lang = 'EN'
+        config['LANGUAGE'] = {'language': ini_lang}
 
         print(os.path.basename(__file__))
         with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini", 'w') as configfile:

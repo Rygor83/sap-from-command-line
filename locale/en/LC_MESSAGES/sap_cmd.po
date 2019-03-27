@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2019-03-22 15:35+0300\n"
+"POT-Creation-Date: 2019-03-27 14:15+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,243 +15,205 @@ msgstr ""
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:34
-msgid "РЎРёСЃС‚РµРјР°:"
-msgstr "System:"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:48
+msgid "Мандант"
+msgstr "Mandant"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:36
-msgid "РњР°РЅРґР°РЅС‚:"
-msgstr "Mandant: "
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:48
+msgid "Пользователь"
+msgstr "User"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:38
-msgid "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ:"
-msgstr "User: "
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:48
+msgid "Система"
+msgstr "System"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:40
-msgid "РџР°СЂРѕР»СЊ:"
-msgstr "Password: "
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:50
+msgid "Пароль"
+msgstr "Password"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:43
-msgid "РЅР°Р¶РјРёС‚Рµ Enter РёР»Рё Р»СЋР±РѕР№ С‚РµРєСЃС‚ РґР»СЏ РІС‹С…РѕРґР°: "
-msgstr "press Enter or any text to quit:"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:69
+msgid "нажмите Enter или любой текст для выхода: "
+msgstr "press Enter or other text to quit:"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:45
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:340
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:487
-msgid "РЅР°Р¶РјРёС‚Рµ Enter ..."
-msgstr "press Enter ..."
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:77
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:467
+msgid "нажмите Enter ..."
+msgstr "press Enter: "
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:56
-msgid "Р‘Р°Р·С‹ РґР°РЅРЅС‹С… РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚. Р”Р»СЏ СЃРѕР·РґР°РЅРёСЏ Р·Р°РїСѓСЃС‚РёС‚Рµ РєРѕРјР°РЅРґСѓ \"db\" "
-msgstr "Database does not exist. Run 'db' command to create."
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:96
+msgid "Базы данных не существует. Для создания запустите команду \"db\" "
+msgstr "Database doesn't exist. Run 'db' command to create."
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:75
-msgid "РџРѕ СѓРєР°Р·Р°РЅРЅС‹Рј РґР°РЅРЅС‹Рј РЅР°Р№С‚Рё РЅРёС‡РµРіРѕ РЅРµ РїРѕР»СѓС‡РёР»РѕСЃСЊ"
-msgstr "Nothing found according to entered parameters"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:124
+msgid "По указанным данным найти ничего не получилось"
+msgstr "Nothing found by the entered data"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:86
-msgid "Р”Р°РЅРЅС‹Рµ СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓСЋС‚ РІ Р±Р°Р·Рµ РґР°РЅРЅС‹С…:"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:146
+msgid "Данные уже существуют в базе данных:"
 msgstr "Data already exist in the database:"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:94
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:101
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:110
-msgid "РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅ РґР»СЏ СѓРґР°Р»РµРЅРёСЏ РїРѕ РІРІРµРґРµРЅРЅС‹Рј РґР°РЅРЅС‹Рј:"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:159
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:176
+msgid "Ничего не найден для удаления по введенным данным:"
 msgstr "Nothing found to delete by the entered data:"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:126
-msgid ""
-"\n"
-"            РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РЅСѓР¶РЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ С‚.Рє. ini С„Р°Р№Р»Р° РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚. \n"
-"\n"
-"            Р”Р»СЏ СЃРѕР·РґР°РЅРёСЏ Р·Р°РїСѓСЃС‚РёС‚Рµ РєРѕРјР°РЅРґСѓ \"ini\" Рё СѓРєР°Р¶РёС‚Рµ РІ СЃРѕР·РґР°РЅРЅРѕРј С„Р°Р№Р»Рµ РІСЃРµ С‚СЂРµР±СѓРµС‚РјС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ \n"
-"\n"
-"            "
-msgstr ""
-"Can't read parameters from ini file as ini file does not exist. Run 'ini' "
-"command to create."
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:195
+msgid "Не удалось получить нужные параметры т.к. ini файла не существует."
+msgstr "ini file doesn't existd, can't get parameters"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:136
-msgid "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ ini С„Р°Р№Р»"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:196
+msgid "Для создания запустите команду \"ini\" и укажите в созданном файле все требуетмые параметры"
+msgstr ""
+"Run 'ini' command to create. Don't forget to fill in all required parameters "
+"in ini file"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:205
+msgid "Не удалось прочитать ini файл"
 msgstr "Can't read ini file"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:168
-msgid "РљР»СЋС‡Рё С€РёС„СЂРѕРІР°РЅРёСЏ СЃРѕР·РґР°РЅС‹."
-msgstr "Encryption keys are created."
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:170
-msgid "РљР»СЋС‡Рё С€РёС„СЂРѕРІР°РЅРёСЏ СѓР¶Рµ СЃРѕР·РґР°РЅС‹"
-msgstr "Encryption keys are already created."
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:180
-msgid "РІ ini С„Р°Р№Р»Рµ РЅРµ РЅР°Р№РґРµРЅ РїСѓС‚СЊ Рє РїСѓР±Р»РёС‡РЅРѕРјСѓ РєР»СЋС‡Сѓ С€РёС„СЂРѕРІР°РЅРёСЏ"
-msgstr "Can't find path to public encryption key in ini file"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:203
-msgid "РІ ini С„Р°Р№Р»Рµ РЅРµ РЅР°Р№РґРµРЅ РїСѓС‚СЊ Рє РїСЂРёРІР°С‚РЅРѕРјСѓ РєР»СЋС‡Сѓ С€РёС„СЂРѕРІР°РЅРёСЏ"
-msgstr "Can't find path to private encryption key in ini file"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:237
-msgid "РІ ini С„Р°Р№Р»Рµ РЅРµ РЅР°Р№РґРµРЅ РїСѓС‚СЊ Рє saplogon.exe"
-msgstr "Can't find path to saplogon.exe in ini file"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:241
+msgid "Необходимо указать их расположение в файле *.ini"
+msgstr "Fill in all required parameters in ini file"
 
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:247
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:367
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:394
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:415
-msgid "РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ"
+msgid "Ключи шифрования уже созданы"
+msgstr "Encryption keys are already created."
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:267
+msgid "Публичный ключ шифрования не доступен. Проверьте доступ"
+msgstr "Can't find public encryption key. Check the path to it."
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:291
+msgid "Приватный ключ шифрования не доступен. Проверьте доступ"
+msgstr "Can't find private encryption key. Check the path to it."
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:359
+msgid "в ini файле не найден путь к saplogon.exe"
+msgstr "There is no path to saplogon.exe in ini file"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:370
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:495
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:527
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:551
+msgid "пользователь"
 msgstr "user"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:248
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:370
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:397
-msgid "РїР°СЂРѕР»СЊ"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:371
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:498
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:530
+msgid "пароль"
 msgstr "password"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:249
-msgid "СЏР·С‹Рє РІС…РѕРґР°"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:372
+msgid "язык входа"
 msgstr "language"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:250
-msgid "РїРѕРєР°Р·Р°С‚СЊ РїР°СЂР°РјРµС‚СЂС‹ Р·Р°РїСѓСЃРєР°"
-msgstr "show SAP parameters "
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:373
+msgid "показать параметры запуска"
+msgstr "show launch parameters"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:251
-msgid "РєРѕРґ С‚СЂР°РЅР·Р°РєС†РёРё"
-msgstr "transaction code"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:374
+msgid "код транзакции"
+msgstr "transaction"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:262
-msgid "РІ ini С„Р°Р№Р»Рµ РЅРµ РЅР°Р№РґРµРЅ РїСѓС‚СЊ Рє sapshcut.exe"
-msgstr "Can't find path to sapshcut.exe in ini file"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:386
+msgid "в ini файле не найден путь к sapshcut.exe"
+msgstr "There is no path to sapshcut.exe in ini file"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:266
-msgid "РџСЂРѕР±СѓРµРј Р·Р°РїСѓСЃС‚РёС‚СЊ"
-msgstr "Trying to launch "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:277
-msgid "Р’С‹Р±СЂР°РЅС‹ СЃР»РµРґСѓСЋС‰РёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»Рё: "
-msgstr "The following users are selected: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:279
-msgid "Р’С‹Р±РµСЂРёС‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕРґ РєРѕС‚РѕСЂС‹Рј С…РѕС‚РёРј РІРѕР№С‚Рё РІ СЃРёСЃС‚РµРјСѓ."
-msgstr "Choose user."
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:280
-msgid "Р”РѕРїСѓСЃС‚РёРјС‹Р№ РІРІРѕРґ - РёРЅРґРµРєСЃ РѕС‚ 1 РґРѕ"
-msgstr "Valid input is an index from 1 to"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:283
-msgid "Р’РѕР·РјРѕР¶РЅРѕ РІРІРѕРґРёС‚СЊ Р·РЅР°С‡РµРЅРёСЏ С‚РѕР»СЊРєРѕ РѕС‚ 1 РґРѕ"
-msgstr "It is possible to enter values only from 1 to"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:284
-msgid "Р’С‹Р±РµСЂРёС‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕРґ РєРѕС‚РѕСЂС‹Рј С…РѕС‚РёРј РІРѕР№С‚Рё РІ СЃРёСЃС‚РµРјСѓ: "
-msgstr "Choose user: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:354
-msgid "Р‘Р°Р·Р° РґР°РЅРЅС‹С… СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚."
-msgstr "Database already created."
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:360
-msgid "Р‘Р°Р·Р° РґР°РЅРЅС‹С… СЃРѕР·РґР°РЅР°"
-msgstr "Database created"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:364
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:391
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:412
-msgid "СЃРёСЃС‚РµРјР°"
-msgstr "system"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:366
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:393
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:414
-msgid "РјР°РЅРґР°РЅС‚"
-msgstr "mandant"
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:385
-msgid "Р”РѕР±Р°РІР»РµРЅР° СЃР»РµРґСѓСЋС‰Р°СЏ СЃРёСЃС‚РµРјР°:"
-msgstr "The following system is added to database: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:387
-msgid "Р§С‚Рѕ-С‚Рѕ РїРѕС€Р»Рѕ РЅРµ С‚Р°Рє ..."
-msgstr "Sothing went wrong ..."
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:400
+msgid "Выбраны следующие пользователи: "
+msgstr "The following users found:"
 
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:408
-msgid "РџР°СЂРѕР»СЊ РѕР±РЅРѕРІР»РµРЅ"
-msgstr "Password is updated"
+msgid "Выберите пользователя, под которым хотим войти в систему"
+msgstr "Choose a user"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:425
-msgid "РЈРґР°Р»РµРЅР° СЃР»РµРґСѓСЋС‰Р°СЏ СЃРёСЃС‚РµРјР°:"
-msgstr "The following system is deleted from database: "
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:416
+msgid "Информация о запускаемой системе:"
+msgstr "Info about system:"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:438
-msgid "ini С„Р°Р№Р» СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚."
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:478
+msgid "База данных уже существует."
+msgstr "Database already exists."
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:486
+msgid "База данных создана"
+msgstr "Database is created"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:487
+msgid "Если база данных будет перемещена, то следует указать ее путь в *.ini файле"
+msgstr ""
+"If you move database other place, don't forget to enter this path in ini file"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:492
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:524
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:548
+msgid "система"
+msgstr "system"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:494
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:526
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:550
+msgid "мандант"
+msgstr "mandant"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:514
+msgid "Добавлена следующая система:"
+msgstr "The following system is added to database: "
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:519
+msgid "Что-то пошло не так ..."
+msgstr "Something went wrong ..."
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:542
+msgid "Пароль обновлен для следующей системы:"
+msgstr "Password is updated for the following system:"
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:562
+msgid "Удалена следующая система:"
+msgstr "The following systems is deleted: "
+
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:575
+msgid "ini файл уже существует."
 msgstr "ini file is already created."
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:450
-msgid "РїСѓС‚СЊ РґРѕ С„Р°Р№Р»Р° sapshcut.exe"
-msgstr "path to sapshcut.exe file"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:581
+msgid "путь до файла sapshcut.exe"
+msgstr "path to sapshcut.exe"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:451
-msgid "РїСѓС‚СЊ РґРѕ С„Р°Р№Р»Р° saplogon.exe"
-msgstr "path to saplogon.exe file"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:582
+msgid "путь до файла saplogon.exe"
+msgstr "path to saplogon.exe"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:453
-msgid "РїСѓС‚СЊ РґРѕ РїСѓР±Р»РёС‡РЅРѕРіРѕ РєР»СЋС‡Р°"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:584
+msgid "путь до публичного ключа"
 msgstr "path to public encryption key"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:454
-msgid "РїСѓС‚СЊ РґРѕ РїСЂРёРІР°С‚РЅРѕРіРѕ РєР»СЋС‡Р°. РєР»СЋС‡ С…СЂР°РЅРёС‚СЊ РІ Р·Р°С‰РёС‰РµРЅРЅРѕРј С…СЂР°РЅРёР»РёС‰Рµ"
-msgstr ""
-"Path to public encryption key. Place public encryption key in safe place"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:585
+msgid "путь до приватного ключа. ключ хранить в защищенном хранилище"
+msgstr "path to private encryption key. The key must be stored in a safe place"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:456
-msgid "СЏР·С‹Рє РёРЅС‚РµСЂС„РµР№СЃР°: РёР»Рё RU (СЂСѓСЃСЃРєРёР№), РёР»Рё EN (Р°РЅРіР»РёР№СЃРєРёР№ СЏР·С‹Рє)"
-msgstr "interface language: RU, EN"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:601
+msgid "ini файл создан."
+msgstr "ini file is created."
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:462
-msgid ""
-"ini С„Р°Р№Р» СЃРѕР·РґР°РЅ. \n"
-" !!! Р—Р°РїРѕР»РЅРёС‚Рµ РІСЃРµ С‚СЂРµР±СѓРµРјС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ РІ С„Р°Р№Р»Рµ !!!"
-msgstr "ini file is created"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:602
+msgid "!!! Заполните все требуемые параметры в файле !!!"
+msgstr "!!! Fill in all required parameters in ini file !!!"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:466
-msgid "РїРѕРєР°Р·Р°С‚СЊ РІС‹Р±СЂР°РЅРЅСѓСЋ СЃРёСЃС‚РµРјСѓ"
-msgstr "Show selected SAP system"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:608
+msgid "показать выбранную систему"
+msgstr "show parameters of required system"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:467
-msgid "РїРѕРєР°Р·Р°С‚СЊ РІСЃРµ СЃРёСЃС‚РµРјС‹"
-msgstr "Show all SAP systems"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:609
+msgid "показать все системы"
+msgstr "show all systems"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:468
-msgid "РїРѕРєР°Р·Р°С‚СЊ РїР°СЂРѕР»Рё"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:610
+msgid "показать пароли"
 msgstr "show password"
 
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:483
-msgid "РњР°РЅРґР°РЅС‚: "
-msgstr "Mandant: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:483
-msgid "РЎРёСЃС‚РµРјР°: "
-msgstr "System: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:484
-msgid "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: "
-msgstr "User: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:485
-msgid "РџР°СЂРѕР»СЊ: "
-msgstr "Password: "
-
-#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:496
-msgid ""
-"РљР»СЋС‡Рё С€РёС„СЂРѕРІР°РЅРёСЏ СЃРѕР·РґР°РЅС‹: public_key.txt Рё private_key.txt \n"
-" \n"
-"                   РќРµРѕР±С…РѕРґРёРјРѕ СѓРєР°Р·Р°С‚СЊ РёС… СЂР°СЃРїРѕР»РѕР¶РµРЅРёРµ РІ С„Р°Р№Р»Рµ *.ini \n"
-" \n"
-"                   Р¤Р°Р№Р» private_key.txt РґРѕР»Р¶РµРЅ РЅР°С…РѕРґРёС‚СЊСЃСЏ РІ Р·Р°С€РёС„СЂРѕРІР°РЅРЅРѕРј С…СЂР°РЅРёР»РёС‰Рµ"
-msgstr ""
-"Public encryption keys are created: public_key.txt and private_key.txt "
-"\nEnter path to both keys in ini file\nPlace private encryption key in safe "
-"place"
+#: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:625
+msgid "Запрошенные системы:"
+msgstr "Requested system: "
 
