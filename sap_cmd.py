@@ -633,6 +633,54 @@ def keys():
     Crypto().generate_keys()
 
 
+@cli.command('ver', help=_('Текущая версия SAP shortcut'))
+def ver():
+    # Считываем конфигурационный файл
+    conf = Config()
+    conf.get_config()
+
+    sapshcut_exe_path = conf.config['APPLICATION']['command_line']
+    if not sapshcut_exe_path.endswith('sapshcut.exe'):
+        msg.clear()
+        msg.append(colored(_('в ini файле не найден путь к sapshcut.exe'), 'yellow'))
+        print_log(msg)
+        sys.exit()
+
+    # Добавляем путь к командному файлу
+    argument = [sapshcut_exe_path]
+
+    # Добавляем номер системы
+    item = '-version'
+    argument.append(item)
+
+    # Запускаем SAP
+    subprocess.call(argument)
+
+
+@cli.command('help', help=_('SAP GUI shortcut help'))
+def hlp():
+    # Считываем конфигурационный файл
+    conf = Config()
+    conf.get_config()
+
+    sapshcut_exe_path = conf.config['APPLICATION']['command_line']
+    if not sapshcut_exe_path.endswith('sapshcut.exe'):
+        msg.clear()
+        msg.append(colored(_('в ini файле не найден путь к sapshcut.exe'), 'yellow'))
+        print_log(msg)
+        sys.exit()
+
+    # Добавляем путь к командному файлу
+    argument = [sapshcut_exe_path]
+
+    # Добавляем номер системы
+    item = '-help'
+    argument.append(item)
+
+    # Запускаем SAP
+    subprocess.call(argument)
+
+
 if __name__ == '__main__':
     cli()
 

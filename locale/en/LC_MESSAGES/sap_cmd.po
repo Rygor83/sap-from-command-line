@@ -1,6 +1,6 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR ORGANIZATION
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# Rygor <pisemco@gmail.com>, YEAR 2019.
 #
 msgid ""
 msgstr ""
@@ -38,7 +38,7 @@ msgstr "press Enter or other text to quit:"
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:77
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:467
 msgid "нажмите Enter ..."
-msgstr "press Enter: "
+msgstr "press Enter ... "
 
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:96
 msgid "Базы данных не существует. Для создания запустите команду \"db\" "
@@ -59,7 +59,7 @@ msgstr "Nothing found to delete by the entered data:"
 
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:195
 msgid "Не удалось получить нужные параметры т.к. ini файла не существует."
-msgstr "ini file doesn't existd, can't get parameters"
+msgstr "ini file doesn't exist, can't get parameters"
 
 #: d:\Studio\Programming\Projects\sap-command-line\sap_cmd.py:196
 msgid "Для создания запустите команду \"ini\" и укажите в созданном файле все требуетмые параметры"
