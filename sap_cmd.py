@@ -3,26 +3,27 @@
 #  ------------------------------------------
 
 import configparser
+import ctypes
+import functools
+import gettext
 import os
 import subprocess
 import sys
-import gettext
-import ctypes
+
 import click
+from colorama import init
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import rsa
+from prettytable import PrettyTable
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.exc import IntegrityError
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
-from prettytable import PrettyTable
-import functools
-from colorama import init
 from termcolor import colored
 
 public_file = 'public_key.txt'
@@ -45,12 +46,16 @@ class Sap(Base):
 
 
 def print_sys_table(systems: list, v: bool = 0):
-    header = [_('Система'), _('Мандант'), _('Пользователь')]
+    # TODO: Сделать функцию динамическую, чтобы можно было засовывать разные заголовки
+
+    header = ['№', _('Система'), _('Мандант'), _('Пользователь')]
     if v:
         header.append(_('Пароль'))
     t = PrettyTable(header)
+    count = 0
     for system in systems:
-        row = [system[0], system[1], system[2]]
+        count = count + 1
+        row = [count, system[0], system[1], system[2]]
         if v:
             row.append(Crypto.decrypto(system[3]))
         t.add_row(row)
@@ -68,7 +73,7 @@ def print_log(messages=[], systems=[], v: bool = 0, stop=''):
         click.echo()
         return input(_('нажмите Enter или любой текст для выхода: '))
     elif stop == 'Y':
-        ans = input('>')
+        ans = input('> ')
         return ans
     elif stop == 'Z':
         return
@@ -106,11 +111,17 @@ class Database(object):
         :param check: флаг проверки выполнена ли операция (добавление, удаление) без уведомлений о результатах поиска;
         :return: информация о системе (система, мандант, пользователь и пароль);
         """
+
+        # TODO: попробовать внедрить namedtuple
+        #       from collections import namedtuple
+
+        client = str(mandant).zfill(3)
+
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
         if system:
             query = query.filter_by(system_id=system)
         if mandant:
-            query = query.filter_by(mandant_num=mandant)
+            query = query.filter_by(mandant_num=client)
         if user:
             query = query.filter_by(user_id=user)
 
@@ -122,7 +133,7 @@ class Database(object):
             if not check:
                 msg.clear()
                 msg.append(colored(_('По указанным данным найти ничего не получилось'), 'yellow'))
-                sys_list.append([system, mandant, user])
+                sys_list.append([system, client, user])
                 print_log(msg, sys_list)
                 sys.exit()
 
@@ -135,8 +146,11 @@ class Database(object):
         :param password:
         :return:
         """
+
+        client = str(mandant).zfill(3)
+
         sap_info = Sap(
-            system_id=system, mandant_num=mandant, user_id=user, password=password)
+            system_id=system, mandant_num=client, user_id=user, password=password)
 
         self.session.add(sap_info)
         try:
@@ -144,12 +158,14 @@ class Database(object):
         except IntegrityError:
             msg.clear()
             msg.append(colored(_('Данные уже существуют в базе данных:'), 'yellow'))
-            sys_list.append([system, mandant, user])
+            sys_list.append([system, client, user])
             print_log(msg, sys_list)
             sys.exit()
 
     def update(self, system, mandant, user, password):
-        result = self.filter(mandant, system, user)
+        client = str(mandant).zfill(3)
+
+        result = self.filter(client, system, user)
 
         if result:
             result.password = password
@@ -157,24 +173,26 @@ class Database(object):
         else:
             msg.clear()
             msg.append(colored(_('Ничего не найден для удаления по введенным данным:'), 'yellow'))
-            sys_list.append([system, mandant, user])
+            sys_list.append([system, client, user])
             print_log(msg, sys_list)
             sys.exit()
 
     def delete(self, system, mandant, user):
-        result = self.filter(mandant, system, user)
+        client = str(mandant).zfill(3)
+        result = self.filter(client, system, user)
         self.session.delete(result)
         self.session.commit()
 
     def filter(self, mandant, system, user):
+        client = str(mandant).zfill(3)
         query = self.session.query(Sap)
         try:
-            result = query.filter(Sap.system_id == system, Sap.mandant_num == mandant,
+            result = query.filter(Sap.system_id == system, Sap.mandant_num == client,
                                   Sap.user_id == user).one()
         except NoResultFound:
             msg.clear()
             msg.append(colored(_('Ничего не найден для удаления по введенным данным:'), 'yellow'))
-            sys_list.append([system, mandant, user])
+            sys_list.append([system, client, user])
             print_log(msg, sys_list)
             sys.exit()
         return result
@@ -192,6 +210,8 @@ class Config(object):
             path = os.path.join(os.path.dirname(__file__), ini_file)
         else:
             msg.clear()
+            # TODO: переделать сообщиние, чтоб мол нет доступа к ини файлу т.к. его или не существует, или нет доступа.
+            # TODO: Сделать не только уведомление, но так же попытка запустить контейнер, где располагается БД
             msg.append(colored(_('Не удалось получить нужные параметры т.к. ini файла не существует.'), 'yellow'))
             msg.append(_('Для создания запустите команду "ini" и укажите в созданном файле все требуетмые параметры'))
             print_log(msg)
@@ -363,16 +383,29 @@ def logon():
     click.launch(saplogon_exe_path)
 
 
+@cli.command('pw')
+@click.argument('system')
+@click.argument('mandant', required=False, type=click.IntRange(1, 999))
+@click.option('-u', help=_('пользователь'))
+def pw(system, mandant, u=''):
+    """ Копирует пароль от заданной системы в буфер обмена. Стирает буфер обмена через 30 секунд \n
+        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
+
+    # TODO: Реализова на подобии команды RUN
+    #       Как копировать в буфер обмена и как стирать буфер обмена
+
+
 # noinspection PyShadowingNames,PyUnboundLocalVariable,PyTypeChecker
 @cli.command('run')
 @click.argument('system')
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
 @click.option('-u', help=_('пользователь'))
-@click.option('-p', help=_('пароль'))
+@click.option('-pw', help=_('пароль'))
 @click.option('-l', help=_('язык входа'), default='RU')
 @click.option('-v', help=_('показать параметры запуска'), is_flag=True, type=click.BOOL)
 @click.option('-t', help=_('код транзакции'))
-def run(system, mandant, u='', p='', l='RU', v=0, t=''):
+@click.option('-p', help=_('параметры для транзакции'))
+def run(system, mandant, u='', pw='', l='RU', v=0, t='', p=''):
     """ Запуск указанной SAP системы \n
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
@@ -388,7 +421,7 @@ def run(system, mandant, u='', p='', l='RU', v=0, t=''):
         sys.exit()
 
     # Подсоединяемся к базе данных и запрашиваем данные
-    msg.append(_(f"Пробуем запустить {str(system).upper()}"))
+    msg.append(_(f"Пробуем запустить {str(system).upper()} {mandant if mandant else ''} {t.upper() if t else ''}"))
     print_log(msg, stop='Z')
 
     db = Database()
@@ -427,10 +460,13 @@ def run(system, mandant, u='', p='', l='RU', v=0, t=''):
     argument.append(item)
 
     # Добавляем номер манданта
-    item = '-client=' + sap_data[ans][1]
+    client = sap_data[ans][1]
+    # Если манданты имеею длину меньше чем 3 символа, например, 001, 002, то дополняем их лидирующими нулями
+    # все осатльные системы, например, 100, остаются как есть.
+    item = '-client=' + str.zfill(client, 3)
     argument.append(item)
 
-    # Добавляем язык для входа. по умолчанию подставляется RU, если не указано другое.
+    # Добавляем язык для входа. по умолчанию подставляетс-я RU, если не указано другое.
     item = '-language=' + l
     argument.append(item)
 
@@ -445,8 +481,8 @@ def run(system, mandant, u='', p='', l='RU', v=0, t=''):
 
     # Добавляем пароль
     # можно вводить пароль самостоятельно отличный от пароля в БДe
-    if p:
-        item = '-pw=' + p
+    if pw:
+        item = '-pw=' + pw
         argument.append(item)
     else:
         item = '-pw=' + Crypto.decrypto(sap_data[ans][3])
@@ -454,10 +490,28 @@ def run(system, mandant, u='', p='', l='RU', v=0, t=''):
 
     # Добавляем код транзакции
     if t:
-        item = '-command=' + t
-        argument.append(item)
-        item = '-type=transaction'
-        argument.append(item)
+        if p:
+            # TODO: сделать использование параметра коммады с параметрами.
+            # sapshcut.exe -user="gababitskii" -pw="<f,bwrbq1" -system="AKE" -client="100" -command="*SE11 RSRD1-TBMA_VAL=VTBFHA;*"
+            # используем -t для запуска транзакции и -v для передачи параметров. В зависимости от транзакции нужно держать список полей
+
+            parameter_list = p.split('+')
+            # item = f"-command=\"{t.upper()} VTGFHA-BUKRS={parameter_list[0]};VTGFHA-RFHA={parameter_list[1]};\""
+            item = '-command="*TM_52 VTGFHA-BUKRS=TRM1;"'  # VTGFHA-RFHA=100000000057;" '
+
+            argument.append(item)
+            print(item)
+            # item = '-type=transaction'
+            # argument.append(item)
+        else:
+            item = '-command=' + t
+            argument.append(item)
+            item = '-type=transaction'
+            argument.append(item)
+
+    # Окно на весь экран
+    item = '-maxgui'
+    argument.append(item)
 
     # Запускаем SAP
     ret = subprocess.call(argument)
@@ -503,10 +557,12 @@ def database():
 def add(system, mandant, user, password):
     """ Добавление SAP систем в базу данных """
 
-    db = Database()
-    db.add(str(system).upper(), mandant, str(user).upper(), Crypto.encrypto(str.encode(password)))
+    client = str(mandant).zfill(3)
 
-    result = db.query(str(system).upper(), mandant, str(user).upper())
+    db = Database()
+    db.add(str(system).upper(), client, str(user).upper(), Crypto.encrypto(str.encode(password)))
+
+    result = db.query(str(system).upper(), client, str(user).upper())
 
     if result:
         for item in result:
@@ -534,13 +590,14 @@ def add(system, mandant, user, password):
 )
 def update(system, mandant, user, password):
     """ Обновление пароля для SAP системы """
+    client = str(mandant).zfill(3)
 
     db = Database()
-    db.update(str(system).upper(), mandant, str(user).upper(), Crypto.encrypto(str.encode(password)))
+    db.update(str(system).upper(), client, str(user).upper(), Crypto.encrypto(str.encode(password)))
 
     msg.clear()
     msg.append(colored(_('Пароль обновлен для следующей системы:'), 'green'))
-    sys_list.append([str(system).upper(), mandant, str(user).upper()])
+    sys_list.append([str(system).upper(), client, str(user).upper()])
     print_log(msg, sys_list)
 
 
@@ -551,16 +608,17 @@ def update(system, mandant, user, password):
 @click.option('-user', prompt=True, help=_('пользователь'))
 def delete(system, mandant, user):
     """ Удаление указанной SAP системы из базы данных """
+    client = str(mandant).zfill(3)
 
     db = Database()
-    db.delete(str(system).upper(), mandant, str(user).upper())
+    db.delete(str(system).upper(), client, str(user).upper())
 
-    result = db.query(system, mandant, user, 'x')
+    result = db.query(system, client, user, 'x')
 
     if not result:
         msg.clear()
         msg.append(colored(_('Удалена следующая система:'), 'green'))
-        sys_list.append([str(system).upper(), mandant, str(user).upper()])
+        sys_list.append([str(system).upper(), client, str(user).upper()])
         print_log(msg, sys_list)
 
 
@@ -603,7 +661,6 @@ def ini():
         print_log(msg)
 
 
-@functools.lru_cache()
 @cli.command('show')
 @click.option('-s', required=False, help=_('показать выбранную систему'))
 @click.option('-all', is_flag=True, required=False, help=_('показать все системы'))
