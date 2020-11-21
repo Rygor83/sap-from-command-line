@@ -9,8 +9,10 @@ import gettext
 import os
 import subprocess
 import sys
-
 import click
+import pyperclip
+import time
+
 from colorama import init
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -25,6 +27,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from termcolor import colored
+from ctypes import windll
+
 
 public_file = 'public_key.txt'
 private_file = 'private_key.txt'
@@ -52,9 +56,7 @@ def print_sys_table(systems: list, v: bool = 0):
     if v:
         header.append(_('Пароль'))
     t = PrettyTable(header)
-    count = 0
-    for system in systems:
-        count = count + 1
+    for count, system in enumerate(systems, start=1):
         row = [count, system[0], system[1], system[2]]
         if v:
             row.append(Crypto.decrypto(system[3]))
@@ -339,13 +341,16 @@ def check_existence(file_extension) -> bool:
         if os.path.isfile(path_db):
             file_exists = True
             return file_exists
+        else:
+            file_exists = True
+            return file_exists
 
-    if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}{file_extension}"):
-        file_exists = True
-        return file_exists
-    else:
-        file_exists = False
-        return file_exists
+    # if os.path.isfile(f"{os.path.splitext(os.path.basename(__file__))[0]}{file_extension}"):
+    #     file_exists = True
+    #     return file_exists
+    # else:
+    #     file_exists = False
+    #     return file_exists
 
 
 if check_existence('.ini'):
@@ -387,12 +392,41 @@ def logon():
 @click.argument('system')
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
 @click.option('-u', help=_('пользователь'))
-def pw(system, mandant, u=''):
-    """ Копирует пароль от заданной системы в буфер обмена. Стирает буфер обмена через 30 секунд \n
+def pw(system, mandant):
+    """ Копирует пароль от заданной системы в буфер обмена. Стирает буфер обмена через 15 секунд \n
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
-    # TODO: Реализова на подобии команды RUN
-    #       Как копировать в буфер обмена и как стирать буфер обмена
+    db = Database()
+    sap_data = db.query(str(system).upper(), mandant)
+
+    ans = ''
+    if len(sap_data) >= 2:
+        msg.clear()
+        msg.append(_('Выбраны следующие пользователи: '))
+        print_log(msg, sap_data, stop='Z')
+
+        while not ans.isdigit() or int(ans) > len(sap_data) or int(ans) < 1:
+            if ans.isdigit() and 1 <= int(ans) <= len(sap_data):
+                break
+            msg.clear()
+            msg.append(_(f"Возможно вводить значения только от 1 до {str(len(sap_data))}."))
+            msg.append(_('Выберите пользователя, под которым хотим войти в систему'))
+            ans = print_log(msg, stop='Y')
+        ans = int(ans) - 1
+    else:
+        ans = 0
+
+    pyperclip.copy(Crypto.decrypto(sap_data[ans][3]))
+    msg.clear()
+    msg.append('Пароль скопирован в буфер обмена')
+    ans = print_log(msg, stop='Z')
+    time.sleep(15)
+    if windll.user32.OpenClipboard(None):
+        windll.user32.EmptyClipboard()
+        windll.user32.CloseClipboard()
+    msg.clear()
+    msg.append('Буфер обмена очищен')
+    ans = print_log(msg, stop='X')
 
 
 # noinspection PyShadowingNames,PyUnboundLocalVariable,PyTypeChecker

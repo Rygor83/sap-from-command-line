@@ -1,0 +1,6 @@
+Click
+colorama
+cryptography
+PTable
+SQLAlchemy
+termcolor
