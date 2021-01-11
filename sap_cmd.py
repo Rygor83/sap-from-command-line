@@ -1,15 +1,15 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2019.
+#   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
-
-import ctypes
-import subprocess
-import time
-from ctypes import windll
 
 import click
 import pyperclip
-from colorama import init
+import ctypes
+import subprocess
+import time
+import traceback
+
+from ctypes import windll
 from prettytable import PrettyTable
 
 from crypto import *
@@ -18,15 +18,11 @@ from database import *
 msg = []
 sys_list = []
 
-init()
 
-
-class Sap(Base):
-    __tablename__ = 'sap'
-    system_id = Column(String(3), primary_key=True)
-    mandant_num = Column(String(3), primary_key=True)
-    user_id = Column(String(10), primary_key=True)
-    password = Column(BLOB)
+def show_exception_and_exit(exc_type, exc_value, tb):
+    traceback.print_exception(exc_type, exc_value, tb)
+    input('Нажсмите для продолжения ... ')
+    sys.exit(-1)
 
 
 def print_sys_table(systems: list, v: bool = 0):
@@ -476,4 +472,5 @@ def hlp():
 
 
 if __name__ == '__main__':
+    sys.excepthook = show_exception_and_exit
     cli()

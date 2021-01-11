@@ -1,6 +1,7 @@
 #  ------------------------------------------
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
+
 import configparser
 import functools
 import os
