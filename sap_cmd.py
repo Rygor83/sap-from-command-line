@@ -2,62 +2,17 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-import click
-import pyperclip
-import ctypes
 import subprocess
 import time
-import traceback
+import ctypes
+import pyperclip
 
-from ctypes import windll
-from prettytable import PrettyTable
-
-from crypto import *
 from database import *
+from utilities import *
+from config import *
 
 msg = []
 sys_list = []
-
-
-def show_exception_and_exit(exc_type, exc_value, tb):
-    traceback.print_exception(exc_type, exc_value, tb)
-    input('Нажсмите для продолжения ... ')
-    sys.exit(-1)
-
-
-def print_sys_table(systems: list, v: bool = 0):
-    # TODO: Сделать функцию динамическую, чтобы можно было засовывать разные заголовки
-
-    header = ['№', 'Система', 'Мандант', 'Пользователь']
-    if v:
-        header.append('Пароль')
-    t = PrettyTable(header)
-    for count, system in enumerate(systems, start=1):
-        row = [count, system[0], system[1], system[2]]
-        if v:
-            row.append(Crypto.decrypto(system[3]))
-        t.add_row(row)
-    click.echo(t)
-
-
-# noinspection PyDefaultArgument
-def print_log(messages=[], systems=[], v: bool = 0, stop=''):
-    click.echo()
-    for message in messages:
-        click.echo(message)
-    if systems:
-        print_sys_table(systems, v)
-    if stop == 'X':
-        click.echo()
-        return input('нажмите Enter или любой текст для выхода: ')
-    elif stop == 'Y':
-        ans = input('> ')
-        return ans
-    elif stop == 'Z':
-        return
-    else:
-        click.echo()
-        return click.pause('нажмите Enter ...')
 
 
 @click.group()
@@ -71,15 +26,14 @@ def logon():
     """ Запуск SAPLogon """
 
     # Считываем конфигурационный файл
-    conf = Config()
-    conf.get_config()
+    config = Config()
+    config.read()
 
     # Запускаем saplogon.exe
-    saplogon_exe_path = conf.config['APPLICATION']['sap']
+    saplogon_exe_path = config.data['APPLICATION']['sap']
     if not str(saplogon_exe_path).endswith('saplogon.exe'):
-        msg.clear()
-        msg.append(colored('в ini файле не найден путь к saplogon.exe', 'yellow'))
-        print_log(msg)
+        click.echo(click.style('В ini файле не найден путь к saplogon.exe \n', bg='black', fg='yellow'))
+        click.pause('Нажмите для продолжения ...')
         sys.exit()
 
     click.launch(saplogon_exe_path)
@@ -117,9 +71,9 @@ def pw(system, mandant):
     msg.append('Пароль скопирован в буфер обмена')
     ans = print_log(msg, stop='Z')
     time.sleep(15)
-    if windll.user32.OpenClipboard(None):
-        windll.user32.EmptyClipboard()
-        windll.user32.CloseClipboard()
+    if ctypes.windll.user32.OpenClipboard(None):
+        ctypes.windll.user32.EmptyClipboard()
+        ctypes.windll.user32.CloseClipboard()
     msg.clear()
     msg.append('Буфер обмена очищен')
     ans = print_log(msg, stop='X')
@@ -140,14 +94,13 @@ def run(system, mandant, u='', pw='', l='RU', v=0, t='', p=''):
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     # Считываем конфигурационный файл
-    conf = Config()
-    conf.get_config()
+    config = Config()
+    config.read()
 
-    sapshcut_exe_path = conf.config['APPLICATION']['command_line']
+    sapshcut_exe_path = config.data['APPLICATION']['command_line']
     if not sapshcut_exe_path.endswith('sapshcut.exe'):
-        msg.clear()
-        msg.append(colored('в ini файле не найден путь к sapshcut.exe', 'yellow'))
-        print_log(msg)
+        click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', bg='black', fg='yellow'))
+        click.pause('Нажмите для продолжения ...')
         sys.exit()
 
     # Подсоединяемся к базе данных и запрашиваем данные
@@ -221,18 +174,19 @@ def run(system, mandant, u='', pw='', l='RU', v=0, t='', p=''):
     # Добавляем код транзакции
     if t:
         if p:
-            # TODO: сделать использование параметра коммады с параметрами.
-            # sapshcut.exe -user="gababitskii" -pw="<f,bwrbq1" -system="AKE" -client="100"
-            # -command="*SE11 RSRD1-TBMA_VAL=VTBFHA;*"
+            param_data = db.query_param(str(t).upper())
 
-            parameter_list = p.split('+')
-            # item = f"-command=\"{t.upper()} VTGFHA-BUKRS={parameter_list[0]};VTGFHA-RFHA={parameter_list[1]};\""
-            item = '-command="*TM_52 VTGFHA-BUKRS=TRM1;"'  # VTGFHA-RFHA=100000000057;" '
+            # TODO: сделать использование параметра коммады с параметрами.
+            # sapshcut.exe -user="gababitskii" -pw="<f,bwrbq1" -system="AKE" -client="100" -command="*SE11 RSRD1-TBMA_VAL=VTBFHA;*"
+            # используем -t для запуска транзакции и -v для передачи параметров. В зависимости от транзакции нужно держать список полей
+
+            item = f"-command=\"*{t.upper()} {param_data[0][1]}={p}\""
+            # item = '-command="*TM_52 VTGFHA-BUKRS=TRM1;"'  # VTGFHA-RFHA=100000000057;" '
 
             argument.append(item)
             print(item)
-            # item = '-type=transaction'
-            # argument.append(item)
+            item = '-type=transaction'
+            argument.append(item)
         else:
             item = '-command=' + t
             argument.append(item)
@@ -247,32 +201,34 @@ def run(system, mandant, u='', pw='', l='RU', v=0, t='', p=''):
     ret = subprocess.call(argument)
 
     if ret:
-        print(ret)
-        input('нажмите Enter ...')
+        click.echo(ret)
+        click.pause('Нажмите для продолжения ...')
 
 
 @cli.command('db')
 def database():
     """ Создание базы данных для хранеия информкции о SAP системах """
 
-    conf = Config()
-    conf.get_config()
-    path_db = conf.config['DATABASE']['path']
+    db_name = Database.db_name
+    ini_file = Config.ini_file
+
+    config = Config()
+    config.read()
+    path_db = config.data['DATABASE']['path']
 
     # Проверяем путь к базе данных из конфига
     if os.path.isfile(path_db):
-        print(colored('База данных уже существует.', 'yellow'))
-        input('Нажмите для продолжения ...')
+        click.echo(click.style('База данных уже существует \n', bg='black', fg='yellow'))
+        click.pause('Нажмите для продолжения ...')
     else:
-        # Путь из конфига не существует, значит проверим базу данных в папке скрипта
-        db_name = Database.db_name
-
         eng = create_engine(f"sqlite:///{db_name}")
         Base.metadata.create_all(eng)
-        msg.clear()
-        msg.append(colored(_('База данных создана'), 'green'))
-        msg.append(_('Если база данных будет перемещена, то следует указать ее путь в *.ini файле'))
-        print_log(msg)
+
+        click.echo(click.style('База данных создана \n', bg='black', fg='green'))
+        click.echo('Путь: %s \n' % click.format_filename(db_name))
+        click.echo(click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', bg='red', fg='white'))
+        click.echo(click.style(f'Путь к базе данных следует указать в {ini_file} \n', bg='black', fg='white'))
+        click.pause('Нажмите для продолжения ...')
 
 
 @cli.command('add')
@@ -304,9 +260,8 @@ def add(system, mandant, user, password):
             sys_list.append([item[0], item[1], item[2]])
             print_log(msg, sys_list)
     else:
-        msg.clear()
-        msg.append(colored('Что-то пошло не так ...', 'white', 'on_red'))
-        print_log(msg)
+        click.echo(click.style('Не удалось добавить системы в базу данных ... \n', bg='red', fg='white'))
+        click.pause('Нажмите для продолжения ...')
 
 
 @cli.command('update')
@@ -359,39 +314,13 @@ def delete(system, mandant, user):
 def ini():
     """ Создание конфигурационного ini файла """
 
-    ini_file = Config.ini_file
+    config = Config()
 
-    if os.path.isfile(ini_file):
-        msg.clear()
-        msg.append(colored('ini файл уже существует.', 'yellow'))
-        print_log(msg)
+    if config.exists():
+        click.echo(click.style('INI файл уже существует \n', bg='black', fg='yellow'))
+        click.pause('Нажмите для продолжения ...')
     else:
-        config = configparser.ConfigParser()
-        config['DATABASE'] = {'path': f"{os.path.splitext(os.path.basename(__file__))[0]}.db"}
-
-        config['APPLICATION'] = {'command_line': 'путь до файла sapshcut.exe',
-                                 'sap': 'путь до файла saplogon.exe'}
-
-        config['KEYS'] = {Crypto.public_file: 'путь до публичного ключа',
-                          Crypto.private_file: 'путь до приватного ключа. ключ хранить в защищенном хранилище'}
-
-        # Определение языка
-        windll = ctypes.windll.kernel32
-        lng_code = windll.GetUserDefaultUILanguage()
-        if lng_code == 1049:
-            ini_lang = 'RU'
-        else:
-            ini_lang = 'EN'
-        config['LANGUAGE'] = {'language': ini_lang}
-
-        print(os.path.basename(__file__))
-        with open(f"{os.path.splitext(os.path.basename(__file__))[0]}.ini", 'w') as configfile:
-            config.write(configfile)
-
-        msg.clear()
-        msg.append(colored('ini файл создан.', 'green'))
-        msg.append('!!! Заполните все требуемые параметры в файле !!!')
-        print_log(msg)
+        config.create()
 
 
 @cli.command('show')
@@ -426,10 +355,10 @@ def keys():
 @cli.command('ver', help='Текущая версия SAP shortcut')
 def ver():
     # Считываем конфигурационный файл
-    conf = Config()
-    conf.get_config()
+    config = Config()
+    config.read()
 
-    sapshcut_exe_path = conf.config['APPLICATION']['command_line']
+    sapshcut_exe_path = config.data['APPLICATION']['command_line']
     if not sapshcut_exe_path.endswith('sapshcut.exe'):
         msg.clear()
         msg.append(colored('в ini файле не найден путь к sapshcut.exe', 'yellow'))
@@ -450,10 +379,10 @@ def ver():
 @cli.command('help', help='SAP GUI shortcut help')
 def hlp():
     # Считываем конфигурационный файл
-    conf = Config()
-    conf.get_config()
+    config = Config()
+    config.read()
 
-    sapshcut_exe_path = conf.config['APPLICATION']['command_line']
+    sapshcut_exe_path = config.data['APPLICATION']['command_line']
     if not sapshcut_exe_path.endswith('sapshcut.exe'):
         msg.clear()
         msg.append(colored('в ini файле не найден путь к sapshcut.exe', 'yellow'))

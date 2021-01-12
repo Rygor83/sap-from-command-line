@@ -2,6 +2,9 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
+import os
+import click
+import sys
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
@@ -9,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 
-from config import *
+import config as cfg
 
 Base = declarative_base()
 
@@ -37,16 +40,17 @@ class Database(object):
 
     def __init__(self):
 
-        conf = Config()
-        conf.get_config()
-        path_db = conf.config['DATABASE']['path']
+        conf = cfg.Config()
+        conf.read()
+        path_db = conf.data['DATABASE']['path']
         if os.path.isfile(path_db):
             engine = create_engine(f"sqlite:///{path_db}")
             session = sessionmaker(bind=engine)
             self.session = session()
         else:
-            print(colored('Базы данных не существует. Для создания запустите команду "db" ', 'yellow'))
-            input('Нажмите для продолжения')
+            click.echo(click.style('Базы данных не существует. Для создания запустите команду "db"  \n', bg='black',
+                                   fg='yellow'))
+            click.pause('Нажмите для продолжения ...')
             sys.exit()
 
     def query(self, system='', mandant='', user='', check=''):
@@ -78,9 +82,10 @@ class Database(object):
             return result
         else:
             if not check:
-                print(colored('По указанным данным найти ничего не получилось', 'yellow'))
-                print([system, client, user])
-                input('Нажмите для продолжения')
+                click.echo(click.style('По указанным данным найти ничего не получилось  \n', bg='black',
+                                       fg='yellow'))
+                click.echo([system, client, user])
+                click.pause('Нажмите для продолжения ...')
                 sys.exit()
 
     def query_param(self, trans=''):
@@ -118,9 +123,10 @@ class Database(object):
         try:
             self.session.commit()
         except IntegrityError:
-            print(colored('Данные уже существуют в базе данных:', 'yellow'))
-            print([system, client, user])
-            input('Нажмите для продолжения')
+            click.echo(click.style('Данные уже существуют в базе данных:  \n', bg='black',
+                                   fg='yellow'))
+            click.echo([system, client, user])
+            click.pause('Нажмите для продолжения ...')
             sys.exit()
 
     def update(self, system, mandant, user, password):
@@ -132,9 +138,9 @@ class Database(object):
             result.password = password
             self.session.commit()
         else:
-            print(colored('Ничего не найден для удаления по введенным данным:', 'yellow'))
-            print([system, client, user])
-            input('Нажмите для продолжения')
+            click.echo(click.style('Ничего не найден для удаления по введенным данным: \n', bg='black', fg='yellow'))
+            click.echo([system, client, user])
+            click.pause('Нажмите для продолжения ...')
             sys.exit()
 
     def delete(self, system, mandant, user):
@@ -150,8 +156,8 @@ class Database(object):
             result = query.filter(Sap.system_id == system, Sap.mandant_num == client,
                                   Sap.user_id == user).one()
         except NoResultFound:
-            print(colored('Ничего не найден для удаления по введенным данным:', 'yellow'))
-            print([system, client, user])
-            input('Нажмите для продолжения')
+            click.echo(click.style('Ничего не найден для удаления по введенным данным: \n', bg='black', fg='yellow'))
+            click.echo([system, client, user])
+            click.pause('Нажмите для продолжения ...')
             sys.exit()
         return result
