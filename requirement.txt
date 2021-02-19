@@ -1,6 +1,9 @@
 Click
 colorama
 cryptography
-PTable
 SQLAlchemy
 termcolor
+setuptools
+pyperclip
+prettytable
+pytest

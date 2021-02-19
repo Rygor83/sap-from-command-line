@@ -19,11 +19,11 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
 
-    install_requires=['click', 'SQLAlchemy', 'cryptography', 'pyperclip', 'prettytable'],
+    install_requires=['click', 'SQLAlchemy', 'cryptography', 'pyperclip', 'prettytable', 'appdirs'],
 
     entry_points={
         'console_scripts': [
-            'tasks = sap.cli:sap_cli',
+            'sap = sap.cli:sap_cli',
         ]
     },
 )

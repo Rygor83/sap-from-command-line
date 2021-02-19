@@ -24,6 +24,7 @@ def pw(sap_system):
 
 
 def run(sap_system):
+    """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
     return _sapdb.run(sap_system)
 
 

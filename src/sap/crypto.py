@@ -8,6 +8,8 @@ import click
 import sys
 import os
 
+import sap.utilities as utilities
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -16,10 +18,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 class Crypto(object):
-    public_file = 'public_key_path'
-    private_file = 'private_key_path'
-    public = 'public'
-    private = 'private'
+    public = 'public_key.txt'
+    private = 'private_key.txt'
+
+    public_file = os.path.join(utilities.path(), public)
+    private_file = os.path.join(utilities.path(), private)
 
     @staticmethod
     def generate_keys():
@@ -27,10 +30,10 @@ class Crypto(object):
         Создание ключей шифрования: публичный ключ и приватный ключа
         """
 
-        conf = cfg.Config()
-        conf.read()
-        path_public_key = conf.data['KEYS'][Crypto.public_file]
-        path_private_key = conf.data['KEYS'][Crypto.private_file]
+        cfg = sap.config.Config()
+        _config = cfg.read()
+        path_public_key = _config.public_key_path
+        path_private_key = _config.private_key_path
 
         if not os.path.isfile(path_public_key) and not os.path.isfile(path_private_key):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
@@ -45,15 +48,15 @@ class Crypto(object):
                                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
             Crypto.save_key(public_pem, Crypto.public_file)
             click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
-                                   bg='black', fg='green'))
+                                   **utilities.color_success))
             click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
-                                   bg='black', fg='green'))
+                                   **utilities.color_success))
             click.echo('Необходимо указать их расположение в файле *.ini')
             click.echo(click.style(f"Файл {Crypto.private_file} должен находиться в зашифрованном хранилище",
-                                   bg='red', fg='white'))
+                                   **utilities.color_sensitive))
             click.pause('Нажмите для продолжения ...')
         else:
-            click.echo(click.style("Ключи шифрования уже созданы", bg='black', fg='yellow'))
+            click.echo(click.style("Ключи шифрования уже созданы", **utilities.color_warning))
             click.pause('Нажмите для продолжения ...')
             sys.exit()
 
@@ -74,7 +77,7 @@ class Crypto(object):
                 public_key = serialization.load_pem_public_key(message, backend=default_backend())
         except FileNotFoundError:
             click.echo(
-                click.style('Публичный ключ шифрования не доступен. Проверьте доступ', bg='black', fg='yellow'))
+                click.style('Публичный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
             click.pause('Нажмите для продолжения ...')
             sys.exit()
 
@@ -90,7 +93,7 @@ class Crypto(object):
 
     @staticmethod
     def decrypto(encrypted_password):
-        private_key_file = Crypto.get_key('private')
+        private_key_file = Crypto.get_key(Crypto.private)
 
         try:
             with open(private_key_file, "rb") as key_file:
@@ -99,7 +102,7 @@ class Crypto(object):
                                                                  backend=default_backend())
         except FileNotFoundError:
             click.echo(
-                click.style('Приватный ключ шифрования не доступен. Проверьте доступ', bg='black', fg='yellow'))
+                click.style('Приватный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
             click.pause('Нажмите для продолжения ...')
             sys.exit()
 
@@ -115,7 +118,7 @@ class Crypto(object):
         cfg = sap.config.Config()
         _config = cfg.read()
 
-        if key_type == 'private':
+        if key_type == Crypto.private:
             return _config.private_key_path
-        elif key_type == 'public':
+        elif key_type == Crypto.public:
             return _config.public_key_path

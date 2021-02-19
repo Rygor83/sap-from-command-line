@@ -21,7 +21,6 @@ def sap_cli():
     """ Скрипт для запуска SAP систем из командной строки """
 
 
-# noinspection PyShadowingNames
 @sap_cli.command('logon')
 def logon():
     """ Запуск SAPLogon """
@@ -32,7 +31,7 @@ def logon():
 
     saplogon_exe_path = _config.saplogon_path
     if not os.path.exists(saplogon_exe_path):
-        click.echo(click.style(f'Путь до saplogon.exe не верный: \n{saplogon_exe_path} \n', bg='black', fg='yellow'))
+        click.echo(click.style(f'Путь до saplogon.exe не верный: \n{saplogon_exe_path} \n', **utilities.color_warning))
         sys.exit()
 
     click.launch(saplogon_exe_path)
@@ -46,76 +45,142 @@ def pw(system, mandant):
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     with _sap_db():
+        timeout = 15
+
         sap_system = Sap_system(str(system).upper(), str(mandant).upper() if mandant else '', '', '')
         result = sap.pw(sap_system)
 
         if not result:
             utilities.no_result_output(system, mandant)
 
-        selected_system = choose_system([Sap_system(*item) for item in result])
-        pyperclip.copy(Crypto.decrypto(selected_system.password))
+        selected_system = utilities.choose_system(
+            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
+        pyperclip.copy(selected_system.password)
 
-        click.echo(click.style('Пароль скопирован в буфер обмена \n', bg='black', fg='green'))
-        time.sleep(15)
+        click.echo(
+            click.style(f'Пароль скопирован в буфер обмена.\nБуфер обмена будет очищен через {timeout} секунд.\n',
+                        **utilities.color_message))
+        click.echo(
+            click.style(
+                'Если пользуетесь Clipboard manager, то следует внести приложения PY.EXE, CMD.EXE в исключения,\n'
+                'чтобы не хранить чувствительну информацию.\n',
+                **utilities.color_sensitive))
+
+        time.sleep(timeout)
         if ctypes.windll.user32.OpenClipboard(None):
             ctypes.windll.user32.EmptyClipboard()
         ctypes.windll.user32.CloseClipboard()
-        click.echo(click.style('Буфер обмена очищен \n', bg='black', fg='green'))
+
+        click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
         click.pause('Нажмите для продолжения ...')
 
 
-def choose_system(result, v=''):
-    ans = 0
-    if len(result) >= 2:
-        utilities.print_system_list(result, 'Доступные системы', v=v)
+@sap_cli.command('debug')
+@click.argument('system', required=False)
+@click.argument('mandant', required=False, type=click.IntRange(1, 999))
+@click.option('-u', '--user', 'user', help='пользователь')
+@click.option('-pw', '--password', 'password', help='пароль')
+@click.option('-l', '--language', 'language', help='язык входа', default='RU')
+@click.option('-v', '--verbose', 'verbose', help='показать параметры запуска', is_flag=True, type=click.BOOL)
+@click.option('-f', '--file', 'file', help='создать файл для печати', is_flag=True, type=click.BOOL)
+def debug(system, mandant='', user='', password='', language='RU', verbose=False, file=False):
+    if file:
+        file_name = 'DEBUG.TXT'
 
-        while int(ans) > len(result) or int(ans) < 1:
-            if 1 <= int(ans) <= len(result):
-                break
-            click.echo(click.style(f"\nВозможно вводить значения только от 1 до {str(len(result))}.", bg='black',
-                                   fg='white'))
-            ans = click.prompt('Выберите систему, в которую хотите войти \n>>>', type=int)
-        ans = ans - 1
+        click.echo(f'Сейчас создастся файл {file_name}')
+        click.echo('Сразу после создания откроется папка с файлом\n')
+        click.pause('Нажмите любую клавишу')
 
-    system = Sap_system(result[ans].system, result[ans].mandant, result[ans].user, result[ans].password)
-    return system
+        path = utilities.path()
+        file_path = path + '\\' + file_name
+        with open(file_path, 'w') as writer:
+            writer.write('[FUNCTION]\n')
+            writer.write('Command =/H\n')
+            writer.write('Title=Debugger\n')
+            writer.write('Type=SystemCommand')
+
+        raw_s = r'explorer /select,' + r'{}'.format(file_path)
+        subprocess.Popen(raw_s)
+
+    else:
+        with _sap_db():
+            sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
+                                    str(user).upper() if user else '', '')
+            result = sap.run(sap_system)
+
+            if not result:
+                utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
+
+            cfg = sap.config.Config()
+            _config = cfg.read()
+
+            sapshcut_exe_path = _config.command_line_path
+            if not os.path.exists(sapshcut_exe_path):
+                click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
+                click.pause('Нажмите для продолжения ...')
+                sys.exit()
+
+            selected_system = utilities.choose_system(
+                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result], verbose)
+
+            if verbose:
+                utilities.print_system_list([selected_system], 'Информация о запускаемой системе', verbose)
+                click.pause('Нажмите для продолжения ... ')
+
+            # Добавляем параметры для запуска SAP системы
+            argument = [
+                sapshcut_exe_path,  # Путь до sapshcut.exe
+                f"-system={selected_system.system}",  # Id системы
+                f"-client={str.zfill(selected_system.mandant, 3)}",  # Номер манданта
+                f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
+                f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
+                f"-language={language}",  # Язык для входа
+                '-maxgui',  # Развернуть окно на весь экран
+            ]
+
+            item = '-command=/H'
+            argument.append(item)
+            item = '-type=SystemCommand'
+            argument.append(item)
+
+            ret = subprocess.call(argument)
 
 
-# noinspection PyShadowingNames,PyUnboundLocalVariable,PyTypeChecker
 @sap_cli.command('run')
 @click.argument('system')
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', help='пользователь')
-@click.option('-pw', help='пароль')
-@click.option('-l', help='язык входа', default='RU')
-@click.option('-v', help='показать параметры запуска', is_flag=True, type=click.BOOL)
-@click.option('-t', help='код транзакции')
-@click.option('-p', help='параметры для транзакции')
-def run(system, mandant='', u='', pw='', l='RU', v=False, t='', p=''):
+@click.option('-u', '--user', 'user', help='пользователь')
+@click.option('-pw', '--password', 'password', help='пароль')
+@click.option('-l', '--language', 'language', help='язык входа', default='RU')
+@click.option('-v', '--verbose', 'verbose', help='показать параметры запуска', is_flag=True, type=click.BOOL)
+@click.option('-t', '--transaction', 'transaction', help='код транзакции')
+@click.option('-p', '--parameter', 'parameter', help='параметры для транзакции')
+def run(system, mandant='', user='', password='', language='RU', verbose=False, transaction='', parameter=''):
     """ Запуск указанной SAP системы \n
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     with _sap_db():
         sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
-                                str(u).upper() if u else '', '')
+                                str(user).upper() if user else '', '')
         result = sap.run(sap_system)
 
         if not result:
-            utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), u)
+            utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
 
         cfg = sap.config.Config()
         _config = cfg.read()
 
         sapshcut_exe_path = _config.command_line_path
         if not os.path.exists(sapshcut_exe_path):
-            click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', bg='black', fg='yellow'))
+            click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
             click.pause('Нажмите для продолжения ...')
             sys.exit()
 
-        selected_system = choose_system([Sap_system(*item) for item in result], v)
+        selected_system = utilities.choose_system(
+            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result], verbose)
 
-        if v:
-            utilities.print_system_list([selected_system], 'Информация о запускаемой системе', v)
+        if verbose:
+            utilities.print_system_list([selected_system], 'Информация о запускаемой системе', verbose)
             click.pause('Нажмите для продолжения ... ')
 
         # Добавляем параметры для запуска SAP системы
@@ -123,29 +188,35 @@ def run(system, mandant='', u='', pw='', l='RU', v=False, t='', p=''):
             sapshcut_exe_path,  # Путь до sapshcut.exe
             f"-system={selected_system.system}",  # Id системы
             f"-client={str.zfill(selected_system.mandant, 3)}",  # Номер манданта
-            f"-user={u}" if u else f"-user={selected_system.user}",  # Пользователь
-            f"-pw={pw}" if pw else f"-pw={Crypto.decrypto(selected_system.password)}",  # Пароль
-            f"-language={l}",  # Язык для входа
+            f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
+            f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
+            f"-language={language}",  # Язык для входа
             '-maxgui',  # Развернуть окно на весь экран
         ]
 
-        # Добавляем код транзакции
-        if t:
-            if p:
-                # TODO: Доделать запуск транзакции с параметрами
-
-                param_data = sap.query_param(str(t).upper())
-
-                item = f"-command=\"*{t.upper()} {param_data[0][1]}={p}\""
-                # item = '-command="*TM_52 VTGFHA-BUKRS=TRM1;"'  # VTGFHA-RFHA=100000000057;" '
-
-                argument.append(item)
-                print(item)
-            else:
-                item = '-command=' + t
-                argument.append(item)
+        if transaction:
             item = '-type=transaction'
             argument.append(item)
+
+            if parameter:
+                # TODO: Доделать запуск транзакции с параметрами
+
+                # param_data = sap.query_param(str(transaction).upper())
+
+                # item = f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""
+                # item = '-command=\"*TM_52 VTGFHA-BUKRS=TRM1; VTGFHA-RFHA=100000000057;\"'
+                item = '-command=\"/n*FBM1 BKPF-BUKRS=1000;\"'
+                argument.append(item)
+
+                print(item)
+            else:
+                item = '-command=' + transaction
+                argument.append(item)
+
+        # # Для просмотра параметров вызова
+        # for item in argument:
+        #     print(item)
+        # click.pause('wait')
 
         # Запускаем SAP
         ret = subprocess.call(argument)
@@ -172,8 +243,8 @@ def database():
     '-password',
     help='SAP password',
     prompt=True,
-    # confirmation_prompt=True,
-    # hide_input=True,
+    confirmation_prompt=True,
+    hide_input=True,
 )
 def add(system, mandant, user, password):
     """ Add sap system with it's parameters to db."""
@@ -184,7 +255,7 @@ def add(system, mandant, user, password):
         result = sap.add(sap_system)
 
     if result:
-        click.echo(click.style('Не удалось добавить системы в базу данных ... \n', bg='red', fg='white'))
+        click.echo(click.style('Не удалось добавить системы в базу данных ... \n', **utilities.color_sensitive))
         click.echo(result)
     else:
         utilities.print_system_list([sap_system], 'Добавлена следующая система: ')
@@ -210,16 +281,17 @@ def add(system, mandant, user, password):
 def update(system, mandant, user, password):
     """ Обновление пароля для SAP системы """
     encrypted_password = Crypto.encrypto(str.encode(password))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password)
+    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password)
+    sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password)
 
     with _sap_db():
-        result = sap.update(sap_system)
+        result = sap.update(sap_encrypted_system)
 
         if result is None:
-            utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
-        else:
             utilities.print_system_list([sap_system], 'Обновленная система', True)
             click.pause('Нажмите для продолжения ...')
+        else:
+            utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
 
 
 @sap_cli.command('delete')
@@ -250,25 +322,28 @@ def config():
     cfg = sap.config.Config()
 
     if cfg.exists():
-        click.echo(click.style('Config уже существует \n', bg='black', fg='yellow'))
+        click.echo(click.style('Config уже существует \n', **utilities.color_warning))
         click.pause('Нажмите для продолжения ...')
     else:
         cfg.create()
 
 
 @sap_cli.command('list')
-@click.option('-s', required=False, help='показать выбранную систему')
-@click.option('-v', help='показать пароли', is_flag=True)
-def list_systems(s, v):
+@click.option('-s', '--system', 'system', required=False, help='показать выбранную систему')
+@click.option('-v', '--verbose', 'verbose', help='показать пароли', is_flag=True)
+def list_systems(system, verbose):
     """ Информация о SAP системах находящихся в базе данных """
 
     with _sap_db():
-        result = sap.list_systems(str(s).upper() if s else '')
+        result = sap.list_systems(str(system).upper() if system else '')
 
         if not result:
-            utilities.no_result_output(s)
+            utilities.no_result_output(system)
 
-        utilities.print_system_list([Sap_system(*item) for item in result], 'Список доступных систем', v)
+        systems_list = [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '') for item in
+                        result]
+
+        utilities.print_system_list(systems_list, 'Список доступных систем', verbose)
         click.pause('Нажмите для продолжения ...')
 
 
@@ -285,7 +360,8 @@ def shortcut_version():
     cfg = sap.config.Config()
     _config = cfg.read()
 
-    utilities.launch_command_line_with_params(_config.command_line_path, '-version')
+    parameter = '-version'
+    utilities.launch_command_line_with_params(_config.command_line_path, parameter)
 
 
 @sap_cli.command('help', help='SAP GUI shortcut help')
@@ -300,7 +376,9 @@ def shortcut_help():
 @sap_cli.command('start')
 def start():
     # TODO: создать команду для начального формирования ключей, базы данных, конфига и прописи всех данных в конфиг
-    pass
+    database()
+    config()
+    Crypto.generate_keys()
 
 
 @contextmanager

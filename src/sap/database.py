@@ -3,6 +3,9 @@
 #  ------------------------------------------
 import os
 
+import click
+import sap.utilities as utilities
+
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +23,8 @@ class Sap(Base):
     user_id = Column(String(10), primary_key=True)
     password = Column(BLOB)
 
+    # TODO: Добавить колонку "Описание" с описанием системы т.к. иногда не понятно, что за система и чья она
+
 
 class Param(Base):
     __tablename__ = 'parameters'
@@ -28,51 +33,58 @@ class Param(Base):
 
 
 class SapDB():  # noqa : E801
-    """Wrapper class for TinyDB.
-
-    The methods in this class need to match
-    all database interaction classes.
-
-    So far, this is:
-    TasksDB_MongoDB found in tasksdb_pymongo.py.
-    TasksDB_TinyDB found in tasksdb_tinydb.py.
-    """
+    """ Класс по работе с базой данных   """
     session = ''
 
     def __init__(self, db_path, db_type):  # type (str) -> ()
         """Connect to db."""
+        self.database_name = 'database.db'
+        self.database_type = db_type if db_type else 'sqlite'
+        self.database_path = os.path.join(utilities.path(), self.database_name)
+
         if os.path.exists(db_path):
-            engine = create_engine(f"{db_type}:///{db_path}")
+            # Путь из файла
+            engine = create_engine(f"{self.database_type}:///{db_path}")
+            session = sessionmaker(bind=engine)
+            self.session = session()
+        elif os.path.exists(self.database_path):
+            # Путь по умолчанию
+            engine = create_engine(f"{self.database_type}:///{self.database_path}")
             session = sessionmaker(bind=engine)
             self.session = session()
         else:
-            engine = create_engine(f"sqlite:///{self.db_name}")
+            # Пути нет, значит создаем БД в пути по умолчанию
+            engine = create_engine(f"{self.database_type}:///{self.database_path}")
             Base.metadata.create_all(engine)
 
             session = sessionmaker(bind=engine)
             self.session = session()
 
-            click.echo(click.style('База данных создана \n', bg='black', fg='green'))
-            click.echo('Путь: %s \n' % click.format_filename(self.db_name))
-            click.echo(click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', bg='red', fg='white'))
+            click.echo(click.style('База данных создана \n', **utilities.color_warning))
+            click.echo('Путь: %s \n' % click.format_filename(self.database_path))
             click.echo(
-                click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n', bg='black', fg='white'))
+                click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', **utilities.color_sensitive))
+            click.echo(
+                click.style(f'Путь к базе данных следует указать в ini файле \n',
+                            **utilities.color_message))
             click.pause('Нажмите для продолжения ...')
 
     def create(db_path, db_type):
         if os.path.exist():  # self.exists():
-            click.echo(click.style('Базы данных существует. \n', bg='black', fg='yellow'))
+            click.echo(click.style('Базы данных существует. \n', **utilities.color_warning))
             click.pause('Нажмите для продолжения ...')
             sys.exit()
         else:
             engine = create_engine(f"sqlite:///{self.db_name}")
             Base.metadata.create_all(engine)
 
-            click.echo(click.style('База данных создана \n', bg='black', fg='green'))
+            click.echo(click.style('База данных создана \n', **utilities.color_success))
             click.echo('Путь: %s \n' % click.format_filename(self.db_name))
-            click.echo(click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', bg='red', fg='white'))
             click.echo(
-                click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n', bg='black', fg='white'))
+                click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', **utilities.color_sensitive))
+            click.echo(
+                click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n',
+                            **utilities.color_message))
             click.pause('Нажмите для продолжения ...')
 
     def add(self, sap_system):  # type (namedtuple) -> list
@@ -89,7 +101,7 @@ class SapDB():  # noqa : E801
         return result
 
     def run(self, sap_system):  # # type (namedtuple) -> list
-        """Return a task dict with matching id."""
+        """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
         if sap_system.system:
             query = query.filter_by(system_id=sap_system.system)

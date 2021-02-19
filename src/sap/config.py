@@ -2,11 +2,12 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-from collections import namedtuple
-from configparser import ConfigParser
 import ctypes
 import os
 import click
+import sap.utilities as utilities
+from collections import namedtuple
+from configparser import ConfigParser
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
                                      'private_key_path', 'language'])
@@ -15,7 +16,8 @@ SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 
 class Config(object):
 
     def __init__(self):
-        self.ini_file_path = 'config.ini'
+        self.ini_name = 'sap_config.ini'
+        self.config_path = os.path.join(utilities.path(), self.ini_name)
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -23,7 +25,7 @@ class Config(object):
         if not self.exists():
             self.create()
         else:
-            a = parser.read(self.ini_file_path)
+            a = parser.read(self.config_path)
 
             db_path = parser.get('DATABASE', 'db_path')
             db_type = parser.get('DATABASE', 'db_type')
@@ -60,14 +62,17 @@ class Config(object):
             parser.write(configfile)
 
         click.echo('Путь: %s \n' % click.format_filename(self.ini_file_path))
-        click.echo(click.style('INI файл создан', bg='black', fg='green'))
-        click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', bg='black', fg='white'))
+        click.echo(click.style('INI файл создан', **utilities.color_success))
+        click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
         click.pause('Нажмите для продолжения ...')
 
-        click.launch(self.ini_file_path)
+        click.launch(self.config_path)
 
     def exists(self):
-        if os.path.exists(self.ini_file_path):
+        if os.path.exists(self.config_path):
             return True
         else:
             return False
+
+    def open_config(self):
+        click.launch(self.config_path)
