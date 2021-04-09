@@ -6,8 +6,8 @@ from collections import namedtuple
 from six import string_types
 
 # Sap system parameters : [system: str, mandant: int, user: str, password: byte]
-Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password'])
-Sap_system.__new__.__defaults__ = (None, None, None, None)
+Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'transaction'])
+Sap_system.__new__.__defaults__ = (None, None, None, None, None)
 
 
 # custom exceptions

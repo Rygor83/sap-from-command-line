@@ -19,6 +19,14 @@ color_success = {'bg': 'black', 'fg': 'green'}
 color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
+# Заголовки таблиц
+header_nsmup = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль']  # NSMUP: Number, System, Mandant, User, Password
+header_nsmu = ['№', 'Система', 'Мандант', 'Пользователь']  # NSMU: Number, System, Mandant, User
+header_nsmut = ['№', 'Система', 'Мандант', 'Пользователь', 'Транзакция']  # NSMU: Number, System, Mandant, User
+header_nsmutp = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль',
+                 'Транзакция']  # NSMU: Number, System, Mandant, User, Password, Transaction
+header_nsm = ['№', 'Система', 'Мандант']  # NSM: Number, System, Mandant
+
 
 def launch_command_line_with_params(command_line_path, param):
     ''' Запуск sapshcut.exe с разными параметрами'''
@@ -38,7 +46,7 @@ def launch_command_line_with_params(command_line_path, param):
 def choose_system(result, verbose=False):
     ans = 0
     if len(result) >= 2:
-        print_system_list(result, 'Доступные системы', verbose=verbose)
+        print_system_list(result, 'Доступные системы', header_nsmu, verbose=verbose)
 
         while int(ans) > len(result) or int(ans) < 1:
             if 1 <= int(ans) <= len(result):
@@ -52,26 +60,35 @@ def choose_system(result, verbose=False):
     return system
 
 
-def print_system_list(systems: list, title, verbose=False):
+def print_system_list(systems: list, title, header: list, verbose=False):
+    # TODO: Сделать универсальным:
+    #  на вход подавать так же и заголовок.
+    #  Затем функцию подавать в:
+    #  1. Когда пытаемся запустить системы: мол пробуем запустить то-то и то-то
+    #     вместо модуля NO_RESULT_OUTPUT
+    #  2. Когда не удалось получить данные системы
+
     sorted_systems = sorted(systems, key=attrgetter('system', 'mandant'))
 
-    # Формируем заголовок таблицы
-    header = ['№', 'Система', 'Мандант', 'Пользователь']
     if verbose:
         header.append('Пароль')
 
     # Создаем таблицу
     t = PrettyTable(header)
 
-    # Выравнивание
-    t.align["Пользователь"] = "l"
-    t.align["Пароль"] = "l"
-
     # Добавление информации в табилцу
     for num, system in enumerate(sorted_systems, start=1):
-        row = [num, system.system, system.mandant, system.user]
+        row = [num, system.system]
+        if system.mandant:
+            row.append(system.mandant)
+        if system.user:
+            row.append(system.user)
+            t.align["Пользователь"] = "l"
+        if system.transaction:
+            row.append(system.transaction)
         if verbose:
             row.append(system.password)
+            t.align["Пароль"] = "l"
         t.add_row(row)
 
     # Вывод информации

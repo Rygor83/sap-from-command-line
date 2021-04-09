@@ -9,6 +9,8 @@ import time
 import ctypes
 import pyperclip
 import sys
+import time
+
 import sap.config
 from contextlib import contextmanager
 from sap.api import Sap_system
@@ -47,32 +49,35 @@ def pw(system, mandant):
     with _sap_db():
         timeout = 15
 
-        sap_system = Sap_system(str(system).upper(), str(mandant).upper() if mandant else '', '', '')
+        sap_system = Sap_system(str(system).upper(), str(mandant).upper() if mandant else '')
         result = sap.pw(sap_system)
 
         if not result:
-            utilities.no_result_output(system, mandant)
+            # utilities.no_result_output(system, mandant)
+            utilities.print_system_list([Sap_system(str(system).upper(), mandant)],
+                                        'По следующим параметрам ничего не найдено', utilities.header_nsm)
+            click.pause('Нажмите для продолжения ...')
+        else:
+            selected_system = utilities.choose_system(
+                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
+            pyperclip.copy(selected_system.password)
 
-        selected_system = utilities.choose_system(
-            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
-        pyperclip.copy(selected_system.password)
+            click.echo(
+                click.style(f'Пароль скопирован в буфер обмена.\nБуфер обмена будет очищен через {timeout} секунд.\n',
+                            **utilities.color_message))
+            click.echo(
+                click.style(
+                    'Если пользуетесь Clipboard manager, то следует внести приложения PY.EXE, CMD.EXE в исключения,\n'
+                    'чтобы не хранить чувствительну информацию.\n',
+                    **utilities.color_sensitive))
 
-        click.echo(
-            click.style(f'Пароль скопирован в буфер обмена.\nБуфер обмена будет очищен через {timeout} секунд.\n',
-                        **utilities.color_message))
-        click.echo(
-            click.style(
-                'Если пользуетесь Clipboard manager, то следует внести приложения PY.EXE, CMD.EXE в исключения,\n'
-                'чтобы не хранить чувствительну информацию.\n',
-                **utilities.color_sensitive))
+            time.sleep(timeout)
+            if ctypes.windll.user32.OpenClipboard(None):
+                ctypes.windll.user32.EmptyClipboard()
+            ctypes.windll.user32.CloseClipboard()
 
-        time.sleep(timeout)
-        if ctypes.windll.user32.OpenClipboard(None):
-            ctypes.windll.user32.EmptyClipboard()
-        ctypes.windll.user32.CloseClipboard()
-
-        click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
-        click.pause('Нажмите для продолжения ...')
+            click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
+            click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('debug')
@@ -81,9 +86,10 @@ def pw(system, mandant):
 @click.option('-u', '--user', 'user', help='пользователь')
 @click.option('-pw', '--password', 'password', help='пароль')
 @click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-v', '--verbose', 'verbose', help='показать параметры запуска', is_flag=True, type=click.BOOL)
 @click.option('-f', '--file', 'file', help='создать файл для печати', is_flag=True, type=click.BOOL)
-def debug(system, mandant='', user='', password='', language='RU', verbose=False, file=False):
+def debug(system, mandant='', user='', password='', language='RU', file=False):
+    ''' Запуск дебага любой выбранной системы или создание файла для дебага диалоговых окон'''
+
     if file:
         file_name = 'DEBUG.TXT'
 
@@ -105,7 +111,7 @@ def debug(system, mandant='', user='', password='', language='RU', verbose=False
     else:
         with _sap_db():
             sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
-                                    str(user).upper() if user else '', '')
+                                    str(user).upper() if user else '')
             result = sap.run(sap_system)
 
             if not result:
@@ -121,11 +127,7 @@ def debug(system, mandant='', user='', password='', language='RU', verbose=False
                 sys.exit()
 
             selected_system = utilities.choose_system(
-                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result], verbose)
-
-            if verbose:
-                utilities.print_system_list([selected_system], 'Информация о запускаемой системе', verbose)
-                click.pause('Нажмите для продолжения ... ')
+                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
 
             # Добавляем параметры для запуска SAP системы
             argument = [
@@ -152,16 +154,15 @@ def debug(system, mandant='', user='', password='', language='RU', verbose=False
 @click.option('-u', '--user', 'user', help='пользователь')
 @click.option('-pw', '--password', 'password', help='пароль')
 @click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-v', '--verbose', 'verbose', help='показать параметры запуска', is_flag=True, type=click.BOOL)
 @click.option('-t', '--transaction', 'transaction', help='код транзакции')
 @click.option('-p', '--parameter', 'parameter', help='параметры для транзакции')
-def run(system, mandant='', user='', password='', language='RU', verbose=False, transaction='', parameter=''):
+def run(system, mandant='', user='', password='', language='RU', transaction='', parameter=''):
     """ Запуск указанной SAP системы \n
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     with _sap_db():
         sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
-                                str(user).upper() if user else '', '')
+                                str(user).upper() if user else '')
         result = sap.run(sap_system)
 
         if not result:
@@ -177,11 +178,7 @@ def run(system, mandant='', user='', password='', language='RU', verbose=False, 
             sys.exit()
 
         selected_system = utilities.choose_system(
-            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result], verbose)
-
-        if verbose:
-            utilities.print_system_list([selected_system], 'Информация о запускаемой системе', verbose)
-            click.pause('Нажмите для продолжения ... ')
+            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
 
         # Добавляем параметры для запуска SAP системы
         argument = [
@@ -213,10 +210,17 @@ def run(system, mandant='', user='', password='', language='RU', verbose=False, 
                 item = '-command=' + transaction
                 argument.append(item)
 
-        # # Для просмотра параметров вызова
-        # for item in argument:
-        #     print(item)
-        # click.pause('wait')
+        # Показываем, что будем запускать
+        if transaction:
+            header = utilities.header_nsmut
+        else:
+            header = utilities.header_nsmu
+
+        utilities.print_system_list([Sap_system(selected_system.system, selected_system.mandant, selected_system.user,
+                                                '', str(transaction).upper() if transaction else '')],
+                                    'Пробуем запустить следующую систему',
+                                    header)
+        time.sleep(2)
 
         # Запускаем SAP
         ret = subprocess.call(argument)
@@ -258,7 +262,7 @@ def add(system, mandant, user, password):
         click.echo(click.style('Не удалось добавить системы в базу данных ... \n', **utilities.color_sensitive))
         click.echo(result)
     else:
-        utilities.print_system_list([sap_system], 'Добавлена следующая система: ')
+        utilities.print_system_list([sap_system], 'Добавлена следующая система: ', utilities.header_nsmu)
 
     click.pause('Нажмите для продолжения ...')
 
@@ -288,7 +292,7 @@ def update(system, mandant, user, password):
         result = sap.update(sap_encrypted_system)
 
         if result is None:
-            utilities.print_system_list([sap_system], 'Обновленная система', True)
+            utilities.print_system_list([sap_system], 'Обновленная система', utilities.header_nsmu, verbose=True)
             click.pause('Нажмите для продолжения ...')
         else:
             utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
@@ -302,7 +306,7 @@ def update(system, mandant, user, password):
 def delete(system, mandant, user):
     """ Удаление указанной SAP системы из базы данных """
     mandant = int(str(mandant).zfill(3))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), '')
+    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper())
 
     with _sap_db():
         result = sap.delete(sap_system)
@@ -311,7 +315,7 @@ def delete(system, mandant, user):
             utilities.no_result_output(system, mandant, user)
             exit()
 
-        utilities.print_system_list([sap_system], 'Удалена следующая система')
+        utilities.print_system_list([sap_system], 'Удалена следующая система', utilities.header_nsmu)
         click.pause('Нажмите для продолжения ...')
 
 
@@ -323,6 +327,7 @@ def config():
 
     if cfg.exists():
         click.echo(click.style('Config уже существует \n', **utilities.color_warning))
+        click.echo(utilities.path())
         click.pause('Нажмите для продолжения ...')
     else:
         cfg.create()
@@ -343,8 +348,12 @@ def list_systems(system, verbose):
         systems_list = [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '') for item in
                         result]
 
-        utilities.print_system_list(systems_list, 'Список доступных систем', verbose)
-        click.pause('Нажмите для продолжения ...')
+        utilities.print_system_list(systems_list, 'Список доступных систем', utilities.header_nsmu, verbose)
+        if verbose:
+            click.pause('Нажмите для продолжения. Данные о паролях будут очищены с экрана ...')
+            os.system('cls')
+        else:
+            click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('keys')

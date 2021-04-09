@@ -1,9 +1,0 @@
-Click
-colorama
-cryptography
-SQLAlchemy
-termcolor
-setuptools
-pyperclip
-prettytable
-pytest
