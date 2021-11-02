@@ -56,7 +56,7 @@ def pw(system, mandant):
             # utilities.no_result_output(system, mandant)
             utilities.print_system_list([Sap_system(str(system).upper(), mandant)],
                                         'По следующим параметрам ничего не найдено', utilities.header_nsm)
-            click.pause('Нажмите для продолжения ...')
+            # click.pause('Нажмите для продолжения ...')
         else:
             selected_system = utilities.choose_system(
                 [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
@@ -77,7 +77,7 @@ def pw(system, mandant):
             ctypes.windll.user32.CloseClipboard()
 
             click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
-            click.pause('Нажмите для продолжения ...')
+            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('debug')
@@ -123,7 +123,7 @@ def debug(system, mandant='', user='', password='', language='RU', file=False):
             sapshcut_exe_path = _config.command_line_path
             if not os.path.exists(sapshcut_exe_path):
                 click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-                click.pause('Нажмите для продолжения ...')
+                # click.pause('Нажмите для продолжения ...')
                 sys.exit()
 
             selected_system = utilities.choose_system(
@@ -174,7 +174,7 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
         sapshcut_exe_path = _config.command_line_path
         if not os.path.exists(sapshcut_exe_path):
             click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-            click.pause('Нажмите для продолжения ...')
+            # click.pause('Нажмите для продолжения ...')
             sys.exit()
 
         selected_system = utilities.choose_system(
@@ -220,14 +220,13 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
                                                 '', str(transaction).upper() if transaction else '')],
                                     'Пробуем запустить следующую систему',
                                     header)
-        time.sleep(2)
 
         # Запускаем SAP
         ret = subprocess.call(argument)
 
         if ret:
             click.echo(ret)
-            click.pause('Нажмите для продолжения ...')
+            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('db')
@@ -264,7 +263,7 @@ def add(system, mandant, user, password):
     else:
         utilities.print_system_list([sap_system], 'Добавлена следующая система: ', utilities.header_nsmu)
 
-    click.pause('Нажмите для продолжения ...')
+    # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('update')
@@ -276,11 +275,8 @@ def add(system, mandant, user, password):
     '-password',
     help='пароль',
     prompt=True,
-
-    # TODO: убрать комментарии для пароля
-
-    # confirmation_prompt=True,
-    # hide_input=True
+    confirmation_prompt=True,
+    hide_input=True
 )
 def update(system, mandant, user, password):
     """ Обновление пароля для SAP системы """
@@ -293,7 +289,7 @@ def update(system, mandant, user, password):
 
         if result is None:
             utilities.print_system_list([sap_system], 'Обновленная система', utilities.header_nsmu, verbose=True)
-            click.pause('Нажмите для продолжения ...')
+            # click.pause('Нажмите для продолжения ...')
         else:
             utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
 
@@ -316,7 +312,7 @@ def delete(system, mandant, user):
             exit()
 
         utilities.print_system_list([sap_system], 'Удалена следующая система', utilities.header_nsmu)
-        click.pause('Нажмите для продолжения ...')
+        # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('config')
@@ -328,7 +324,7 @@ def config():
     if cfg.exists():
         click.echo(click.style('Config уже существует \n', **utilities.color_warning))
         click.echo(utilities.path())
-        click.pause('Нажмите для продолжения ...')
+        # click.pause('Нажмите для продолжения ...')
     else:
         cfg.create()
 
@@ -353,7 +349,8 @@ def list_systems(system, verbose):
             click.pause('Нажмите для продолжения. Данные о паролях будут очищены с экрана ...')
             os.system('cls')
         else:
-            click.pause('Нажмите для продолжения ...')
+            pass
+            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('keys')
@@ -385,9 +382,23 @@ def shortcut_help():
 @sap_cli.command('start')
 def start():
     # TODO: создать команду для начального формирования ключей, базы данных, конфига и прописи всех данных в конфиг
-    database()
-    config()
-    Crypto.generate_keys()
+    pass
+
+
+@sap_cli.command('backup')
+def backup():
+    # TODO: создать команду для бэкапа ini фалов, sap logon систем
+    #	Бэкап должен шифроваться текущим ключом шифрования
+
+    # Пути к saplogon.ini брать отсюда 2580439
+    pass
+
+
+@sap_cli.command('launch')
+def launch():
+	#TODO: сделать таблицу https ардесов для SAP системы,
+	# путь до браузера, чтобы запускать их в браузере.
+	pass
 
 
 @contextmanager

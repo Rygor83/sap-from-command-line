@@ -33,7 +33,7 @@ def launch_command_line_with_params(command_line_path, param):
     if not os.path.exists(command_line_path):
         click.echo(
             click.style(f'Путь до sapshcut.exe не верный: \n{command_line_path} \n', **color_warning))
-        click.pause('Нажмите для продолжения ...')
+        # click.pause('Нажмите для продолжения ...')
         sys.exit()
 
     # Добавляем путь к командному файлу
@@ -112,7 +112,7 @@ def no_result_output(system, mandant='', user=''):
 
 def show_exception_and_exit(exc_type, exc_value, tb):
     traceback.print_exception(exc_type, exc_value, tb)
-    click.pause('Нажмите для продолжения ...')
+    # click.pause('Нажмите для продолжения ...')
     sys.exit(-1)
 
 
@@ -138,7 +138,7 @@ def get_run_parameters(system, mandant='', user='', password='', language='RU', 
     sapshcut_exe_path = _config.command_line_path
     if not os.path.exists(sapshcut_exe_path):
         click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-        click.pause('Нажмите для продолжения ...')
+        # click.pause('Нажмите для продолжения ...')
         sys.exit()
 
     selected_system = utilities.choose_system(

@@ -8,8 +8,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='sap',
-    version='0.1.5',
-    license='proprietary',
+    version='0.2',  # Версию нужно править и в __init__.py
+    license='MIT',
     description='Launch sap systems from saplogon with sapshcut.exe',
 
     author='Rygor',

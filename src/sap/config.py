@@ -58,10 +58,10 @@ class Config(object):
             ini_lang = 'EN'
         parser['LOCALE'] = {'language': ini_lang}
 
-        with open(self.ini_file_path, 'w') as configfile:
+        with open(self.config_path, 'w') as configfile:
             parser.write(configfile)
 
-        click.echo('Путь: %s \n' % click.format_filename(self.ini_file_path))
+        click.echo('Путь: %s \n' % click.format_filename(self.config_path))
         click.echo(click.style('INI файл создан', **utilities.color_success))
         click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
         click.pause('Нажмите для продолжения ...')
