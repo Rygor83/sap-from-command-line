@@ -22,6 +22,8 @@ class Sap(Base):
     mandant_num = Column(String(3), primary_key=True)
     user_id = Column(String(10), primary_key=True)
     password = Column(BLOB)
+    customer = Column(String(20), primary_key=False)
+    description = Column(String(20), primary_key=False)
 
     # TODO: Добавить колонку "Описание" с описанием системы т.к. иногда не понятно, что за система и чья она
 
@@ -92,7 +94,9 @@ class SapDB():  # noqa : E801
         record = Sap(system_id=sap_system.system,
                      mandant_num=sap_system.mandant,
                      user_id=str(sap_system.user).zfill(3),
-                     password=sap_system.password)
+                     password=sap_system.password,
+                     customer=sap_system.customer,
+                     description=sap_system.description)
         result = self.session.add(record)
         try:
             self.session.commit()
@@ -102,10 +106,11 @@ class SapDB():  # noqa : E801
 
     def run(self, sap_system):  # # type (namedtuple) -> list
         """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
-        
-        #TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*, чтобы система искала какие системы есть и выводила для выбора
-        
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
+
+        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*, чтобы система искала какие системы есть и выводила для выбора
+
+        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
+                                   Sap.description)
         if sap_system.system:
             query = query.filter_by(system_id=sap_system.system)
         if sap_system.mandant:
@@ -116,10 +121,11 @@ class SapDB():  # noqa : E801
 
     def list_systems(self, system):  # type (str) -> list[dict]
         """Return list of tasks."""
-        
-        #TODO: Сделать Fuzzy search если пользователь ошибся
 
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
+        # TODO: Сделать Fuzzy search если пользователь ошибся
+
+        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
+                                   Sap.description)
         if system:
             query = query.filter_by(system_id=system)
         return query.all()
@@ -148,6 +154,8 @@ class SapDB():  # noqa : E801
 
         if result:
             result.password = sap_system.password
+            result.customer = sap_system.customer
+            result.description = sap_system.description
             self.session.commit()
 
     def delete(self, sap_system):  # type (namedtuple) -> bool

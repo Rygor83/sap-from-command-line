@@ -178,7 +178,7 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
             sys.exit()
 
         selected_system = utilities.choose_system(
-            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
+            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]), '', item[4], item[5]) for item in result])
 
         # Добавляем параметры для запуска SAP системы
         argument = [
@@ -216,17 +216,18 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
         else:
             header = utilities.header_nsmu
 
-        utilities.print_system_list([Sap_system(selected_system.system, selected_system.mandant, selected_system.user,
-                                                '', str(transaction).upper() if transaction else '')],
-                                    'Пробуем запустить следующую систему',
-                                    header)
+        # TODO: Доработать вывод
+
+        # utilities.print_system_list([Sap_system(selected_system.system, selected_system.mandant, selected_system.user,
+        #                                         '', str(transaction).upper() if transaction else '')],
+        #                             'Пробуем запустить следующую систему',
+        #                             header)
 
         # Запускаем SAP
         ret = subprocess.call(argument)
 
         if ret:
             click.echo(ret)
-            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('db')
@@ -239,22 +240,20 @@ def database():
 
 @sap_cli.command('add')
 @click.option('-system', prompt=True, help='SAP system')
-@click.option(
-    '-mandant', prompt=True, help='SAP Client', type=click.IntRange(1, 999))
+@click.option('-mandant', prompt=True, help='SAP Client', type=click.IntRange(1, 999))
 @click.option('-user', prompt=True, help='SAP user')
-@click.option(
-    '-password',
-    help='SAP password',
-    prompt=True,
-    confirmation_prompt=True,
-    hide_input=True,
-)
-def add(system, mandant, user, password):
+@click.option('-password', help='SAP password', prompt=True, confirmation_prompt=True,
+              # hide_input=True,
+              )
+@click.option('-customer', prompt=True, help="Customer", type=click.STRING)
+@click.option('-description', prompt=True, help="System description", type=click.STRING)
+def add(system, mandant, user, password, description, customer):
     """ Add sap system with it's parameters to db."""
 
     with _sap_db():
         encrypted_password = Crypto.encrypto(str.encode(password))
-        sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password)
+        sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
+                                '', str(customer).upper(), str(description))
         result = sap.add(sap_system)
 
     if result:
@@ -276,20 +275,23 @@ def add(system, mandant, user, password):
     help='пароль',
     prompt=True,
     confirmation_prompt=True,
-    hide_input=True
+    # hide_input=True
 )
-def update(system, mandant, user, password):
+@click.option('-customer', prompt=True, help="Customer", type=click.STRING)
+@click.option('-description', prompt=True, help="System description", type=click.STRING)
+def update(system, mandant, user, password, customer, description):
     """ Обновление пароля для SAP системы """
     encrypted_password = Crypto.encrypto(str.encode(password))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password)
-    sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password)
+    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password, '', str(customer),
+                            str(description))
+    sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
+                                      '', str(customer), str(description))
 
     with _sap_db():
         result = sap.update(sap_encrypted_system)
 
         if result is None:
             utilities.print_system_list([sap_system], 'Обновленная система', utilities.header_nsmu, verbose=True)
-            # click.pause('Нажмите для продолжения ...')
         else:
             utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
 
@@ -341,8 +343,9 @@ def list_systems(system, verbose):
         if not result:
             utilities.no_result_output(system)
 
-        systems_list = [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '') for item in
-                        result]
+        systems_list = [
+            Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '', '', item[4], item[5]) for
+            item in result]
 
         utilities.print_system_list(systems_list, 'Список доступных систем', utilities.header_nsmu, verbose)
         if verbose:
@@ -396,9 +399,9 @@ def backup():
 
 @sap_cli.command('launch')
 def launch():
-	#TODO: сделать таблицу https ардесов для SAP системы,
-	# путь до браузера, чтобы запускать их в браузере.
-	pass
+    # TODO: сделать таблицу https ардесов для SAP системы,
+    # путь до браузера, чтобы запускать их в браузере.
+    pass
 
 
 @contextmanager

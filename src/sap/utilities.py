@@ -20,11 +20,13 @@ color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
 # Заголовки таблиц
-header_nsmup = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль']  # NSMUP: Number, System, Mandant, User, Password
-header_nsmu = ['№', 'Система', 'Мандант', 'Пользователь']  # NSMU: Number, System, Mandant, User
-header_nsmut = ['№', 'Система', 'Мандант', 'Пользователь', 'Транзакция']  # NSMU: Number, System, Mandant, User
+header_nsmup = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль', 'Заказчик',
+                'Описание']  # NSMUP: Number, System, Mandant, User, Password
+header_nsmu = ['№', 'Система', 'Мандант', 'Пользователь', 'Заказчик', 'Описание']  # NSMU: Number, System, Mandant, User
+header_nsmut = ['№', 'Система', 'Мандант', 'Пользователь', 'Транзакция', 'Заказчик',
+                'Описание']  # NSMU: Number, System, Mandant, User
 header_nsmutp = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль',
-                 'Транзакция']  # NSMU: Number, System, Mandant, User, Password, Transaction
+                 'Транзакция', 'Заказчик', 'Описание']  # NSMU: Number, System, Mandant, User, Password, Transaction
 header_nsm = ['№', 'Система', 'Мандант']  # NSM: Number, System, Mandant
 
 
@@ -89,6 +91,12 @@ def print_system_list(systems: list, title, header: list, verbose=False):
         if verbose:
             row.append(system.password)
             t.align["Пароль"] = "l"
+        if system.customer:
+            row.append(system.customer)
+            t.align["Заказчик"] = "l"
+        if system.description:
+            row.append(system.description)
+            t.align["Описание"] = "l"
         t.add_row(row)
 
     # Вывод информации
