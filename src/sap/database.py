@@ -23,8 +23,6 @@ class Sap(Base):
     user_id = Column(String(10), primary_key=True)
     password = Column(BLOB)
 
-    # TODO: Добавить колонку "Описание" с описанием системы т.к. иногда не понятно, что за система и чья она
-
 
 class Param(Base):
     __tablename__ = 'parameters'
@@ -102,9 +100,9 @@ class SapDB():  # noqa : E801
 
     def run(self, sap_system):  # # type (namedtuple) -> list
         """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
-        
-        #TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*, чтобы система искала какие системы есть и выводила для выбора
-        
+
+        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*, чтобы система искала какие системы есть и выводила для выбора
+
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
         if sap_system.system:
             query = query.filter_by(system_id=sap_system.system)
@@ -116,8 +114,8 @@ class SapDB():  # noqa : E801
 
     def list_systems(self, system):  # type (str) -> list[dict]
         """Return list of tasks."""
-        
-        #TODO: Сделать Fuzzy search если пользователь ошибся
+
+        # TODO: Сделать Fuzzy search если пользователь ошибся
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
         if system:
