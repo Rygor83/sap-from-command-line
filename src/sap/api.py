@@ -4,10 +4,12 @@
 
 from collections import namedtuple
 from six import string_types
+import sqlalchemy
+import click
 
 # Sap system parameters : [system: str, mandant: int, user: str, password: byte]
-Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'transaction'])
-Sap_system.__new__.__defaults__ = (None, None, None, None, None)
+Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'transaction', 'customer', 'description'])
+Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None)
 
 
 # custom exceptions
@@ -43,6 +45,8 @@ def add(sap_system: Sap_system):
         raise ValueError('sap.user must be str')
     if not isinstance(sap_system.password, bytes):
         raise ValueError('sap.password must be str')
+    if not isinstance(sap_system.description, str):
+        raise ValueError('sap.description must be string')
     if _sapdb is None:
         raise UninitializedDatabase()
 

@@ -56,7 +56,6 @@ def pw(system, mandant):
             # utilities.no_result_output(system, mandant)
             utilities.print_system_list([Sap_system(str(system).upper(), mandant)],
                                         'По следующим параметрам ничего не найдено', utilities.header_nsm)
-            # click.pause('Нажмите для продолжения ...')
         else:
             selected_system = utilities.choose_system(
                 [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
@@ -77,7 +76,6 @@ def pw(system, mandant):
             ctypes.windll.user32.CloseClipboard()
 
             click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
-            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('debug')
@@ -123,11 +121,11 @@ def debug(system, mandant='', user='', password='', language='RU', file=False):
             sapshcut_exe_path = _config.command_line_path
             if not os.path.exists(sapshcut_exe_path):
                 click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-                # click.pause('Нажмите для продолжения ...')
                 sys.exit()
 
             selected_system = utilities.choose_system(
-                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
+                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]), '', item[4], item[5]) for item in
+                 result])
 
             # Добавляем параметры для запуска SAP системы
             argument = [
@@ -161,8 +159,9 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
         Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
     with _sap_db():
-        sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
-                                str(user).upper() if user else '')
+        sap_system = Sap_system(str(system).upper(),
+                                str(mandant).zfill(3) if mandant else '',
+                                str(user).upper() if user else '', '', '', '', '')
         result = sap.run(sap_system)
 
         if not result:
@@ -174,11 +173,10 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
         sapshcut_exe_path = _config.command_line_path
         if not os.path.exists(sapshcut_exe_path):
             click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-            # click.pause('Нажмите для продолжения ...')
             sys.exit()
 
         selected_system = utilities.choose_system(
-            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
+            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]), '', item[4], item[5]) for item in result])
 
         # Добавляем параметры для запуска SAP системы
         argument = [
@@ -216,8 +214,15 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
         else:
             header = utilities.header_nsmu
 
-        utilities.print_system_list([Sap_system(selected_system.system, selected_system.mandant, selected_system.user,
-                                                '', str(transaction).upper() if transaction else '')],
+        # TODO: Доработать вывод
+
+        utilities.print_system_list([Sap_system(selected_system.system,
+                                                selected_system.mandant,
+                                                selected_system.user,
+                                                '',
+                                                str(transaction).upper() if transaction else '',
+                                                selected_system.customer,
+                                                selected_system.description)],
                                     'Пробуем запустить следующую систему',
                                     header)
 
@@ -226,7 +231,6 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
 
         if ret:
             click.echo(ret)
-            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('db')
@@ -239,22 +243,20 @@ def database():
 
 @sap_cli.command('add')
 @click.option('-system', prompt=True, help='SAP system')
-@click.option(
-    '-mandant', prompt=True, help='SAP Client', type=click.IntRange(1, 999))
+@click.option('-mandant', prompt=True, help='SAP Client', type=click.IntRange(1, 999))
 @click.option('-user', prompt=True, help='SAP user')
-@click.option(
-    '-password',
-    help='SAP password',
-    prompt=True,
-    confirmation_prompt=True,
-    hide_input=True,
-)
-def add(system, mandant, user, password):
+@click.option('-password', help='SAP password', prompt=True, confirmation_prompt=True,
+              # hide_input=True,
+              )
+@click.option('-customer', prompt=True, help="Customer", type=click.STRING)
+@click.option('-description', prompt=True, help="System description", type=click.STRING)
+def add(system, mandant, user, password, description, customer):
     """ Add sap system with it's parameters to db."""
 
     with _sap_db():
         encrypted_password = Crypto.encrypto(str.encode(password))
-        sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password)
+        sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
+                                '', str(customer).upper(), str(description))
         result = sap.add(sap_system)
 
     if result:
@@ -262,8 +264,6 @@ def add(system, mandant, user, password):
         click.echo(result)
     else:
         utilities.print_system_list([sap_system], 'Добавлена следующая система: ', utilities.header_nsmu)
-
-    # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('update')
@@ -276,20 +276,29 @@ def add(system, mandant, user, password):
     help='пароль',
     prompt=True,
     confirmation_prompt=True,
-    hide_input=True
+    # hide_input=True
 )
-def update(system, mandant, user, password):
+@click.option('-customer', prompt=True, help="Customer", type=click.STRING)
+@click.option('-description', prompt=True, help="System description", type=click.STRING)
+def update(system, mandant, user, password, customer, description):
     """ Обновление пароля для SAP системы """
+
+    # TODO: вставлять данные уже сущетсвующей системы, чтобы пользователь мог
+    #  решить, изменять или не изменять.
+
     encrypted_password = Crypto.encrypto(str.encode(password))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password)
-    sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password)
+    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password, '', str(customer),
+                            str(description))
+    sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
+                                      '', str(customer), str(description))
 
     with _sap_db():
         result = sap.update(sap_encrypted_system)
 
         if result is None:
             utilities.print_system_list([sap_system], 'Обновленная система', utilities.header_nsmu, verbose=True)
-            # click.pause('Нажмите для продолжения ...')
+            click.pause('Нажмите для продолжения. Данные с паролем будут очищены с экрана ...')
+            os.system('cls')
         else:
             utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
 
@@ -302,7 +311,7 @@ def update(system, mandant, user, password):
 def delete(system, mandant, user):
     """ Удаление указанной SAP системы из базы данных """
     mandant = int(str(mandant).zfill(3))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper())
+    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), '', '', '', '')
 
     with _sap_db():
         result = sap.delete(sap_system)
@@ -312,7 +321,6 @@ def delete(system, mandant, user):
             exit()
 
         utilities.print_system_list([sap_system], 'Удалена следующая система', utilities.header_nsmu)
-        # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('config')
@@ -324,7 +332,6 @@ def config():
     if cfg.exists():
         click.echo(click.style('Config уже существует \n', **utilities.color_warning))
         click.echo(utilities.path())
-        # click.pause('Нажмите для продолжения ...')
     else:
         cfg.create()
 
@@ -341,8 +348,9 @@ def list_systems(system, verbose):
         if not result:
             utilities.no_result_output(system)
 
-        systems_list = [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '') for item in
-                        result]
+        systems_list = [
+            Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '', '', item[4], item[5]) for
+            item in result]
 
         utilities.print_system_list(systems_list, 'Список доступных систем', utilities.header_nsmu, verbose)
         if verbose:
@@ -350,7 +358,6 @@ def list_systems(system, verbose):
             os.system('cls')
         else:
             pass
-            # click.pause('Нажмите для продолжения ...')
 
 
 @sap_cli.command('keys')
@@ -388,17 +395,26 @@ def start():
 @sap_cli.command('backup')
 def backup():
     # TODO: создать команду для бэкапа ini фалов, sap logon систем
-    #	Бэкап должен шифроваться текущим ключом шифрования
+    # Бэкап должен шифроваться текущим ключом шифрования
 
     # Пути к saplogon.ini брать отсюда 2580439
     pass
 
 
 @sap_cli.command('launch')
-def launch():
-	#TODO: сделать таблицу https ардесов для SAP системы,
-	# путь до браузера, чтобы запускать их в браузере.
-	pass
+@click.argument('system')
+@click.argument('mandant', required=False, type=click.IntRange(1, 999))
+@click.option('-u', '--user', 'user', help='пользователь')
+@click.option('-pw', '--password', 'password', help='пароль')
+@click.option('-l', '--language', 'language', help='язык входа', default='RU')
+@click.option('-t', '--transaction', 'transaction', help='код транзакции')
+@click.option('-p', '--parameter', 'parameter', help='параметры для транзакции')
+def launch(system, mandant='', user='', password='', language='RU', transaction='', parameter=''):
+    """ Launch sap system in web """
+
+    # TODO: сделать таблицу https ардесов для SAP системы,
+    # путь до браузера, чтобы запускать их в браузере.
+    pass
 
 
 @contextmanager
