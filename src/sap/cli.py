@@ -27,7 +27,6 @@ def sap_cli():
 def logon():
     """ Запуск SAPLogon """
 
-    # Считываем конфигурационный файл
     cfg = sap.config.Config()
     _config = cfg.read()
 
