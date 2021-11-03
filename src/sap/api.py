@@ -4,6 +4,8 @@
 
 from collections import namedtuple
 from six import string_types
+import sqlalchemy
+import click
 
 # Sap system parameters : [system: str, mandant: int, user: str, password: byte]
 Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'transaction', 'customer', 'description'])

@@ -20,13 +20,11 @@ color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
 # Заголовки таблиц
-header_nsmup = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль', 'Заказчик',
-                'Описание']  # NSMUP: Number, System, Mandant, User, Password
-header_nsmu = ['№', 'Система', 'Мандант', 'Пользователь', 'Заказчик', 'Описание']  # NSMU: Number, System, Mandant, User
-header_nsmut = ['№', 'Система', 'Мандант', 'Пользователь', 'Транзакция', 'Заказчик',
-                'Описание']  # NSMU: Number, System, Mandant, User
+header_nsmup = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль']  # NSMUP: Number, System, Mandant, User, Password
+header_nsmu = ['№', 'Система', 'Мандант', 'Пользователь']  # NSMU: Number, System, Mandant, User
+header_nsmut = ['№', 'Система', 'Мандант', 'Пользователь', 'Транзакция']  # NSMU: Number, System, Mandant, User
 header_nsmutp = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль',
-                 'Транзакция', 'Заказчик', 'Описание']  # NSMU: Number, System, Mandant, User, Password, Transaction
+                 'Транзакция']  # NSMU: Number, System, Mandant, User, Password, Transaction
 header_nsm = ['№', 'Система', 'Мандант']  # NSM: Number, System, Mandant
 
 
@@ -35,7 +33,6 @@ def launch_command_line_with_params(command_line_path, param):
     if not os.path.exists(command_line_path):
         click.echo(
             click.style(f'Путь до sapshcut.exe не верный: \n{command_line_path} \n', **color_warning))
-        # click.pause('Нажмите для продолжения ...')
         sys.exit()
 
     # Добавляем путь к командному файлу
@@ -58,7 +55,8 @@ def choose_system(result, verbose=False):
             ans = click.prompt('Выберите систему, в которую хотите войти \n>>>', type=int)
         ans = ans - 1
 
-    system = Sap_system(result[ans].system, result[ans].mandant, result[ans].user, result[ans].password)
+    system = Sap_system(result[ans].system, result[ans].mandant, result[ans].user, result[ans].password,
+                        result[ans].transaction, result[ans].customer, result[ans].description)
     return system
 
 
@@ -74,6 +72,11 @@ def print_system_list(systems: list, title, header: list, verbose=False):
 
     if verbose:
         header.append('Пароль')
+        header.append('Заказчик')
+        header.append('Описание')
+    else:
+        header.append('Заказчик')
+        header.append('Описание')
 
     # Создаем таблицу
     t = PrettyTable(header)
@@ -114,13 +117,11 @@ def no_result_output(system, mandant='', user=''):
         click.echo(f'Мандант: {mandant}')
     if user:
         click.echo(f'Пользователь: {str(user).upper()}')
-    click.pause('\nНажмите для продолжения ...')
     sys.exit()
 
 
 def show_exception_and_exit(exc_type, exc_value, tb):
     traceback.print_exception(exc_type, exc_value, tb)
-    # click.pause('Нажмите для продолжения ...')
     sys.exit(-1)
 
 
@@ -146,7 +147,6 @@ def get_run_parameters(system, mandant='', user='', password='', language='RU', 
     sapshcut_exe_path = _config.command_line_path
     if not os.path.exists(sapshcut_exe_path):
         click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-        # click.pause('Нажмите для продолжения ...')
         sys.exit()
 
     selected_system = utilities.choose_system(

@@ -2,7 +2,7 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 import os
-
+import sys
 import click
 import sap.utilities as utilities
 
@@ -24,6 +24,7 @@ class Sap(Base):
     password = Column(BLOB)
     customer = Column(String(20), primary_key=False)
     description = Column(String(20), primary_key=False)
+    url = Column(String(250), primary_key=False)
 
     # TODO: Добавить колонку "Описание" с описанием системы т.к. иногда не понятно, что за система и чья она
 
@@ -38,11 +39,11 @@ class SapDB():  # noqa : E801
     """ Класс по работе с базой данных   """
     session = ''
 
-    def __init__(self, db_path, db_type):  # type (str) -> ()
+    def __init__(self, db_path, db_type=''):  # type (str) -> ()
         """Connect to db."""
         self.database_name = 'database.db'
         self.database_type = db_type if db_type else 'sqlite'
-        self.database_path = os.path.join(utilities.path(), self.database_name)
+        self.database_path = db_path if db_path else os.path.join(utilities.path(), self.database_name)
 
         if os.path.exists(db_path):
             # Путь из файла
@@ -71,23 +72,23 @@ class SapDB():  # noqa : E801
                             **utilities.color_message))
             click.pause('Нажмите для продолжения ...')
 
-    def create(db_path, db_type):
-        if os.path.exist():  # self.exists():
+    def create(self):  # db_path='', db_type=''
+        db_path = self.database_path.join(self.database_name)
+        if os.path.exists(db_path):  # self.exists():
             click.echo(click.style('Базы данных существует. \n', **utilities.color_warning))
-            click.pause('Нажмите для продолжения ...')
-            sys.exit()
+            # sys.exit()
         else:
-            engine = create_engine(f"sqlite:///{self.db_name}")
+            engine = create_engine(f"sqlite:///{db_path}")
             Base.metadata.create_all(engine)
 
             click.echo(click.style('База данных создана \n', **utilities.color_success))
-            click.echo('Путь: %s \n' % click.format_filename(self.db_name))
+            click.echo('Путь: %s \n' % click.format_filename(db_path))
             click.echo(
                 click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', **utilities.color_sensitive))
-            click.echo(
-                click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n',
-                            **utilities.color_message))
-            click.pause('Нажмите для продолжения ...')
+            # click.echo(
+            #     click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n',
+            #                 **utilities.color_message))
+            # click.pause('Нажмите для продолжения ...')
 
     def add(self, sap_system):  # type (namedtuple) -> list
         """Add a task dict to db."""
@@ -101,13 +102,14 @@ class SapDB():  # noqa : E801
         try:
             self.session.commit()
         except IntegrityError:
-            pass
+            return result
         return result
 
     def run(self, sap_system):  # # type (namedtuple) -> list
         """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
 
-        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*, чтобы система искала какие системы есть и выводила для выбора
+        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*,
+        #  чтобы система искала какие системы есть и выводила для выбора
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
                                    Sap.description)

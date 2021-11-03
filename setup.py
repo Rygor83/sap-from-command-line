@@ -14,7 +14,6 @@ setup(
 
     author='Rygor',
     author_email='pisemco@gmail.com',
-    url='http://rygor.by',
 
     packages=find_packages(where='src'),
     package_dir={'': 'src'},

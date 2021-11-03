@@ -1,0 +1,9 @@
+appdirs
+click
+cryptography
+prettytable
+pyperclip
+pytest
+setuptools
+six
+sqlalchemy

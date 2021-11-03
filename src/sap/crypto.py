@@ -57,7 +57,6 @@ class Crypto(object):
             click.pause('Нажмите для продолжения ...')
         else:
             click.echo(click.style("Ключи шифрования уже созданы", **utilities.color_warning))
-            click.pause('Нажмите для продолжения ...')
             sys.exit()
 
     @staticmethod
@@ -78,7 +77,6 @@ class Crypto(object):
         except FileNotFoundError:
             click.echo(
                 click.style('Публичный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
-            click.pause('Нажмите для продолжения ...')
             sys.exit()
 
         encrypted_data = public_key.encrypt(
@@ -103,7 +101,6 @@ class Crypto(object):
         except FileNotFoundError:
             click.echo(
                 click.style('Приватный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
-            click.pause('Нажмите для продолжения ...')
             sys.exit()
 
         decrypted_data = private_key.decrypt(encrypted_password,
