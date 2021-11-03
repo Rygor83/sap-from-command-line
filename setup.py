@@ -18,7 +18,8 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
 
-    install_requires=['click', 'SQLAlchemy', 'cryptography', 'pyperclip', 'prettytable', 'appdirs', 'six'],
+    install_requires=['click', 'SQLAlchemy', 'sqlalchemy_utils', 'cryptography', 'pyperclip', 'prettytable', 'appdirs',
+                      'six'],
 
     entry_points={
         'console_scripts': [

@@ -43,14 +43,22 @@ def logon():
 @click.argument('system')
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
 def pw(system, mandant):
-    """ Копирует пароль от заданной системы в буфер обмена. Стирает буфер обмена через 15 секунд \n
-        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
+    """
+    Copy password  for the requested system into clipboard.
+    Wait 15 seconds and clears clipboard.
+
+    Required arguments: \n
+    1. SYSTEM ID \n
+
+    Optional argument: \n
+    2. MANDANT
+    """
 
     with _sap_db():
         timeout = 15
 
         sap_system = Sap_system(str(system).upper(), str(mandant).upper() if mandant else '')
-        result = sap.pw(sap_system)
+        result = sap.query_system(sap_system)
 
         if not result:
             # utilities.no_result_output(system, mandant)
@@ -58,7 +66,8 @@ def pw(system, mandant):
                                         'По следующим параметрам ничего не найдено', utilities.header_nsm)
         else:
             selected_system = utilities.choose_system(
-                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
+                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]), '', item[4], item[5]) for item in
+                 result])
             pyperclip.copy(selected_system.password)
 
             click.echo(
@@ -110,7 +119,7 @@ def debug(system, mandant='', user='', password='', language='RU', file=False):
         with _sap_db():
             sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
                                     str(user).upper() if user else '')
-            result = sap.run(sap_system)
+            result = sap.query_system(sap_system)
 
             if not result:
                 utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
@@ -162,7 +171,7 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
         sap_system = Sap_system(str(system).upper(),
                                 str(mandant).zfill(3) if mandant else '',
                                 str(user).upper() if user else '', '', '', '', '')
-        result = sap.run(sap_system)
+        result = sap.query_system(sap_system)
 
         if not result:
             utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
@@ -337,13 +346,16 @@ def config():
 
 
 @sap_cli.command('list')
-@click.option('-s', '--system', 'system', required=False, help='показать выбранную систему')
+@click.argument('system', required=False)
+@click.argument('mandant', required=False, type=click.IntRange(1, 999))
 @click.option('-v', '--verbose', 'verbose', help='показать пароли', is_flag=True)
-def list_systems(system, verbose):
+def list_systems(system, mandant, verbose):
     """ Информация о SAP системах находящихся в базе данных """
 
     with _sap_db():
-        result = sap.list_systems(str(system).upper() if system else '')
+        sap_system = Sap_system(str(system).upper() if system else '', str(mandant) if mandant else '', '', '', '', '',
+                                '')
+        result = sap.query_system(sap_system)
 
         if not result:
             utilities.no_result_output(system)

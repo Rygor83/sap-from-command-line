@@ -3,26 +3,60 @@
 #  ------------------------------------------
 
 import pytest
+import click
 import os
 from click.testing import CliRunner
 from sap.database import SapDB
 from sap.api import Sap_system
+from sap.crypto import Crypto
 
 
 @pytest.fixture
 def database(tmpdir):
-    return SapDB(db_path=tmpdir, db_type='')
+    path = tmpdir.join('sap_db.db')
+    return SapDB(db_path=path, db_type='')
 
 
 @pytest.fixture
 def db(database, tmpdir):
-    db = database
-    db.create()
-    yield
-    db.delete(Sap_system('XXX', '100', 'Rygor', '12345678', '', 'AK', 'Test system'))
+    database.create()
+    yield database
+    database.stop_sap_db()
+    database.drop()
 
 
 def test_add(db):
-    system = Sap_system('XXX', '100', 'Rygor', '12345678', '', 'AK', 'Test system')
+    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
+    system = Sap_system(*sys_list)
     db.add(system)
-    assert db.list_systems('XXX')
+    del sys_list[4]
+    result_lst = db.list_systems('XXX')
+    assert list(result_lst[0]) == sys_list
+
+
+def test_delete(db):
+    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
+    system = Sap_system(*sys_list)
+    db.add(system)
+    db.delete(system)
+    del sys_list[4]
+    result_lst = db.list_systems('XXX')
+    assert result_lst == []
+
+
+def test_run(db):
+    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
+    system = Sap_system(*sys_list)
+    db.add(system)
+    del sys_list[4]
+    result_lst = db.run(system)
+    assert list(result_lst[0]) == sys_list
+
+
+def test_pw(db):
+    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
+    system = Sap_system(*sys_list)
+    db.add(system)
+    del sys_list[4]
+    result_lst = db.pw(system)
+    assert list(result_lst[0]) == sys_list

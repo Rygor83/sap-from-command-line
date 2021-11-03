@@ -6,13 +6,11 @@ from .api import (
     Sap_system,
     TasksException,
     add,
-    run,
     delete,
     update,
-    pw,
     start_sap_db,
     stop_sap_db,
-    list_systems,
+    query_system,
     query_param,
     database
 )
