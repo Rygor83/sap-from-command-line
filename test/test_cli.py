@@ -30,7 +30,7 @@ def test_add(db):
     system = Sap_system(*sys_list)
     db.add(system)
     del sys_list[4]
-    result_lst = db.list_systems('XXX')
+    result_lst = db.query_system(Sap_system(system='XXX'))
     assert list(result_lst[0]) == sys_list
 
 
@@ -40,23 +40,5 @@ def test_delete(db):
     db.add(system)
     db.delete(system)
     del sys_list[4]
-    result_lst = db.list_systems('XXX')
+    result_lst = db.query_system(Sap_system(system='XXX'))
     assert result_lst == []
-
-
-def test_run(db):
-    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
-    system = Sap_system(*sys_list)
-    db.add(system)
-    del sys_list[4]
-    result_lst = db.run(system)
-    assert list(result_lst[0]) == sys_list
-
-
-def test_pw(db):
-    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
-    system = Sap_system(*sys_list)
-    db.add(system)
-    del sys_list[4]
-    result_lst = db.pw(system)
-    assert list(result_lst[0]) == sys_list

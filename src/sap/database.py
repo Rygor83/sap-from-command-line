@@ -175,49 +175,6 @@ class SapDB():  # noqa : E801
         """Disconnect from DB."""
         self.session.close()
 
-    # \/\/\/\/\/\/\/\/\/\/\/\/\/ TO DELETE METHODS \/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
-
-    def run(self, sap_system):  # # type (namedtuple) -> list
-        """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
-
-        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*,
-        #  чтобы система искала какие системы есть и выводила для выбора
-
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description)
-        if sap_system.system:
-            query = query.filter_by(system_id=sap_system.system)
-        if sap_system.mandant:
-            query = query.filter_by(mandant_num=sap_system.mandant)
-        if sap_system.user:
-            query = query.filter_by(user_id=sap_system.user)
-        return query.all()
-
-    def list_systems(self, system):  # type (str) -> list[dict]
-        """Return list of tasks."""
-
-        # TODO: Сделать Fuzzy search если пользователь ошибся
-
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description)
-        if system:
-            query = query.filter_by(system_id=system)
-        return query.all()
-
-    def pw(self, sap_system):  # # type (namedtuple) -> bool
-        """Return number of tasks in db."""
-
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description)
-        if sap_system.system:
-            query = query.filter_by(system_id=sap_system.system)
-        if sap_system.mandant:
-            query = query.filter_by(mandant_num=sap_system.mandant)
-
-        return query.all()
-
-    # ^^^^^^^^^^^^^^^^^^^^^ TO DELETE METHODS ^^^^^^^^^^^^^^^^^^^^^
-
 
 def start_sap_db(db_path, db_type):
     """Connect to db."""
