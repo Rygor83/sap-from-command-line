@@ -3,12 +3,14 @@
 #  ------------------------------------------
 
 import pytest
-import click
-import os
 from click.testing import CliRunner
+from sap.cli import run, list_systems, add, delete, debug, update
 from sap.database import SapDB
-from sap.api import Sap_system
-from sap.crypto import Crypto
+
+
+@pytest.fixture
+def runner():
+    return CliRunner()
 
 
 @pytest.fixture
@@ -25,20 +27,35 @@ def db(database, tmpdir):
     database.drop()
 
 
-def test_add(db):
-    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
-    system = Sap_system(*sys_list)
-    db.add(system)
-    del sys_list[4]
-    result_lst = db.query_system(Sap_system(system='XXX'))
-    assert list(result_lst[0]) == sys_list
+# def test_run(runner):
+#     result = runner.invoke(run, "dhv 100")
+#     assert result.output == ('\n''\n''+------------------------------------------------------------+\n'
+#                              '|           Trying to LAUNCH the following system            |\n'
+#                              '+-------------+--------+---------+-------------+-------------+\n'
+#                              '| Customer    | System | Mandant | Description | User        |\n'
+#                              '+-------------+--------+---------+-------------+-------------+\n'
+#                              '| BelarusNeft | DHV    | 100     | Dev         | DEVELOPER25 |\n'
+#                              '+-------------+--------+---------+-------------+-------------+\n')
 
 
-def test_delete(db):
-    sys_list = ['XXX', '111', 'rygor', Crypto.encrypto(str.encode('123')), '', 'AK', 'Dev']
-    system = Sap_system(*sys_list)
-    db.add(system)
-    db.delete(system)
-    del sys_list[4]
-    result_lst = db.query_system(Sap_system(system='XXX'))
-    assert result_lst == []
+def test_list(runner):
+    result = runner.invoke(list_systems, "dhv 100")
+    assert result.output == ('\n''\n''+------------------------------------------------------------+\n'
+                             '|                     Available systems                      |\n'
+                             '+-------------+--------+---------+-------------+-------------+\n'
+                             '| Customer    | System | Mandant | Description | User        |\n'
+                             '+-------------+--------+---------+-------------+-------------+\n'
+                             '| BelarusNeft | DHV    | 100     | Dev         | DEVELOPER25 |\n'
+                             '+-------------+--------+---------+-------------+-------------+\n')
+
+
+def test_add(runner):
+    result = runner.invoke(add, input="XXX 100 Rygor 12345678 12345678 AK Test")
+    result = run.invoke(list_systems, "XXX 100")
+    assert result.output == ('\n''\n''+------------------------------------------------------------+\n'
+                             '|                     Available systems                      |\n'
+                             '+-------------+--------+---------+-------------+-------------+\n'
+                             '| Customer    | System | Mandant | Description | User        |\n'
+                             '+-------------+--------+---------+-------------+-------------+\n'
+                             '| AK          | XXX    | 100     | Test        | Rygor       |\n'
+                             '+-------------+--------+---------+-------------+-------------+\n')

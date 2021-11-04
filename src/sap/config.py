@@ -39,34 +39,38 @@ class Config(object):
                              language)
 
     def create(self):
-        parser = ConfigParser()
-        parser['DATABASE'] = {'db_path': 'database.db',
-                              'db_type': 'sqlite'}
 
-        parser['APPLICATION'] = {'command_line_path': 'путь до файла sapshcut.exe',
-                                 'saplogon_path': 'путь до файла saplogon.exe'}
-
-        parser['KEYS'] = {'public_key_path': 'путь до публичного ключа',
-                          'private_key_path': 'путь до приватного ключа. !!! ключ хранить в защищенном хранилище'}
-
-        # Определение языка
-        win_dll = ctypes.windll.kernel32
-        lng_code = win_dll.GetUserDefaultUILanguage()
-        if lng_code == 1049:
-            ini_lang = 'RU'
+        if os.path.exists(self.config_path):
+            raise ConfigExists(self.config_path)
         else:
-            ini_lang = 'EN'
-        parser['LOCALE'] = {'language': ini_lang}
+            parser = ConfigParser()
+            parser['DATABASE'] = {'db_path': 'database.db',
+                                  'db_type': 'sqlite'}
 
-        with open(self.config_path, 'w') as configfile:
-            parser.write(configfile)
+            parser['APPLICATION'] = {'command_line_path': 'путь до файла sapshcut.exe',
+                                     'saplogon_path': 'путь до файла saplogon.exe'}
 
-        click.echo('Путь: %s \n' % click.format_filename(self.config_path))
-        click.echo(click.style('INI файл создан', **utilities.color_success))
-        click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
-        click.pause('Нажмите для продолжения ...')
+            parser['KEYS'] = {'public_key_path': 'путь до публичного ключа',
+                              'private_key_path': 'путь до приватного ключа. !!! ключ хранить в защищенном хранилище'}
 
-        click.launch(self.config_path)
+            # Определение языка
+            win_dll = ctypes.windll.kernel32
+            lng_code = win_dll.GetUserDefaultUILanguage()
+            if lng_code == 1049:
+                ini_lang = 'RU'
+            else:
+                ini_lang = 'EN'
+            parser['LOCALE'] = {'language': ini_lang}
+
+            with open(self.config_path, 'w') as configfile:
+                parser.write(configfile)
+
+            click.echo('Путь: %s \n' % click.format_filename(self.config_path))
+            click.echo(click.style('INI файл создан', **utilities.color_success))
+            click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
+            click.pause('Нажмите для продолжения ...')
+
+            click.launch(self.config_path)
 
     def exists(self):
         if os.path.exists(self.config_path):
@@ -76,3 +80,11 @@ class Config(object):
 
     def open_config(self):
         click.launch(self.config_path)
+
+
+class ConfigExists(Exception):
+    """Base class for other exceptions"""
+
+    def __init__(self, config_path, message="sap_config.ini already exists"):
+        self.message = f"{message}. Path: {config_path}"
+        super().__init__(self.message)

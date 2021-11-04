@@ -410,7 +410,7 @@ def list_systems(system, mandant, verbose):
         else:
             sap_system = sap_systems_list_into_nametuple(result)
 
-            utilities.print_system_list(sap_system, 'Available systems', verbose)
+            utilities.print_system_list(sap_system, 'Available systems', verbose=verbose)
             if verbose:
                 click.pause('Press Enter. Information about passwords will be deleted from screen ...')
                 os.system('cls')
@@ -454,8 +454,28 @@ def shortcut_help():
 
 @sap_cli.command('start')
 def start():
-    # TODO: создать команду для начального формирования ключей, базы данных, конфига и прописи всех данных в конфиг
-    pass
+    """
+    Starting point for working wiht SAP command line tool
+    1. Database creation.
+    2. ini file with config parameters createion.
+    3. Usefull messages
+    """
+
+    # TODO: Убрать вывод сообщения из классов базы данных, конфига и ключей шифрования и добавить сюда
+
+    from sap.database import SapDB
+    from sap.config import Config
+
+    db = SapDB()
+    db.create()
+
+    cfg = Config()
+    cfg.create()
+
+    Crypto().generate_keys()
+
+    raw_s = r'explorer /select,' + r'{}'.format(utilities.path())
+    subprocess.Popen(raw_s)
 
 
 @sap_cli.command('backup')

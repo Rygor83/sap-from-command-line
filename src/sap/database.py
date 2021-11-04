@@ -85,15 +85,6 @@ class SapDB():  # noqa : E801
             session = sessionmaker(bind=engine)
             self.session = session()
 
-            # click.echo(click.style('База данных создана \n', **utilities.color_success))
-            # click.echo('Путь: %s \n' % click.format_filename(self.database_path))
-            # click.echo(
-            #     click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', **utilities.color_sensitive))
-            # click.echo(
-            #     click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n',
-            #                 **utilities.color_message))
-            # click.pause('Нажмите для продолжения ...')
-
     def add(self, sap_system):  # type (namedtuple) -> list
         """Add a task dict to db."""
         record = Sap(system_id=sap_system.system,
@@ -184,7 +175,7 @@ def start_sap_db(db_path, db_type):
 class DatabaseExists(Exception):
     """Base class for other exceptions"""
 
-    def __init__(self, db_path, message="Database alrady exists"):
+    def __init__(self, db_path, message="Database already exists"):
         self.message = f"{message}. Path: {db_path}"
         super().__init__(self.message)
 
