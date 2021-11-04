@@ -36,14 +36,13 @@ def launch_command_line_with_params(command_line_path, param):
 def choose_system(sap_system: Sap_system, verbose=False):
     ans = 0
     if len(sap_system[0]) >= 2:
-        print_system_list(sap_system, 'Доступные системы', verbose=verbose)
+        print_system_list(sap_system, 'Available systems', verbose=verbose, enumerate=True)
 
         while int(ans) > len(sap_system[0]) or int(ans) < 1:
             if 1 <= int(ans) <= len(sap_system[0]):
                 break
-            click.echo(click.style(f"\nВозможно вводить значения только от 1 до {str(len(sap_system[0]))}.",
-                                   **color_message))
-            ans = click.prompt('Выберите систему, в которую хотите войти \n>>>', type=int)
+            click.echo(click.style(f"\nAvailable values from 1 to {str(len(sap_system[0]))}.", **color_message))
+            ans = click.prompt('Choose system you want to logon \n>>>', type=int)
         ans = ans - 1
 
     system = Sap_system(
@@ -53,11 +52,14 @@ def choose_system(sap_system: Sap_system, verbose=False):
     return system
 
 
-def print_system_list(sap_system: Sap_system, title, color=color_success, verbose=False):
+def print_system_list(sap_system: Sap_system, title, color=color_success, verbose=False, enumerate=False):
     row = []
 
     # Header for Pretty table
-    header = ['Customer', 'System', 'Mandant', 'Description', 'User']
+    if enumerate:
+        header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User']
+    else:
+        header = ['Customer', 'System', 'Mandant', 'Description', 'User']
     if verbose:
         header.append('Password')
 
@@ -65,6 +67,8 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
     t = PrettyTable(header)
 
     for position in range(len(sap_system[0])):
+        if enumerate:
+            row.append(position + 1)
         if sap_system.customer[position] is not None:
             row.append(sap_system.customer[position])
             t.align["Customer"] = "l"

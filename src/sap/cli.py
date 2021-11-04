@@ -33,7 +33,7 @@ def sap_systems_list_into_nametuple(result: list) -> Sap_system:
 
 
 class String_3(click.ParamType):
-    name = "Check if [SYSTEM] id contains only letters and numbers. 3 chars length"
+    name = "Only letters and numbers. 3 chars length"
 
     def convert(self, value, param, ctx):
         if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
@@ -49,7 +49,7 @@ LETTERS_NUMBERS_3 = String_3()
 
 @click.group()
 def sap_cli():
-    """ Скрипт для запуска SAP систем из командной строки """
+    """ Command line tool to launch SAP systems from saplogon application """
 
 
 @sap_cli.command('logon')
@@ -69,14 +69,22 @@ def logon():
 @sap_cli.command('run')
 @click.argument('system', type=LETTERS_NUMBERS_3)
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', '--user', 'user', help='пользователь')
-@click.option('-pw', '--password', 'password', help='пароль')
-@click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-t', '--transaction', 'transaction', help='код транзакции')
-@click.option('-p', '--parameter', 'parameter', help='параметры для транзакции')
-def run(system, mandant='', user='', password='', language='RU', transaction='', parameter=''):
-    """ Запуск указанной SAP системы \n
-        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
+@click.option('-u', '--user', 'user',
+              help='User id. Either user from database to narrow system selection '
+                   'if several users exist for one system, or user outside of the database')
+@click.option('-pw', '--password', 'password', help='Password for user outside of the database')
+@click.option('-l', '--language', 'language', help='Language to logon', default='RU')
+@click.option('-t', '--transaction', 'transaction', help='Transaction to start after loggin on to SAP system')
+@click.option('-p', '--parameter', 'parameter', help="Transaction's parameters")
+def run(system, mandant='', user='', password='', language='EN', transaction='', parameter=''):
+    """
+    Launch SAP system \n
+    Required arguments : \n
+    1. SYSTEM - system id from saplogon
+
+    Optional arguments: \n
+    2. MANDANT - mandant or client id of sap system
+    """
 
     with _sap_db():
         sap_system_sql = Sap_system(str(system).upper(),
@@ -128,19 +136,29 @@ def run(system, mandant='', user='', password='', language='RU', transaction='',
 @sap_cli.command('debug')
 @click.argument('system', required=False, type=LETTERS_NUMBERS_3)
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', '--user', 'user', help='пользователь')
-@click.option('-pw', '--password', 'password', help='пароль')
-@click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-f', '--file', 'file', help='создать файл для печати', is_flag=True, type=click.BOOL)
+@click.option('-u', '--user', 'user', help='User')
+@click.option('-pw', '--password', 'password', help='Password')
+@click.option('-l', '--language', 'language', help='Logon language', default='RU')
+@click.option('-f', '--file', 'file', help='Create debug file', is_flag=True, type=click.BOOL)
 def debug(system, mandant='', user='', password='', language='RU', file=False):
-    ''' Запуск дебага любой выбранной системы или создание файла для дебага диалоговых окон'''
+    '''
+    System debug \n
+    You can: \n
+    1. Creat debug file - to debug modal dialog box: SAP DEBUG -f \n
+    2. Start debuggin of the opened system (the last used windows will be used): SAP DEBUG <SYSTEM> <MANDANT> \n
+
+    Optional arguments: \n
+    1. SYSTEM - system id from saplogon \n
+    2. MANDANT - mandant or client id of sap system \n
+    '''
 
     if file:
         file_name = 'DEBUG.TXT'
 
-        click.echo(f'Сейчас создастся файл {file_name}')
-        click.echo('Сразу после создания откроется папка с файлом\n')
-        click.pause('Нажмите любую клавишу')
+        click.echo(f'\n{file_name} file will be created.')
+        click.echo(f'After creation, a folder with {file_name} file will be opened \n')
+        click.echo(f'Drag the file to the SAP system to start debug mode \n')
+        click.pause('Press Enter to continue')
 
         path = utilities.path()
         file_path = path + '\\' + file_name
@@ -209,14 +227,14 @@ def prepare_parameters_to_launch_system(result, password, language, user, transa
 @click.argument('mandant', required=False, type=click.IntRange(1, 999))
 def pw(system, mandant):
     """
-    Copy password  for the requested system into clipboard.
-    Wait 15 seconds and clears clipboard.
+    Copy password for the requested system into clipboard.
+    Script waits 15 seconds and clears clipboard.
 
     Required arguments: \n
-    1. SYSTEM ID \n
+    1. SYSTEM ID - system id from saplogon \n \n
 
     Optional argument: \n
-    2. MANDANT
+    2. MANDANT - mandant or client id of sap system \n
     """
 
     with _sap_db():
@@ -239,12 +257,12 @@ def pw(system, mandant):
             pyperclip.copy(selected_system.password[0])
 
             click.echo(
-                click.style(f'Пароль скопирован в буфер обмена.\nБуфер обмена будет очищен через {timeout} секунд.\n',
+                click.style(f'Password is copied into clipboard.\nClipboard will be cleared in {timeout} seconds.\n',
                             **utilities.color_message))
             click.echo(
                 click.style(
-                    'Если пользуетесь Clipboard manager, то следует внести приложения PY.EXE, CMD.EXE в исключения,\n'
-                    'чтобы не хранить чувствительну информацию.\n',
+                    '\nIf you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n'
+                    'in order to keep sensitive information safe.',
                     **utilities.color_sensitive))
 
             time.sleep(timeout)
@@ -252,20 +270,22 @@ def pw(system, mandant):
                 ctypes.windll.user32.EmptyClipboard()
             ctypes.windll.user32.CloseClipboard()
 
-            click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
+            click.echo(click.style('\nClipboard is cleared. \n', **utilities.color_success))
 
 
 @sap_cli.command('add')
-@click.option('-system', prompt=True, help='SAP system', type=LETTERS_NUMBERS_3)
-@click.option('-mandant', prompt=True, help='SAP Client', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='SAP user')
-@click.option('-password', help='SAP password', prompt=True, confirmation_prompt=True,
-              # hide_input=True,
-              )
+@click.option('-system', prompt=True, help='System', type=LETTERS_NUMBERS_3)
+@click.option('-mandant', prompt=True, help='Client', type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help='User')
+@click.option('-password', help='Password', prompt=True, confirmation_prompt=True, hide_input=True)
 @click.option('-customer', prompt=True, help="Customer", type=click.STRING)
-@click.option('-description', prompt=True, help="SAP System description", type=click.STRING)
+@click.option('-description', prompt=True, help="Description", type=click.STRING)
 def add(system, mandant, user, password, description, customer):
-    """ Add sap system with it's parameters to db."""
+    """
+    Add sap system with it's parameters to db.
+
+    Just run SAP ADD and enter system parameters
+    """
 
     with _sap_db():
         encrypted_password = Crypto.encrypto(str.encode(password))
@@ -285,24 +305,22 @@ def add(system, mandant, user, password, description, customer):
 
 
 @sap_cli.command('update')
-@click.option('-system', prompt=True, help='система', type=LETTERS_NUMBERS_3)
+@click.option('-system', prompt=True, help='System', type=LETTERS_NUMBERS_3)
 @click.option(
-    '-mandant', prompt=True, help='мандант', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='пользователь')
-@click.option(
-    '-password',
-    help='пароль',
-    prompt=True,
-    confirmation_prompt=True,
-    # hide_input=True
-)
+    '-mandant', prompt=True, help='Mandant', type=click.IntRange(1, 999))
+@click.option('-user', prompt=True, help='User')
+@click.option('-password', help='Password', prompt=True, confirmation_prompt=True, hide_input=True)
 @click.option('-customer', prompt=True, help="Customer", type=click.STRING)
 @click.option('-description', prompt=True, help="System description", type=click.STRING)
 def update(system, mandant, user, password, customer, description):
-    """ Обновление пароля для SAP системы """
+    """
+    Update selected records of database
+
+    Just run SAP UPDATE and enter system parameters to update
+    """
 
     # TODO: вставлять данные уже сущетсвующей системы, чтобы пользователь мог
-    #  решить, изменять или не изменять.
+    #  решить, что изменять и изменять, или не изменять.
 
     encrypted_password = Crypto.encrypto(str.encode(password))
     sap_system_sql = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password, '',
