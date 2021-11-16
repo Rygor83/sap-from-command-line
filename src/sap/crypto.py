@@ -47,14 +47,6 @@ class Crypto(object):
             public_pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
                                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
             Crypto.save_key(public_pem, Crypto.public_file)
-            click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
-                                   **utilities.color_success))
-            click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
-                                   **utilities.color_success))
-            click.echo('Необходимо указать их расположение в файле *.ini')
-            click.echo(click.style(f"Файл {Crypto.private_file} должен находиться в зашифрованном хранилище",
-                                   **utilities.color_sensitive))
-            click.pause('Нажмите для продолжения ...')
         else:
             click.echo(click.style("Ключи шифрования уже созданы", **utilities.color_warning))
             sys.exit()

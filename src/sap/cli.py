@@ -2,18 +2,17 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-import click
 import os
 import subprocess
 import time
 import ctypes
-import pyperclip
 import sys
-import time
 import re
-
-import sap.config
+import getpass
 from contextlib import contextmanager
+import pyperclip
+import click
+import sap.config
 from sap.api import Sap_system
 from sap.crypto import Crypto
 import sap.utilities as utilities
@@ -27,21 +26,22 @@ def sap_systems_list_into_nametuple(result: list) -> Sap_system:
     customers = [item[4] for item in result]
     descriptions = [item[5] for item in result]
 
-    sap_system = Sap_system(systems, mandants, users, passwords, '', customers, descriptions)
+    sap_system = Sap_system(systems, mandants, users, passwords, customers, descriptions)
 
     return sap_system
 
 
 class String_3(click.ParamType):
+    """ Click check class for parameters type"""
     name = "Only letters and numbers. 3 chars length"
 
     def convert(self, value, param, ctx):
         if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
             return value
-        else:
-            self.fail(
-                f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers. Must be 3 chars length",
-                param, ctx)
+
+        self.fail(
+            f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers. Must be 3 chars length",
+            param, ctx)
 
 
 LETTERS_NUMBERS_3 = String_3()
@@ -72,11 +72,13 @@ def logon():
 @click.option('-u', '--user', 'user',
               help='User id. Either user from database to narrow system selection '
                    'if several users exist for one system, or user outside of the database')
-@click.option('-pw', '--password', 'password', help='Password for user outside of the database')
+@click.option('-pw', '--password', 'request_password', help='Password for user outside of the database',
+              type=click.BOOL, default=False, is_flag=True)
 @click.option('-l', '--language', 'language', help='Language to logon', default='RU')
 @click.option('-t', '--transaction', 'transaction', help='Transaction to start after loggin on to SAP system')
 @click.option('-p', '--parameter', 'parameter', help="Transaction's parameters")
-def run(system, mandant='', user='', password='', language='EN', transaction='', parameter=''):
+def run(system: str, mandant: int = '', user: str = '', request_password=False, language='EN', transaction='',
+        parameter=''):
     """
     Launch SAP system \n
     Required arguments : \n
@@ -85,6 +87,7 @@ def run(system, mandant='', user='', password='', language='EN', transaction='',
     Optional arguments: \n
     2. MANDANT - mandant or client id of sap system
     """
+    password = ''
 
     with _sap_db():
         sap_system_sql = Sap_system(str(system).upper(),
@@ -100,6 +103,13 @@ def run(system, mandant='', user='', password='', language='EN', transaction='',
             utilities.print_system_list(sap_system_output, "NOTHING FOUND according to search criteria",
                                         color=utilities.color_warning)
         else:
+
+            # TODO: доделать возможность вводить чужого пользователя и пароль через GETPASS
+            #  Причем нужно понять, что мы вводим чужого пользователя
+
+            # if request_password:
+            #     password = getpass.getpass("Enter password for user f'{str(user).upper()}':")
+
             argument, selected_system = prepare_parameters_to_launch_system(result, password, language, user)
 
             if transaction:
@@ -122,9 +132,7 @@ def run(system, mandant='', user='', password='', language='EN', transaction='',
                     argument.append(item)
 
             message = 'Trying to LAUNCH the following system'
-            if transaction:
-                message = message + f" with transaction {str(transaction).upper()}"
-            utilities.print_system_list(selected_system, message)
+            utilities.print_system_list(selected_system, message, transaction=transaction)
 
             # Запускаем SAP
             ret = subprocess.call(argument)
@@ -157,7 +165,7 @@ def debug(system, mandant='', user='', password='', language='RU', file=False):
 
         click.echo(f'\n{file_name} file will be created.')
         click.echo(f'After creation, a folder with {file_name} file will be opened \n')
-        click.echo(f'Drag the file to the SAP system to start debug mode \n')
+        click.echo('Drag the file to the SAP system to start debug mode \n')
         click.pause('Press Enter to continue')
 
         path = utilities.path()
@@ -168,8 +176,8 @@ def debug(system, mandant='', user='', password='', language='RU', file=False):
             writer.write('Title=Debugger\n')
             writer.write('Type=SystemCommand')
 
-        raw_s = r'explorer /select,' + r'{}'.format(file_path)
-        subprocess.Popen(raw_s)
+        command = f"explorer /select, {file_path}"
+        subprocess.Popen(command)
 
     else:
         with _sap_db():
@@ -261,7 +269,7 @@ def pw(system, mandant):
                             **utilities.color_message))
             click.echo(
                 click.style(
-                    '\nIf you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n'
+                    'If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n'
                     'in order to keep sensitive information safe.',
                     **utilities.color_sensitive))
 
@@ -290,7 +298,7 @@ def add(system, mandant, user, password, description, customer):
     with _sap_db():
         encrypted_password = Crypto.encrypto(str.encode(password))
         sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
-                                '', str(customer).upper(), str(description))
+                                str(customer).upper(), str(description))
         result = sap.add(sap_system)
 
         sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None)
@@ -323,11 +331,10 @@ def update(system, mandant, user, password, customer, description):
     #  решить, что изменять и изменять, или не изменять.
 
     encrypted_password = Crypto.encrypto(str.encode(password))
-    sap_system_sql = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password, '',
-                                str(customer),
+    sap_system_sql = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password, str(customer),
                                 str(description))
     sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
-                                      '', str(customer), str(description))
+                                      str(customer), str(description))
 
     with _sap_db():
         result = sap.update(sap_encrypted_system)
@@ -361,7 +368,6 @@ def delete(system, mandant, user):
     with _sap_db():
         result = sap.delete(sap_system)
 
-        # sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None)
         result = sap.query_system(sap_system)
 
         if result == []:
@@ -462,6 +468,7 @@ def start():
     """
 
     # TODO: Убрать вывод сообщения из классов базы данных, конфига и ключей шифрования и добавить сюда
+    #   https://towardsdatascience.com/rich-generate-rich-and-beautiful-text-in-the-terminal-with-python-541f39abf32e
 
     from sap.database import SapDB
     from sap.config import Config
@@ -474,12 +481,33 @@ def start():
 
     Crypto().generate_keys()
 
-    raw_s = r'explorer /select,' + r'{}'.format(utilities.path())
-    subprocess.Popen(raw_s)
+    click.launch(cfg.config_path)
+
+    click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
+                           **utilities.color_success))
+    click.echo('Необходимо указать их расположение в файле *.ini')
+    click.echo(click.style(f"Файл {Crypto.private_file} должен находиться в зашифрованном хранилище",
+                           **utilities.color_sensitive))
+
+    click.echo(click.style(f"База данных создана: {db.database_path}", **utilities.color_success))
+
+    click.echo('Путь: %s \n' % click.format_filename(cfg.config_path))
+    click.echo(click.style('INI файл создан', **utilities.color_success))
+    click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
+
+    command = f"explorer /select, {utilities.path()}"
+    subprocess.Popen(command)
 
 
 @sap_cli.command('backup')
 def backup():
+    """
+    Create back of \n
+    1. saplogon systems (saplogon.ini. *.xml)
+    2. password database
+    3. cypher files
+    4. config. ini
+    """
     # TODO: создать команду для бэкапа ini, xml фалов с системами sap
     #  также бэкапить базу данных, ключи шифрования, ini конфигурационных файлов
     #  Создавать zip архив с паролем

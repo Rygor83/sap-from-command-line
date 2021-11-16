@@ -14,6 +14,9 @@ SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 
 
 
 class Config(object):
+    """
+    Class for working with config file: create, read
+    """
 
     def __init__(self):
         self.ini_name = 'sap_config.ini'
@@ -35,11 +38,22 @@ class Config(object):
             private_key_path = parser.get('KEYS', 'private_key_path')
             language = parser.get('LOCALE', 'language')
 
+            if not os.path.exists(command_line_path):
+                raise FileDoesNotExists(command_line_path, "[APPLICATION], 'command_line_path'")
+            if not os.path.exists(saplogon_path):
+                raise FileDoesNotExists(command_line_path, "[APPLICATION], 'saplogon_path'")
+            if not os.path.exists(public_key_path):
+                raise FileDoesNotExists(command_line_path, "[KEYS], 'public_key_path'")
+            if not os.path.exists(private_key_path):
+                raise FileDoesNotExists(command_line_path, "[KEYS], 'private_key_path'")
+
             return SapConfig(db_path, db_type, command_line_path, saplogon_path, public_key_path, private_key_path,
                              language)
 
     def create(self):
-
+        """
+        Create configuration file
+        """
         if os.path.exists(self.config_path):
             raise ConfigExists(self.config_path)
         else:
@@ -65,20 +79,19 @@ class Config(object):
             with open(self.config_path, 'w') as configfile:
                 parser.write(configfile)
 
-            click.echo('Путь: %s \n' % click.format_filename(self.config_path))
-            click.echo(click.style('INI файл создан', **utilities.color_success))
-            click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
-            click.pause('Нажмите для продолжения ...')
-
-            click.launch(self.config_path)
-
     def exists(self):
+        """
+        Check if config path is valid
+        """
         if os.path.exists(self.config_path):
             return True
         else:
             return False
 
     def open_config(self):
+        """
+        Open config file in editor
+        """
         click.launch(self.config_path)
 
 
@@ -87,4 +100,12 @@ class ConfigExists(Exception):
 
     def __init__(self, config_path, message="sap_config.ini already exists"):
         self.message = f"{message}. Path: {config_path}"
+        super().__init__(self.message)
+
+
+class FileDoesNotExists(Exception):
+    """Base class for other exceptions"""
+
+    def __init__(self, path, file_name):
+        self.message = f"Parameters {file_name}. Path does not exist: {path}"
         super().__init__(self.message)

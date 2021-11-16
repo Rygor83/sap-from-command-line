@@ -8,8 +8,8 @@ import sqlalchemy
 import click
 
 # Sap system parameters : [system: str, mandant: int, user: str, password: byte]
-Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'transaction', 'customer', 'description'])
-Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None)
+Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'customer', 'description'])
+Sap_system.__new__.__defaults__ = (None, None, None, None, None, None)
 
 
 def query_system(sap_system: Sap_system):

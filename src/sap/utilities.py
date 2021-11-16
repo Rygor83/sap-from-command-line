@@ -47,12 +47,13 @@ def choose_system(sap_system: Sap_system, verbose=False):
 
     system = Sap_system(
         [sap_system.system[ans]], [sap_system.mandant[ans]], [sap_system.user[ans]], [sap_system.password[ans]],
-        [None], [sap_system.customer[ans]], [sap_system.description[ans]])
+        [sap_system.customer[ans]], [sap_system.description[ans]])
 
     return system
 
 
-def print_system_list(sap_system: Sap_system, title, color=color_success, verbose=False, enumerate=False):
+def print_system_list(sap_system: Sap_system, title, color=color_success, verbose=False, enumerate=False,
+                      transaction: str = ''):
     row = []
 
     # Header for Pretty table
@@ -108,8 +109,12 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
 
     # Вывод информации
     click.echo('\n')
-    click.echo(t.get_string(title=click.style(title, **color), sort_key=operator.itemgetter(1, 0),
-                            sortby="System"))
+    title = f"{click.style(title, **color)}"
+    if transaction:
+        title = title + f"{click.style(' with transaction ', **color)}"
+        title = title + f"{click.style(str(transaction).upper(), **color_sensitive)}"
+    click.echo(t.get_string(title=title, sort_key=operator.itemgetter(1, 0), sortby="System"))
+    click.echo('\n')
 
 
 def show_exception_and_exit(exc_type, exc_value, tb):
