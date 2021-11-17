@@ -257,16 +257,16 @@ def debug(system, mandant="", user="", password="", language="RU", file=False):
             "NOTHING FOUND according to search criteria",
             color=utilities.color_warning,
         )
-            else:
+    else:
 
-                argument, selected_system = prepare_parameters_to_launch_system(result, password, language, user)
+        argument, selected_system = prepare_parameters_to_launch_system(result, password, language, user)
 
-                item = "-command=/H"
-                argument.append(item)
-                item = "-type=SystemCommand"
-                argument.append(item)
+        item = "-command=/H"
+        argument.append(item)
+        item = "-type=SystemCommand"
+        argument.append(item)
 
-                utilities.print_system_list(selected_system, "Trying to DEBUG the following system")
+        utilities.print_system_list(selected_system, "Trying to DEBUG the following system")
 
                 ret = subprocess.call(argument)
 
