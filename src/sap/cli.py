@@ -232,41 +232,41 @@ def debug(system, mandant="", user="", password="", language="RU", file=False):
 
     else:
         with _sap_db():
-    sap_system_sql = Sap_system(
-        str(system).upper(),
-        str(mandant).zfill(3) if mandant else None,
-        str(user).upper() if user else None,
-    )
-    result = sap.query_system(sap_system_sql)
+            sap_system_sql = Sap_system(
+                str(system).upper(),
+                str(mandant).zfill(3) if mandant else None,
+                str(user).upper() if user else None,
+            )
+            result = sap.query_system(sap_system_sql)
 
-    if not result:
-        sap_system_output = sap_systems_list_into_nametuple(
-            [
-                [
-                    str(system).upper(),
-                    str(mandant).zfill(3) if mandant else "",
-                    str(user).upper() if user else "",
-                    "",
-                    "",
-                    "",
-                ]
-            ]
-        )
-        utilities.print_system_list(
-            sap_system_output,
-            "NOTHING FOUND according to search criteria",
-            color=utilities.color_warning,
-        )
-    else:
+            if not result:
+                sap_system_output = sap_systems_list_into_nametuple(
+                    [
+                        [
+                            str(system).upper(),
+                            str(mandant).zfill(3) if mandant else "",
+                            str(user).upper() if user else "",
+                            "",
+                            "",
+                            "",
+                        ]
+                    ]
+                )
+                utilities.print_system_list(
+                    sap_system_output,
+                    "NOTHING FOUND according to search criteria",
+                    color=utilities.color_warning,
+                )
+            else:
 
-        argument, selected_system = prepare_parameters_to_launch_system(result, password, language, user)
+                argument, selected_system = prepare_parameters_to_launch_system(result, password, language, user)
 
-        item = "-command=/H"
-        argument.append(item)
-        item = "-type=SystemCommand"
-        argument.append(item)
+                item = "-command=/H"
+                argument.append(item)
+                item = "-type=SystemCommand"
+                argument.append(item)
 
-        utilities.print_system_list(selected_system, "Trying to DEBUG the following system")
+                utilities.print_system_list(selected_system, "Trying to DEBUG the following system")
 
                 ret = subprocess.call(argument)
 
@@ -284,14 +284,14 @@ def prepare_parameters_to_launch_system(result: list, password, language, user, 
 
     # Добавляем параметры для запуска SAP системы
     argument = [
-    sapshcut_exe_path,  # Путь до sapshcut.exe
-    f"-system={selected_system.system[0]}",  # Id системы
-    f"-client={str(selected_system.mandant[0]).zfill(3)}",  # Номер манданта
-    f"-user={user}" if user else f"-user={selected_system.user[0]}",  # Пользователь
-    f"-pw={password}" if password else f"-pw={selected_system.password[0]}",  # Пароль
-    f"-language={language}",  # Язык для входа
-    "-maxgui",  # Развернуть окно на весь экран
-]
+        sapshcut_exe_path,  # Путь до sapshcut.exe
+        f"-system={selected_system.system[0]}",  # Id системы
+        f"-client={str(selected_system.mandant[0]).zfill(3)}",  # Номер манданта
+        f"-user={user}" if user else f"-user={selected_system.user[0]}",  # Пользователь
+        f"-pw={password}" if password else f"-pw={selected_system.password[0]}",  # Пароль
+        f"-language={language}",  # Язык для входа
+        "-maxgui",  # Развернуть окно на весь экран
+    ]
     return argument, selected_system
 
 
@@ -343,18 +343,18 @@ def pw(system, mandant):
             pyperclip.copy(selected_system.password[0])
 
             click.echo(
-    click.style(
-        f"Password is copied into clipboard.\nClipboard will be cleared in {timeout} seconds.\n",
-        **utilities.color_message,
-    )
-)
+                click.style(
+                    f"Password is copied into clipboard.\nClipboard will be cleared in {timeout} seconds.\n",
+                    **utilities.color_message,
+                )
+            )
             click.echo(
-    click.style(
-        "If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n"
-        "in order to keep sensitive information safe.",
-        **utilities.color_sensitive,
-    )
-)
+                click.style(
+                    "If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n"
+                    "in order to keep sensitive information safe.",
+                    **utilities.color_sensitive,
+                )
+            )
 
             time.sleep(timeout)
             if ctypes.windll.user32.OpenClipboard(None):
@@ -574,8 +574,8 @@ def list_systems(system, mandant, verbose):
 
             utilities.print_system_list(sap_system, "Available systems", verbose=verbose)
             if verbose:
-    click.pause("Press Enter. Information about passwords will be deleted from screen ...")
-    os.system("cls")
+                click.pause("Press Enter. Information about passwords will be deleted from screen ...")
+                os.system("cls")
             else:
                 pass
 
