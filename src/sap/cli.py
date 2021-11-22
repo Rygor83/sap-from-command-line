@@ -5,6 +5,7 @@
 import os
 import subprocess
 import time
+from datetime import datetime
 import ctypes
 import sys
 import getpass
@@ -14,9 +15,11 @@ import click
 import sap.config
 from sap.api import Sap_system
 from sap.crypto import Crypto
-import sap.utilities as utilities
+from sap import utilities
 from sap.database import SapDB
 from sap.config import create_config, open_config
+import pyzipper
+from sap.file_names import CONFIG_NAME
 
 
 @click.group()
@@ -567,7 +570,7 @@ def keys(ctx):
     ctx.obj['CRYPTO'].generate_keys()
 
 
-@sap_cli.command("ver", help="Текущая версия SAP shortcut")
+@sap_cli.command("ver", help="Current version of SAP shortcut")
 @click.pass_context
 def shortcut_version(ctx):
     # Считываем конфигурационный файл
@@ -633,8 +636,10 @@ def start(ctx):
 
 
 @sap_cli.command("backup")
+@click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
+              type=utilities.PASS_REQUIREMENT)
 @click.pass_context
-def backup(ctx):
+def backup(ctx, password):
     """
     Create back of \n
     1. saplogon systems (saplogon.ini. *.xml)
@@ -642,11 +647,38 @@ def backup(ctx):
     3. cypher files
     4. config. ini
     """
-    # TODO: создать команду для бэкапа ini, xml фалов с системами sap
-    #  также бэкапить базу данных, ключи шифрования, ini конфигурационных файлов
-    #  Создавать zip архив с паролем
-    #  Пути к saplogon.ini брать отсюда 2580439
-    pass
+
+    #  Paths to SAPUILandscape.xml: https://launchpad.support.sap.com/#/notes/2075150
+
+    pwd = str.encode(password)
+
+    config_ini_path = os.path.join(utilities.path(), CONFIG_NAME)
+
+    # saplogon_ini_path = utilities.get_reg('CoreLandscapeFileOnServer')
+    saplogon_ini_path = os.path.join(os.path.expandvars(r'%APPDATA%\SAP\Common'), 'SAPUILandscape.xml')
+
+    back_file_name = f'backup_{datetime.now().strftime("%Y.%m.%d-%I.%M.%S")}.zip'
+    back_path = os.path.join(utilities.path(), back_file_name)
+    with pyzipper.AESZipFile(back_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
+        zf.setpassword(pwd)
+        zf.write(ctx.obj['CONFIG_DATA'].db_path, os.path.basename(ctx.obj['CONFIG_DATA'].db_path))
+        zf.write(ctx.obj['CONFIG_DATA'].public_key_path, os.path.basename(ctx.obj['CONFIG_DATA'].public_key_path))
+        zf.write(ctx.obj['CONFIG_DATA'].private_key_path, os.path.basename(ctx.obj['CONFIG_DATA'].private_key_path))
+        zf.write(config_ini_path, os.path.basename(config_ini_path))
+        zf.write(saplogon_ini_path, os.path.basename(saplogon_ini_path))
+
+        zf.comment = b""" \n 1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
+                          \n 2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
+                          \n 3. Other files - according to sap_config.ini paths
+                          \n Or you can place whener you want, just enter new paths to sap_config.ini
+                          \n !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
+
+    if os.path.exists(back_path):
+        click.echo(click.style('Backup succesfully created', **utilities.color_success))
+        command = f"explorer /select, {back_path}"
+        subprocess.Popen(command)
+    else:
+        click.echo('Backup creation failed')
 
 
 @sap_cli.command("launch")

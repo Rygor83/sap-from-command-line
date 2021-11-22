@@ -1,9 +1,8 @@
-appdirs
 click
 cryptography
+appdirs
 prettytable
 pyperclip
-pytest
-setuptools
-six
 sqlalchemy
+sqlalchemy_utils
+pyzipper

@@ -13,6 +13,7 @@ from appdirs import *
 from sap.api import Sap_system
 from prettytable import PrettyTable
 from operator import attrgetter
+import winreg
 
 # Цвета сообщений
 color_message = {'bg': 'black', 'fg': 'white'}
@@ -189,3 +190,37 @@ class String_3(click.ParamType):
 
 
 LETTERS_NUMBERS_3 = String_3()
+
+
+class Pass_requirement(click.ParamType):
+    """Click check class for parameters type"""
+
+    # TODO: долать требования к паролю, чтобы он был не простым
+
+    name = "Requirements for password"
+
+    def convert(self, value, param, ctx):
+        if re.match("^[A-Za-z0-9]*$", value):
+            return value
+
+        self.fail(
+            f"{value!r} Password is week. Use xxxxxx chars",
+            param,
+            ctx,
+        )
+
+
+PASS_REQUIREMENT = Pass_requirement()
+
+
+def get_reg(name):
+    REG_PATH = r"Software\SAP\SAPLogon\Options"
+
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0,
+                                      winreg.KEY_READ)
+        value, regtype = winreg.QueryValueEx(registry_key, name)
+        winreg.CloseKey(registry_key)
+        return value
+    except WindowsError:
+        return None

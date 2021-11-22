@@ -19,7 +19,7 @@ setup(
     package_dir={'': 'src'},
 
     install_requires=['click', 'SQLAlchemy', 'sqlalchemy_utils', 'cryptography', 'pyperclip', 'prettytable', 'appdirs',
-                      'six'],
+                      'six', 'pyzipper'],
 
     entry_points={
         'console_scripts': [
