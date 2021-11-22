@@ -12,11 +12,11 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import rsa
-import sap.utilities as utilities
+from sap import utilities
 from sap.file_names import PRIVATE_KEY_NAME, PUBLIC_KEY_NAME
 
 
-class Crypto():
+class Crypto:
     """ Encryption RSA class """
 
     def __init__(self, public_key_path: str = '', private_key_path: str = ''):
@@ -48,7 +48,7 @@ class Crypto():
 
     def save_key(self, pem, file_name):
         """ Save RSA keys """
-        with open(file_name, "w") as file:
+        with open(file_name, "w", encoding='utf-8') as file:
             for item in pem.splitlines():
                 # click.echo(item)
                 file.write(item.decode() + '\n')

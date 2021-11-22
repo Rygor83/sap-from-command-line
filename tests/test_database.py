@@ -3,9 +3,7 @@
 #  ------------------------------------------
 
 import pytest
-import click
 import os
-from click.testing import CliRunner
 from sap.database import SapDB
 from sap.api import Sap_system
 from sap.crypto import Crypto
@@ -30,10 +28,10 @@ def db(database, tmpdir):
 
 @pytest.fixture
 def crypto(tmpdir):
-    crpt = Crypto(os.path.join(tmpdir, PUBLIC_KEY_NAME), os.path.join(tmpdir, PRIVATE_KEY_NAME))
-    crpt.generate_keys()
+    crypto = Crypto(os.path.join(tmpdir, PUBLIC_KEY_NAME), os.path.join(tmpdir, PRIVATE_KEY_NAME))
+    crypto.generate_keys()
 
-    return crpt
+    return crypto
 
 
 @pytest.fixture
@@ -47,7 +45,7 @@ def added_record(db, crypto):
 
 def test_create_database(db):
     """ Test database creation """
-    assert True == os.path.isfile(db.database_path)
+    assert os.path.isfile(db.database_path) is True
 
 
 def test_add_record_to_db(db, added_record):
@@ -57,7 +55,7 @@ def test_add_record_to_db(db, added_record):
 
 
 def test_delete_record_from_db(db, added_record):
-    """ Test deletiung records from database """
+    """ Test deleting records from database """
     system = Sap_system(*added_record)
     db.delete(system)
     result_lst = db.query_system(Sap_system(system='XXX'))
@@ -75,4 +73,4 @@ def test_update_record(db, added_record, crypto):
 def test_drop_database(database):
     database.create()
     database.drop()
-    assert False == os.path.isfile(database.database_path)
+    assert os.path.isfile(database.database_path) is False

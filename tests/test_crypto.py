@@ -17,7 +17,7 @@ def temp_crypto(tmpdir):
 
 def test_create_crypto_files(temp_crypto):
     temp_crypto.generate_keys()
-    assert True == os.path.isfile(temp_crypto.public_key_path) and True == os.path.isfile(temp_crypto.private_key_path)
+    assert os.path.isfile(temp_crypto.public_key_path) is True and os.path.isfile(temp_crypto.private_key_path) is True
 
 
 def test_encrypt(temp_crypto):

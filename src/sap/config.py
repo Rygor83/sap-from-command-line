@@ -6,10 +6,11 @@
 
 import ctypes
 import os
-import click
-import sap.utilities as utilities
 from collections import namedtuple
 from configparser import ConfigParser
+import click
+from sap import utilities
+
 from sap.exceptions import FileDoesNotExists, ConfigExists
 from sap.file_names import PRIVATE_KEY_NAME, PUBLIC_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
@@ -17,7 +18,7 @@ SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 
                                      'private_key_path', 'language'])
 
 
-class Config(object):
+class Config:
     """
     Class for working with config file: create, read
     """
@@ -34,7 +35,7 @@ class Config(object):
         if not self.exists():
             self.create()
         else:
-            a = parser.read(self.config_file_path)
+            parser.read(self.config_file_path)
 
             db_path = parser.get('DATABASE', 'db_path')
             db_type = parser.get('DATABASE', 'db_type')
@@ -66,7 +67,7 @@ class Config(object):
             parser = ConfigParser(allow_no_value=True)
             parser['DATABASE'] = {
                 "; DB_PATH - Path to database. Database file must be placed in secure place": None,
-                'db_path': f"{self.config_path}\{DATABASE_NAME}",
+                'db_path': f"{self.config_path}\\{DATABASE_NAME}",
                 "; DB_TYPE - database type. Default: sqlite": None,
                 'db_type': 'sqlite'}
 
@@ -78,9 +79,9 @@ class Config(object):
 
             parser['KEYS'] = {
                 "; public_key_path - Path to public_key_file_name encryption key": None,
-                'public_key_path': f"{self.config_path}\{PUBLIC_KEY_NAME}",
+                'public_key_path': f"{self.config_path}\\{PUBLIC_KEY_NAME}",
                 "; PRIVATE_KEY_PATH - Path to private_key_file_name encryption key. Private key must be placed in secure place": None,
-                'private_key_path': f"{self.config_path}\{PRIVATE_KEY_NAME}"}
+                'private_key_path': f"{self.config_path}\\{PRIVATE_KEY_NAME}"}
 
         # Определение языка
         win_dll = ctypes.windll.kernel32
@@ -91,17 +92,14 @@ class Config(object):
             ini_lang = 'EN'
         parser['LOCALE'] = {'language': ini_lang}
 
-        with open(self.config_file_path, 'w') as configfile:
+        with open(self.config_file_path, 'w', encoding='utf-8') as configfile:
             parser.write(configfile)
 
     def exists(self):
         """
         Check if config path is valid
         """
-        if os.path.exists(self.config_file_path):
-            return True
-        else:
-            return False
+        return os.path.exists(self.config_file_path)
 
     def open_config(self):
         """
@@ -112,3 +110,30 @@ class Config(object):
     def remove_config(self):
         """ Remove encryption keys """
         os.remove(self.config_file_path)
+
+
+def open_config(ctx, param, value):
+    """
+    Open configuration file for editing
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    # cfg = Config()
+    ctx.obj['CONFIG_METHODS'].open_config()
+    ctx.exit()
+
+
+def create_config(ctx, param, value):
+    """
+    Open configuration file for editing
+    """
+    if not value or ctx.resilient_parsing:
+        return
+
+    # cfg = Config()
+    if ctx.obj['CONFIG_METHODS'].exists():
+        click.echo(click.style("Config уже существует \n", **utilities.color_warning))
+        click.echo(utilities.path())
+    else:
+        ctx.obj['CONFIG_METHODS'].create()
+    ctx.exit()

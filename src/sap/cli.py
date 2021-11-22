@@ -16,6 +16,7 @@ from sap.api import Sap_system
 from sap.crypto import Crypto
 import sap.utilities as utilities
 from sap.database import SapDB
+from sap.config import create_config, open_config
 
 
 @click.group()
@@ -481,15 +482,19 @@ def delete(ctx, system, mandant, user):
 
 
 @sap_cli.command("config")
+@click.option('-create', is_flag=True, callback=create_config, expose_value=False,
+              is_eager=True,
+              help='Create config file')
+@click.option('-open', is_flag=True, callback=open_config, expose_value=False,
+              is_eager=True,
+              help='Open config file')
 @click.pass_context
 def config(ctx):
     """Создание конфигурационного ini файла"""
 
-    if ctx.obj['CONFIG_METHODS'].exists():
-        click.echo(click.style("Config уже существует \n", **utilities.color_warning))
-        click.echo(utilities.path())
-    else:
-        ctx.obj['CONFIG_METHODS'].create()
+    click.echo("Enter one of subcommands:")
+    click.echo("\t -create - Create config file")
+    click.echo("\t -open   - Open config file")
 
 
 @sap_cli.command("list")

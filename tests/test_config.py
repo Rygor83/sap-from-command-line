@@ -2,6 +2,8 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
+""" Test of config.ini file """
+
 from sap.config import Config
 import os
 import pytest
@@ -17,7 +19,7 @@ def config(tmpdir):
 
 
 def test_config_create(config):
-    assert True == os.path.exists(config.config_file_path)
+    assert os.path.exists(config.config_file_path) is True
 
 
 def test_config_read(config, tmpdir):
