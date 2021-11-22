@@ -24,7 +24,8 @@ class Config(object):
 
     def __init__(self, config_path: str = ''):
         self.ini_name = CONFIG_NAME
-        self.config_path = os.path.join(config_path, self.ini_name) if config_path else os.path.join(
+        self.config_path = config_path if config_path else utilities.path()
+        self.config_file_path = os.path.join(config_path, self.ini_name) if config_path else os.path.join(
             utilities.path(), self.ini_name)
 
     def read(self):
@@ -33,7 +34,7 @@ class Config(object):
         if not self.exists():
             self.create()
         else:
-            a = parser.read(self.config_path)
+            a = parser.read(self.config_file_path)
 
             db_path = parser.get('DATABASE', 'db_path')
             db_type = parser.get('DATABASE', 'db_type')
@@ -43,14 +44,14 @@ class Config(object):
             private_key_path = parser.get('KEYS', 'private_key_path')
             language = parser.get('LOCALE', 'language')
 
-            if not os.path.exists(command_line_path):
-                raise FileDoesNotExists(command_line_path, "[APPLICATION], 'command_line_path'")
-            if not os.path.exists(saplogon_path):
-                raise FileDoesNotExists(command_line_path, "[APPLICATION], 'saplogon_path'")
-            if not os.path.exists(public_key_path):
-                raise FileDoesNotExists(command_line_path, "[KEYS], 'public_key_path'")
-            if not os.path.exists(private_key_path):
-                raise FileDoesNotExists(command_line_path, "[KEYS], 'private_key_path'")
+            # if not os.path.exists(command_line_path):
+            #     raise FileDoesNotExists(command_line_path, "[APPLICATION], 'command_line_path'")
+            # if not os.path.exists(saplogon_path):
+            #     raise FileDoesNotExists(command_line_path, "[APPLICATION], 'saplogon_path'")
+            # if not os.path.exists(public_key_path):
+            #     raise FileDoesNotExists(command_line_path, "[KEYS], 'public_key_path'")
+            # if not os.path.exists(private_key_path):
+            #     raise FileDoesNotExists(command_line_path, "[KEYS], 'private_key_path'")
 
             return SapConfig(db_path, db_type, command_line_path, saplogon_path, public_key_path, private_key_path,
                              language)
@@ -59,8 +60,8 @@ class Config(object):
         """
         Create configuration file
         """
-        if os.path.exists(self.config_path):
-            raise ConfigExists(self.config_path)
+        if os.path.exists(self.config_file_path):
+            raise ConfigExists(self.config_file_path)
         else:
             parser = ConfigParser(allow_no_value=True)
             parser['DATABASE'] = {
@@ -90,14 +91,14 @@ class Config(object):
             ini_lang = 'EN'
         parser['LOCALE'] = {'language': ini_lang}
 
-        with open(self.config_path, 'w') as configfile:
+        with open(self.config_file_path, 'w') as configfile:
             parser.write(configfile)
 
     def exists(self):
         """
         Check if config path is valid
         """
-        if os.path.exists(self.config_path):
+        if os.path.exists(self.config_file_path):
             return True
         else:
             return False
@@ -106,4 +107,8 @@ class Config(object):
         """
         Open config file in editor
         """
-        click.launch(self.config_path)
+        click.launch(self.config_file_path)
+
+    def remove_config(self):
+        """ Remove encryption keys """
+        os.remove(self.config_file_path)

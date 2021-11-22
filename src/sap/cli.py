@@ -668,7 +668,7 @@ def start(ctx):
     ctx.obj['CRYPTO'].generate_keys()
     ctx.obj['DATABASE'].create()
 
-    click.launch(ctx.obj['CONFIG_DATA'].config_path)
+    click.launch(ctx.obj['CONFIG_DATA'].config_file_path)
 
     click.echo(
         click.style(
@@ -688,7 +688,7 @@ def start(ctx):
 
     click.echo(click.style(f"База данных создана: {db.database_path}", **utilities.color_success))
 
-    click.echo("Путь: %s \n" % click.format_filename(cfg.config_path))
+    click.echo("Путь: %s \n" % click.format_filename(cfg.config_file_path))
     click.echo(click.style("INI файл создан", **utilities.color_success))
     click.echo(
         click.style(
