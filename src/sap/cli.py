@@ -7,7 +7,6 @@ import subprocess
 import time
 import ctypes
 import sys
-import re
 import getpass
 from contextlib import contextmanager
 import pyperclip
@@ -19,44 +18,13 @@ import sap.utilities as utilities
 from sap.database import SapDB
 
 
-def sap_systems_list_into_nametuple(result: list) -> Sap_system:
-    systems = [item[0] for item in result]
-    mandants = [item[1] for item in result]
-    users = [item[2] for item in result]
-    passwords = [item[3] for item in result]
-    customers = [item[4] for item in result]
-    descriptions = [item[5] for item in result]
-
-    sap_system = Sap_system(systems, mandants, users, passwords, customers, descriptions)
-
-    return sap_system
-
-
-class String_3(click.ParamType):
-    """Click check class for parameters type"""
-
-    name = "Only letters and numbers. 3 chars length"
-
-    def convert(self, value, param, ctx):
-        if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
-            return value
-
-        self.fail(
-            f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers. Must be 3 chars length",
-            param,
-            ctx,
-        )
-
-
-LETTERS_NUMBERS_3 = String_3()
-
-
 @click.group()
 @click.pass_context
 def sap_cli(ctx):
     """Command line tool to launch SAP systems from saplogon application"""
 
     ctx.ensure_object(dict)
+
     cfg = sap.config.Config()
     _config = cfg.read()
 
@@ -79,42 +47,21 @@ def logon(ctx):
 
 
 @sap_cli.command("run")
-@click.argument("system", type=LETTERS_NUMBERS_3)
+@click.argument("system", type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
+                                           "if several users exist for one system, or user outside of the database",
+              )
 @click.option(
-    "-u",
-    "--user",
-    "user",
-    help="User id. Either user from database to narrow system selection "
-         "if several users exist for one system, or user outside of the database",
-)
-@click.option(
-    "-eu",
-    "--external_user",
-    "external_user",
-    help="Launch sap system with external user (outside database)",
-    type=click.BOOL,
-    default=False,
-    is_flag=True,
+    "-eu", "--external_user", "external_user", help="Launch sap system with external user (outside database)",
+    type=click.BOOL, default=False, is_flag=True,
 )
 @click.option("-l", "--language", "language", help="Language to logon", default="RU")
-@click.option(
-    "-t",
-    "--transaction",
-    "transaction",
-    help="Transaction to start after loggin on to SAP system",
-)
+@click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system", )
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.pass_context
-def run(ctx,
-        system: str,
-        mandant: int,
-        user: str,
-        external_user: bool,
-        language: str,
-        transaction: str,
-        parameter: str,
-        ):
+def run(ctx, system: str, mandant: int, user: str, external_user: bool, language: str, transaction: str,
+        parameter: str, ):
     """
     Launch SAP system \n
     Required arguments : \n
@@ -144,7 +91,7 @@ def run(ctx,
             result = sap.query_system(sap_system_sql)
 
         if not result:
-            sap_system_output = sap_systems_list_into_nametuple(
+            sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
                         system.upper(),
@@ -168,7 +115,8 @@ def run(ctx,
         pwd = ctx.obj['CRYPTO'].decrypto(item[3])
         _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
 
-    argument, selected_system = prepare_parameters_to_launch_system(_result, password, language, user)
+    argument, selected_system = utilities.prepare_parameters_to_launch_system(_result, password, language, user, "",
+                                                                              ctx.obj['CONFIG_DATA'].command_line_path)
 
     if transaction:
         item = "-type=transaction"
@@ -203,7 +151,7 @@ def run(ctx,
 
 
 @sap_cli.command("debug")
-@click.argument("system", required=False, type=LETTERS_NUMBERS_3)
+@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="User")
 @click.option("-pw", "--password", "password", help="Password")
@@ -252,7 +200,7 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
             result = sap.query_system(sap_system_sql)
 
             if not result:
-                sap_system_output = sap_systems_list_into_nametuple(
+                sap_system_output = utilities.sap_systems_list_into_nametuple(
                     [
                         [
                             str(system).upper(),
@@ -275,7 +223,9 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
                     pwd = ctx.obj['CRYPTO'].decrypto(item[3])
                     _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
 
-                argument, selected_system = prepare_parameters_to_launch_system(_result, password, language, user)
+                argument, selected_system = prepare_parameters_to_launch_system(_result, password, language, user, "",
+                                                                                ctx.obj[
+                                                                                    'CONFIG_DATA'].command_line_path)
 
                 item = "-command=/H"
                 argument.append(item)
@@ -287,32 +237,8 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
                 ret = subprocess.call(argument)
 
 
-def prepare_parameters_to_launch_system(result: list, password, language, user, transaction=""):
-    cfg = sap.config.Config()
-    _config = cfg.read()
-    sapshcut_exe_path = _config.command_line_path
-
-    if not os.path.exists(sapshcut_exe_path):
-        raise utilities.WrongPath("sapshcut.exe", sapshcut_exe_path)
-
-    sap_system_output = sap_systems_list_into_nametuple(result)
-    selected_system = utilities.choose_system(sap_system_output)
-
-    # Добавляем параметры для запуска SAP системы
-    argument = [
-        sapshcut_exe_path,  # Путь до sapshcut.exe
-        f"-system={selected_system.system[0]}",  # Id системы
-        f"-client={str(selected_system.mandant[0]).zfill(3)}",  # Номер манданта
-        f"-user={user}" if user else f"-user={selected_system.user[0]}",  # Пользователь
-        f"-pw={password}" if password else f"-pw={selected_system.password[0]}",  # Пароль
-        f"-language={language}",  # Язык для входа
-        "-maxgui",  # Развернуть окно на весь экран
-    ]
-    return argument, selected_system
-
-
 @sap_cli.command("pw")
-@click.argument("system", type=LETTERS_NUMBERS_3)
+@click.argument("system", type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.pass_context
 def pw(ctx, system, mandant):
@@ -335,7 +261,7 @@ def pw(ctx, system, mandant):
         result = sap.query_system(sap_system_sql)
 
         if not result:
-            sap_system_output = sap_systems_list_into_nametuple(
+            sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
                         str(system).upper(),
@@ -358,7 +284,7 @@ def pw(ctx, system, mandant):
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
                 _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
 
-            sap_system_output = sap_systems_list_into_nametuple(_result)
+            sap_system_output = utilities.sap_systems_list_into_nametuple(_result)
             selected_system = utilities.choose_system(sap_system_output)
 
             pyperclip.copy(selected_system.password[0])
@@ -386,7 +312,7 @@ def pw(ctx, system, mandant):
 
 
 @sap_cli.command("add")
-@click.option("-system", prompt=True, help="System", type=LETTERS_NUMBERS_3)
+@click.option("-system", prompt=True, help="System", type=utilities.LETTERS_NUMBERS_3)
 @click.option("-mandant", prompt=True, help="Client", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="User")
 @click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
@@ -429,12 +355,12 @@ def add(ctx, system, mandant, user, password, description, customer):
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
                 _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
 
-            sap_system = sap_systems_list_into_nametuple(_result)
+            sap_system = utilities.sap_systems_list_into_nametuple(_result)
             utilities.print_system_list(sap_system, "The following system is ADDED to the database: ")
 
 
 @sap_cli.command("update")
-@click.option("-system", prompt=True, help="System", type=LETTERS_NUMBERS_3)
+@click.option("-system", prompt=True, help="System", type=utilities.LETTERS_NUMBERS_3)
 @click.option("-mandant", prompt=True, help="Mandant", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="User")
 @click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
@@ -480,13 +406,13 @@ def update(ctx, system, mandant, user, password, customer, description):
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
                 _result = [(item[0], item[1], item[2], pwd, item[4], item[5])]
 
-            sap_system_output = sap_systems_list_into_nametuple(_result)
+            sap_system_output = utilities.sap_systems_list_into_nametuple(_result)
 
             utilities.print_system_list(sap_system_output, "The following system is UPDATED", verbose=True)
             click.pause("Press Enter. Information about passwords will be deleted from screen ...")
             os.system("cls")
         else:
-            sap_system_output = sap_systems_list_into_nametuple(
+            sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
                         str(system).upper(),
@@ -506,7 +432,7 @@ def update(ctx, system, mandant, user, password, customer, description):
 
 
 @sap_cli.command("delete")
-@click.option("-system", prompt=True, help="система", type=LETTERS_NUMBERS_3)
+@click.option("-system", prompt=True, help="система", type=utilities.LETTERS_NUMBERS_3)
 @click.option("-mandant", prompt=True, help="мандант", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="пользователь")
 @click.pass_context
@@ -521,7 +447,7 @@ def delete(ctx, system, mandant, user):
         result = sap.query_system(sap_system)
 
         if result == []:
-            sap_system = sap_systems_list_into_nametuple(
+            sap_system = utilities.sap_systems_list_into_nametuple(
                 [
                     [
                         str(system).upper(),
@@ -535,7 +461,7 @@ def delete(ctx, system, mandant, user):
             )
             utilities.print_system_list(sap_system, "The following system is DELETED from database")
         else:
-            sap_system_output = sap_systems_list_into_nametuple(
+            sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
                         str(system).upper(),
@@ -567,7 +493,7 @@ def config(ctx):
 
 
 @sap_cli.command("list")
-@click.argument("system", required=False, type=LETTERS_NUMBERS_3)
+@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-v", "--verbose", "verbose", help="Show password", is_flag=True)
 @click.pass_context
@@ -588,7 +514,7 @@ def list_systems(ctx, system, mandant, verbose):
         result = sap.query_system(sap_system)
 
         if not result:
-            sap_system_output = sap_systems_list_into_nametuple(
+            sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
                         str(system).upper() if system else "",
@@ -610,7 +536,7 @@ def list_systems(ctx, system, mandant, verbose):
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
                 _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
 
-            sap_system = sap_systems_list_into_nametuple(_result)
+            sap_system = utilities.sap_systems_list_into_nametuple(_result)
 
             utilities.print_system_list(sap_system, "Available systems", verbose=verbose)
             if verbose:
@@ -719,7 +645,7 @@ def backup(ctx):
 
 
 @sap_cli.command("launch")
-@click.argument("system", type=LETTERS_NUMBERS_3)
+@click.argument("system", type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="пользователь")
 @click.option("-pw", "--password", "password", help="пароль")

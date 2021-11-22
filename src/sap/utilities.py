@@ -8,7 +8,7 @@ import traceback
 import os
 import subprocess
 import operator
-
+import re
 from appdirs import *
 from sap.api import Sap_system
 from prettytable import PrettyTable
@@ -19,6 +19,44 @@ color_message = {'bg': 'black', 'fg': 'white'}
 color_success = {'bg': 'black', 'fg': 'green'}
 color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
+
+
+def prepare_parameters_to_launch_system(result: list, password, language, user, transaction="",
+                                        sapshcut_exe_path: str = ""):
+    # cfg = sap.config.Config()
+    # _config = cfg.read()
+    # sapshcut_exe_path = _config.command_line_path
+
+    if not os.path.exists(sapshcut_exe_path):
+        raise utilities.WrongPath("sapshcut.exe", sapshcut_exe_path)
+
+    sap_system_output = sap_systems_list_into_nametuple(result)
+    selected_system = choose_system(sap_system_output)
+
+    # Добавляем параметры для запуска SAP системы
+    argument = [
+        sapshcut_exe_path,  # Путь до sapshcut.exe
+        f"-system={selected_system.system[0]}",  # Id системы
+        f"-client={str(selected_system.mandant[0]).zfill(3)}",  # Номер манданта
+        f"-user={user}" if user else f"-user={selected_system.user[0]}",  # Пользователь
+        f"-pw={password}" if password else f"-pw={selected_system.password[0]}",  # Пароль
+        f"-language={language}",  # Язык для входа
+        "-maxgui",  # Развернуть окно на весь экран
+    ]
+    return argument, selected_system
+
+
+def sap_systems_list_into_nametuple(result: list) -> Sap_system:
+    systems = [item[0] for item in result]
+    mandants = [item[1] for item in result]
+    users = [item[2] for item in result]
+    passwords = [item[3] for item in result]
+    customers = [item[4] for item in result]
+    descriptions = [item[5] for item in result]
+
+    sap_system = Sap_system(systems, mandants, users, passwords, customers, descriptions)
+
+    return sap_system
 
 
 def launch_command_line_with_params(command_line_path, param):
@@ -132,3 +170,22 @@ class WrongPath(Exception):
     def __init__(self, file, path, message="Wrong path to"):
         self.message = f'{message} {file} file: {path}'
         super().__init__(self.message)
+
+
+class String_3(click.ParamType):
+    """Click check class for parameters type"""
+
+    name = "Only letters and numbers. 3 chars length"
+
+    def convert(self, value, param, ctx):
+        if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
+            return value
+
+        self.fail(
+            f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers. Must be 3 chars length",
+            param,
+            ctx,
+        )
+
+
+LETTERS_NUMBERS_3 = String_3()
