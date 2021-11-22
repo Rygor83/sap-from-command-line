@@ -88,8 +88,8 @@ class SapDB():  # noqa : E801
     def add(self, sap_system):  # type (namedtuple) -> list
         """Add a task dict to db."""
         record = Sap(system_id=sap_system.system,
-                     mandant_num=sap_system.mandant,
-                     user_id=str(sap_system.user).zfill(3),
+                     mandant_num=str(sap_system.mandant).zfill(3),
+                     user_id=sap_system.user,
                      password=sap_system.password,
                      customer=sap_system.customer,
                      description=sap_system.description)
