@@ -3,7 +3,7 @@
 #  ------------------------------------------
 
 import os
-import subprocess
+from subprocess import call
 import time
 from datetime import datetime
 import ctypes
@@ -11,31 +11,40 @@ import sys
 import getpass
 from contextlib import contextmanager
 import pyperclip
+import pyzipper
 import click
+import pathlib
+import typing
+
 import sap.config
 from sap.api import Sap_system
 from sap.crypto import Crypto
 from sap import utilities
 from sap.database import SapDB
 from sap.config import create_config, open_config
-import pyzipper
-from sap.file_names import CONFIG_NAME
+from sap.file_names import CONFIG_NAME, DEBUG_FILE_NAME
 
 
 @click.group()
 @click.pass_context
-def sap_cli(ctx):
+@click.option('-path', '--config_path', 'config_path', help="Path to sap_config.ini file", type=click.Path())
+def sap_cli(ctx, config_path: str):
     """Command line tool to launch SAP systems from saplogon application"""
 
     ctx.ensure_object(dict)
 
-    cfg = sap.config.Config()
+    if config_path:
+        cfg = sap.config.Config(config_path)
+    else:
+        cfg = sap.config.Config()
+
     _config = cfg.read()
 
     ctx.obj['CONFIG_DATA'] = _config
     ctx.obj['CONFIG_METHODS'] = cfg
     ctx.obj['CRYPTO'] = Crypto(_config.public_key_path, _config.private_key_path)
     ctx.obj['DATABASE'] = SapDB()
+    ctx.obj['DEBUG'] = config_path
 
 
 @sap_cli.command("logon")
@@ -47,7 +56,7 @@ def logon(ctx):
     if not os.path.exists(saplogon_exe_path):
         raise utilities.WrongPath("saplogon.exe", saplogon_exe_path)
 
-    click.launch(saplogon_exe_path)
+    click.launch(url=saplogon_exe_path)
 
 
 @sap_cli.command("run")
@@ -148,7 +157,7 @@ def run(ctx, system: str, mandant: int, user: str, external_user: bool, language
     utilities.print_system_list(selected_system, message, transaction=transaction)
 
     # Запускаем SAP
-    ret = subprocess.call(argument)
+    ret = call(argument)
 
     if ret:
         click.echo(ret)
@@ -161,8 +170,10 @@ def run(ctx, system: str, mandant: int, user: str, external_user: bool, language
 @click.option("-pw", "--password", "password", help="Password")
 @click.option("-l", "--language", "language", help="Logon language", default="RU")
 @click.option("-f", "--file", "file", help="Create debug file", is_flag=True, type=click.BOOL)
+@click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
+              help='Do you need to open folder with debug file')
 @click.pass_context
-def debug(ctx, system, mandant="", user="", password="", language="RU", file=False):
+def debug(ctx, system, mandant="", user="", password="", language="RU", file=False, open_file=True):
     """
     System debug \n
     You can: \n
@@ -176,23 +187,22 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
     _result = []
 
     if file:
-        file_name = "DEBUG.TXT"
+        debug_folder = ctx.obj['DEBUG'] if ctx.obj['DEBUG'] else utilities.path()
+        debug_file_path = os.path.join(debug_folder, DEBUG_FILE_NAME)
 
-        click.echo(f"\n{file_name} file will be created.")
-        click.echo(f"After creation, a folder with {file_name} file will be opened \n")
+        click.echo(f"\n{debug_file_path} file will be created.")
+        click.echo(f"After creation, a folder with {DEBUG_FILE_NAME} file will be opened \n")
         click.echo("Drag the file to the SAP system to start debug mode \n")
         click.pause("Press Enter to continue")
 
-        path = utilities.path()
-        file_path = path + "\\" + file_name
-        with open(file_path, "w") as writer:
+        with open(debug_file_path, "w", encoding='utf-8') as writer:
             writer.write("[FUNCTION]\n")
             writer.write("Command =/H\n")
             writer.write("Title=Debugger\n")
             writer.write("Type=SystemCommand")
 
-        command = f"explorer /select, {file_path}"
-        subprocess.Popen(command)
+        if open_file:
+            click.launch(url=debug_file_path, locate=True)
 
     else:
         with _sap_db(ctx.obj['CONFIG_DATA']):
@@ -227,9 +237,9 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
                     pwd = ctx.obj['CRYPTO'].decrypto(item[3])
                     _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
 
-                argument, selected_system = prepare_parameters_to_launch_system(_result, password, language, user, "",
-                                                                                ctx.obj[
-                                                                                    'CONFIG_DATA'].command_line_path)
+                argument, selected_system = utilities.prepare_parameters_to_launch_system(_result, password, language,
+                                                                                          user, "", ctx.obj[
+                                                                                              'CONFIG_DATA'].command_line_path)
 
                 item = "-command=/H"
                 argument.append(item)
@@ -238,14 +248,18 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
 
                 utilities.print_system_list(selected_system, "Trying to DEBUG the following system")
 
-                ret = subprocess.call(argument)
+                ret = call(argument)
 
 
 @sap_cli.command("pw")
 @click.argument("system", type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option('-c', "--clear_clipboard", "clear_clipboard", is_flag=True, default=True,
+              help='Clear clipboard: True, False. Default value: True')
+@click.option('-t', "--time_to_clear", "time_to_clear", default=10, type=click.INT,
+              help='Timer in secornds to clear clipboard. Default value: 15')
 @click.pass_context
-def pw(ctx, system, mandant):
+def pw(ctx, system, mandant, clear_clipboard: bool = True, time_to_clear: int = 10):
     """
     Copy password for the requested system into clipboard.
     Script waits 15 seconds and clears clipboard.
@@ -259,7 +273,6 @@ def pw(ctx, system, mandant):
     _result = []
 
     with _sap_db(ctx.obj['CONFIG_DATA']):
-        timeout = 15
 
         sap_system_sql = Sap_system(str(system).upper(), str(mandant).upper() if mandant else None)
         result = sap.query_system(sap_system_sql)
@@ -295,24 +308,33 @@ def pw(ctx, system, mandant):
 
             click.echo(
                 click.style(
-                    f"Password is copied into clipboard.\nClipboard will be cleared in {timeout} seconds.\n",
+                    f"Password is copied into clipboard.\n",
                     **utilities.color_message,
                 )
             )
-            click.echo(
-                click.style(
-                    "If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n"
-                    "in order to keep sensitive information safe.",
-                    **utilities.color_sensitive,
+
+            if clear_clipboard:
+                click.echo(
+                    click.style(
+                        "If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n"
+                        "in order to keep sensitive information safe.",
+                        **utilities.color_sensitive,
+                    )
                 )
-            )
 
-            time.sleep(timeout)
-            if ctypes.windll.user32.OpenClipboard(None):
-                ctypes.windll.user32.EmptyClipboard()
-            ctypes.windll.user32.CloseClipboard()
+                click.echo(
+                    click.style(
+                        f"\nClipboard will be cleared in {time_to_clear} seconds.\n",
+                        **utilities.color_message,
+                    )
+                )
 
-            click.echo(click.style("\nClipboard is cleared. \n", **utilities.color_success))
+                time.sleep(time_to_clear)
+                if ctypes.windll.user32.OpenClipboard(None):
+                    ctypes.windll.user32.EmptyClipboard()
+                ctypes.windll.user32.CloseClipboard()
+
+                click.echo(click.style("\nClipboard is cleared. \n", **utilities.color_success))
 
 
 @sap_cli.command("add")
@@ -631,21 +653,22 @@ def start(ctx):
         )
     )
 
-    command = f"explorer /select, {utilities.path()}"
-    subprocess.Popen(command)
+    click.launch(url=os.path.join(utilities.path(), CONFIG_NAME), locate=True)
 
 
 @sap_cli.command("backup")
 @click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
               type=utilities.PASS_REQUIREMENT)
+@click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
+              help='Do you need to open folder with backup file')
 @click.pass_context
-def backup(ctx, password):
+def backup(ctx, password, open_file=True):
     """
-    Create back of \n
-    1. saplogon systems (saplogon.ini. *.xml)
-    2. password database
-    3. cypher files
-    4. config. ini
+    Create back up for the following files: \n
+    1. saplogon systems (SAPUILandscape.xml) \n
+    2. database \n
+    3. cypher files \n
+    4. sap_config.ini \n
     """
 
     #  Paths to SAPUILandscape.xml: https://launchpad.support.sap.com/#/notes/2075150
@@ -667,16 +690,17 @@ def backup(ctx, password):
         zf.write(config_ini_path, os.path.basename(config_ini_path))
         zf.write(saplogon_ini_path, os.path.basename(saplogon_ini_path))
 
-        zf.comment = b""" \n 1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
-                          \n 2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
-                          \n 3. Other files - according to sap_config.ini paths
-                          \n Or you can place whener you want, just enter new paths to sap_config.ini
-                          \n !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
+        zf.comment = b""" 
+            \n 1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
+            \n 2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
+            \n 3. Other files - according to sap_config.ini paths
+            \n Or you can place whener you want, just enter new paths to sap_config.ini
+            \n !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
 
     if os.path.exists(back_path):
         click.echo(click.style('Backup succesfully created', **utilities.color_success))
-        command = f"explorer /select, {back_path}"
-        subprocess.Popen(command)
+        if open_file:
+            click.launch(url=back_path, locate=True)
     else:
         click.echo('Backup creation failed')
 

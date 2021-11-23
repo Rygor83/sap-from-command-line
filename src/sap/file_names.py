@@ -8,3 +8,9 @@ PRIVATE_KEY_NAME = 'private_key.txt'
 CONFIG_NAME = 'sap_config.ini'
 
 DATABASE_NAME = 'database.db'
+
+COMMAND_LINE_PATH = 'sapshcut.exe'
+SAPLOGON_PATH = 'saplogon.exe'
+
+
+DEBUG_FILE_NAME = "DEBUG.TXT"

@@ -97,6 +97,7 @@ class SapDB():  # noqa : E801
         try:
             self.session.commit()
         except IntegrityError:
+            self.session.rollback()
             return result
         return result
 

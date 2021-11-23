@@ -10,6 +10,8 @@ from collections import namedtuple
 from configparser import ConfigParser
 import click
 from sap import utilities
+import pathlib
+import typing
 
 from sap.exceptions import FileDoesNotExists, ConfigExists
 from sap.file_names import PRIVATE_KEY_NAME, PUBLIC_KEY_NAME, CONFIG_NAME, DATABASE_NAME
@@ -23,11 +25,28 @@ class Config:
     Class for working with config file: create, read
     """
 
-    def __init__(self, config_path: str = ''):
+    def __init__(
+            self,
+            config_path: typing.Union[str, pathlib.Path] = '',
+            db_path: typing.Union[str, pathlib.Path] = '',
+            db_type: typing.Union[str, pathlib.Path] = 'sqlite',
+            command_line_path: typing.Union[str, pathlib.Path] = '',
+            saplogon_path: typing.Union[str, pathlib.Path] = '',
+            public_key_path: typing.Union[str, pathlib.Path] = '',
+            private_key_path: typing.Union[str, pathlib.Path] = '',
+            language: str = 'RU',
+    ):
         self.ini_name = CONFIG_NAME
         self.config_path = config_path if config_path else utilities.path()
         self.config_file_path = os.path.join(config_path, self.ini_name) if config_path else os.path.join(
             utilities.path(), self.ini_name)
+
+        self.db_path = db_path if db_path else f"{self.config_path}\\{DATABASE_NAME}"
+        self.db_type = db_type
+        self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file'
+        self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file'
+        self.public_key_path = public_key_path if public_key_path else f"{self.config_path}\\{PUBLIC_KEY_NAME}"
+        self.private_key_path = private_key_path if private_key_path else f"{self.config_path}\\{PRIVATE_KEY_NAME}"
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -67,21 +86,21 @@ class Config:
             parser = ConfigParser(allow_no_value=True)
             parser['DATABASE'] = {
                 "; DB_PATH - Path to database. Database file must be placed in secure place": None,
-                'db_path': f"{self.config_path}\\{DATABASE_NAME}",
+                'db_path': self.db_path,
                 "; DB_TYPE - database type. Default: sqlite": None,
-                'db_type': 'sqlite'}
+                'db_type': self.db_type}
 
             parser['APPLICATION'] = {
                 "; COMMAND_LINE_PATH - Path to sapshcut.exe file": None,
-                'command_line_path': 'путь до файла sapshcut.exe',
+                'command_line_path': self.command_line_path,
                 "; SAPLOGON_PATH - Path to saplogon.exe file": None,
-                'saplogon_path': 'путь до файла saplogon.exe'}
+                'saplogon_path': self.saplogon_path}
 
             parser['KEYS'] = {
                 "; public_key_path - Path to public_key_file_name encryption key": None,
-                'public_key_path': f"{self.config_path}\\{PUBLIC_KEY_NAME}",
+                'public_key_path': self.public_key_path,
                 "; PRIVATE_KEY_PATH - Path to private_key_file_name encryption key. Private key must be placed in secure place": None,
-                'private_key_path': f"{self.config_path}\\{PRIVATE_KEY_NAME}"}
+                'private_key_path': self.private_key_path}
 
         # Определение языка
         win_dll = ctypes.windll.kernel32
@@ -105,7 +124,7 @@ class Config:
         """
         Open config file in editor
         """
-        click.launch(self.config_file_path)
+        click.launch(url=self.config_file_path)
 
     def remove_config(self):
         """ Remove encryption keys """

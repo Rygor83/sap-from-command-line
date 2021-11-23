@@ -6,14 +6,15 @@ import click
 import sys
 import traceback
 import os
-import subprocess
+from subprocess import call
 import operator
 import re
 from appdirs import *
-from sap.api import Sap_system
 from prettytable import PrettyTable
 from operator import attrgetter
 import winreg
+
+from sap.api import Sap_system
 
 # Цвета сообщений
 color_message = {'bg': 'black', 'fg': 'white'}
@@ -69,7 +70,7 @@ def launch_command_line_with_params(command_line_path, param):
     argument = [command_line_path, param]
 
     # Запускаем SAP
-    subprocess.call(argument)
+    call(argument)
 
 
 def choose_system(sap_system: Sap_system, verbose=False):
@@ -162,7 +163,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 
 
 def path():
-    return user_data_dir('sap', appauthor=False)
+    return user_data_dir('sap\\', appauthor=False)
 
 
 class WrongPath(Exception):
@@ -197,7 +198,7 @@ class Pass_requirement(click.ParamType):
 
     # TODO: долать требования к паролю, чтобы он был не простым
 
-    name = "Requirements for password"
+    name = "Password"
 
     def convert(self, value, param, ctx):
         if re.match("^[A-Za-z0-9]*$", value):
