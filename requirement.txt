@@ -6,3 +6,4 @@ pyperclip
 sqlalchemy
 sqlalchemy_utils
 pyzipper
+rich

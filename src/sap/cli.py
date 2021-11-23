@@ -15,6 +15,7 @@ import pyzipper
 import click
 import pathlib
 import typing
+from rich import print
 
 import sap.config
 from sap.api import Sap_system
@@ -22,12 +23,12 @@ from sap.crypto import Crypto
 from sap import utilities
 from sap.database import SapDB
 from sap.config import create_config, open_config
-from sap.file_names import CONFIG_NAME, DEBUG_FILE_NAME
+from sap.file_names import CONFIG_NAME, DEBUG_FILE_NAME, PRIVATE_KEY_NAME, PUBLIC_KEY_NAME, DATABASE_NAME
 
 
 @click.group()
 @click.pass_context
-@click.option('-path', '--config_path', 'config_path', help="Path to sap_config.ini file", type=click.Path())
+@click.option('-path', '--config_path', 'config_path', help="Path to sap_config.ini folder", type=click.Path())
 def sap_cli(ctx, config_path: str):
     """Command line tool to launch SAP systems from saplogon application"""
 
@@ -38,13 +39,14 @@ def sap_cli(ctx, config_path: str):
     else:
         cfg = sap.config.Config()
 
-    _config = cfg.read()
+    if cfg.exists():
+        _config = cfg.read()
+        ctx.obj['CONFIG_DATA'] = _config
 
-    ctx.obj['CONFIG_DATA'] = _config
-    ctx.obj['CONFIG_METHODS'] = cfg
-    ctx.obj['CRYPTO'] = Crypto(_config.public_key_path, _config.private_key_path)
+    ctx.obj['CRYPTO'] = Crypto(cfg.public_key_path, cfg.private_key_path)
     ctx.obj['DATABASE'] = SapDB()
     ctx.obj['DEBUG'] = config_path
+    ctx.obj['CONFIG_METHODS'] = cfg
 
 
 @sap_cli.command("logon")
@@ -145,7 +147,7 @@ def run(ctx, system: str, mandant: int, user: str, external_user: bool, language
             item = '-command="/n*FBM1 BKPF-BUKRS=1000;"'
             argument.append(item)
 
-            print(item)
+            click.echo(item)
         else:
             item = "-command=" + transaction
             argument.append(item)
@@ -624,36 +626,34 @@ def start(ctx):
     ctx.obj['CRYPTO'].generate_keys()
     ctx.obj['DATABASE'].create()
 
-    click.launch(ctx.obj['CONFIG_DATA'].config_file_path)
+    print("\nThe following files are created:")
+    print(f"1. [yellow]{PUBLIC_KEY_NAME}[/yellow] - used to encrypt passwords in database")
+    print(
+        f"      can be stored in any place. If you move it from default location then don't forget to put new place in {CONFIG_NAME} -> '[KEYS]' -> 'public_key_path'")
+    print(f"2. [yellow]{PRIVATE_KEY_NAME}[/yellow] - used to decrypt passwords")
+    print(
+        f"      must be stored in [bright_red]secure place[/bright_red]. For example, in Bestcrypt container. Don't forget to put new place in {CONFIG_NAME} -> '[KEYS]' -> 'private_key_path'")
+    print(f"3. [yellow]{DATABASE_NAME}[/yellow] - used to store all information about SAP systems")
+    print(
+        f"      must be stored in [bright_red]secure place[/bright_red]. For example, in Bestcrypt container. Don't forget to put new place in {CONFIG_NAME} -> '[DATABASE]' -> 'db_path'")
+    print(f"4. [yellow]{CONFIG_NAME}[/yellow] - used to store information about all previous files locations")
+    print(
+        f"      must be stored only in [bright_red] {ctx.obj['CONFIG_METHODS'].config_path} [/bright_red] folder.")
+    print("\n")
+    print(f"Extra work:")
+    print(
+        f"5. Find 'SAPSHCUT.EXE' file and put it's location in {CONFIG_NAME} -> '[APPLICATION]' -> 'command_line_path'")
+    print(f"5. Find 'SAPLOGON.EXE' file and put it's location in {CONFIG_NAME} -> '[APPLICATION]' -> 'saplogon_path'")
 
-    click.echo(
-        click.style(
-            "Ключи шифрования созданы:"
-            f"{ctx.obj['CONFIG_DATA'].public_key_file_name}"
-            f"{ctx.obj['CONFIG_DATA'].private_key_file_name}",
-            **utilities.color_success,
-        )
-    )
-    click.echo("Необходимо указать их расположение в файле *.ini")
-    click.echo(
-        click.style(
-            f"Файл {ctx.obj['CONFIG_DATA'].private_key_file_name} должен находиться в зашифрованном хранилище",
-            **utilities.color_sensitive,
-        )
-    )
+    print("\n")
+    print("To start work with SAP commands after preparatory work:")
+    print("type 'SAP ADD' to add sap system into database")
+    print("type 'SAP RUN <system id> <mandant num>' to launch sap system")
+    print("type 'SAP --HELP' to learn more about programm")
 
-    click.echo(click.style(f"База данных создана: {db.database_path}", **utilities.color_success))
+    click.pause('\nPress enter to open files folder and start working. Good luck.')
 
-    click.echo("Путь: %s \n" % click.format_filename(cfg.config_file_path))
-    click.echo(click.style("INI файл создан", **utilities.color_success))
-    click.echo(
-        click.style(
-            "!!! Заполните все требуемые параметры в файле !!! \n",
-            **utilities.color_message,
-        )
-    )
-
-    click.launch(url=os.path.join(utilities.path(), CONFIG_NAME), locate=True)
+    click.launch(ctx.obj['CONFIG_METHODS'].config_file_path, locate=True)
 
 
 @sap_cli.command("backup")

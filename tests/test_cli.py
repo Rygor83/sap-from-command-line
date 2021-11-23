@@ -20,7 +20,7 @@ from sap.file_names import COMMAND_LINE_PATH, SAPLOGON_PATH, DEBUG_FILE_NAME
 
 @pytest.fixture
 def crypto(tmp_path):
-    """ Creating temporary encryption keys """
+    """ Prepare temporary encryption keys """
     crypt = Crypto(tmp_path.joinpath(PUBLIC_KEY_NAME), tmp_path.joinpath(PRIVATE_KEY_NAME))
     crypt.generate_keys()
     yield crypt
@@ -29,14 +29,14 @@ def crypto(tmp_path):
 
 @pytest.fixture
 def database(tmp_path):
-    """ Initializing database with temporary path"""
+    """ Prepare database with temporary path"""
     database_path = tmp_path.joinpath(DATABASE_NAME)
     return SapDB(db_path=database_path)
 
 
 @pytest.fixture
 def db(database):
-    """ Creating temporary database """
+    """ Prepare temporary database """
     database.create()
     yield database
     database.stop_sap_db()
@@ -75,6 +75,7 @@ def runner():
 
 
 def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_record):
+    """ Test LIST command with records in database created from api"""
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "xxx", "100"])
     assert result.output == ('\n' '\n'
                              '+--------------------------------------------------+\n'
@@ -87,6 +88,7 @@ def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_re
 
 
 def test_add_with_command_line(runner, config_tmp_path, db):
+    """ Test LIST command with records in database created with command line """
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -108,6 +110,7 @@ def test_add_with_command_line(runner, config_tmp_path, db):
 
 
 def test_update_with_command_line(runner, config_tmp_path, db):
+    """ Test UPDATE command"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -138,6 +141,7 @@ def test_update_with_command_line(runner, config_tmp_path, db):
 
 
 def test_delete_with_command_line(runner, config_tmp_path, db):
+    """ Test DELETE command"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -165,6 +169,7 @@ def test_delete_with_command_line(runner, config_tmp_path, db):
 
 
 def test_pw_with_command_line(runner, config_tmp_path, db):
+    """ Test PW command"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -183,6 +188,7 @@ def test_pw_with_command_line(runner, config_tmp_path, db):
 
 
 def test_debug_file(runner, config_tmp_path):
+    """ Test DEBUG command to create debug file """
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, 'debug', '-f', '-o'])
     with open(os.path.join(config_tmp_path.config_path, DEBUG_FILE_NAME), mode='r') as f:
         text = f.read()
