@@ -102,21 +102,23 @@ class SapDB():  # noqa : E801
         return result
 
     def query_system(self, sap_system):
-        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*,
-        #  чтобы система искала какие системы есть и выводила для выбора
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
                                    Sap.description)
         if sap_system.system:
-            query = query.filter_by(system_id=sap_system.system)
+            # query = query.filter_by(system_id=sap_system.system)
+            query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
         if sap_system.mandant:
             query = query.filter_by(mandant_num=sap_system.mandant)
         if sap_system.user:
-            query = query.filter_by(user_id=sap_system.user)
+            # query = query.filter_by(user_id=sap_system.user)
+            query = query.filter(Sap.user_id.ilike(f"%{sap_system.user}%"))
         if sap_system.customer:
-            query = query.filter_by(customer=sap_system.customer)
+            # query = query.filter(customer=sap_system.customer)
+            query = query.filter(Sap.customer.ilike(f"%{sap_system.customer}%"))
         if sap_system.description:
-            query = query.filter_by(description=sap_system.description)
+            # query = query.filter_by(description=sap_system.description)
+            query = query.filter(Sap.description.ilike(f"%{sap_system.description}%"))
         return query.all()
 
     def update(self, sap_system):  # type (namedtuple) -> list

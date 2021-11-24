@@ -18,6 +18,10 @@ from sap.file_names import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATAB
 from sap.file_names import COMMAND_LINE_PATH, SAPLOGON_PATH, DEBUG_FILE_NAME
 
 
+########################################################################################################################
+# Test with temporary created config, encrypt keys and database
+########################################################################################################################
+
 @pytest.fixture
 def crypto(tmp_path):
     """ Prepare temporary encryption keys """
@@ -75,7 +79,7 @@ def runner():
 
 
 def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_record):
-    """ Test LIST command with records in database created from api"""
+    """ Test LIST command with records in temporary database created from api"""
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "xxx", "100"])
     assert result.output == ('\n' '\n'
                              '+--------------------------------------------------+\n'
@@ -87,8 +91,8 @@ def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_re
                              '+----------+--------+---------+-------------+------+\n' '\n' '\n')
 
 
-def test_add_with_command_line(runner, config_tmp_path, db):
-    """ Test LIST command with records in database created with command line """
+def test_add_record_temp_db(runner, config_tmp_path, db):
+    """ Test LIST command with records in temporary database created with command line """
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -109,8 +113,8 @@ def test_add_with_command_line(runner, config_tmp_path, db):
                              '+----------+--------+---------+-------------+------+\n' '\n' '\n')
 
 
-def test_update_with_command_line(runner, config_tmp_path, db):
-    """ Test UPDATE command"""
+def test_update_record_temp_db(runner, config_tmp_path, db):
+    """ Test UPDATE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -140,8 +144,8 @@ def test_update_with_command_line(runner, config_tmp_path, db):
                              '+----------+--------+---------+-------------+------+\n' '\n' '\n')
 
 
-def test_delete_with_command_line(runner, config_tmp_path, db):
-    """ Test DELETE command"""
+def test_delete_record_temp_db(runner, config_tmp_path, db):
+    """ Test DELETE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -168,8 +172,8 @@ def test_delete_with_command_line(runner, config_tmp_path, db):
                              '+------------+----------+-----------+----------------+-------+\n' '\n' '\n')
 
 
-def test_pw_with_command_line(runner, config_tmp_path, db):
-    """ Test PW command"""
+def test_pw_record_temp_db(runner, config_tmp_path, db):
+    """ Test PW command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -193,3 +197,69 @@ def test_debug_file(runner, config_tmp_path):
     with open(os.path.join(config_tmp_path.config_path, DEBUG_FILE_NAME), mode='r') as f:
         text = f.read()
     assert text == '[FUNCTION]\nCommand =/H\nTitle=Debugger\nType=SystemCommand'
+
+
+########################################################################################################################
+# Test with already created config, encrypt keys and database
+########################################################################################################################
+
+@pytest.fixture
+def add_system_to_existing_database(runner):
+    """ Fixture to add and delete system from existing database """
+    result = runner.invoke(sap_cli,
+                           args=["add",
+                                 "-system", "zzz",
+                                 "-mandant", "100",
+                                 "-user", "USER",
+                                 "-password", "12345",
+                                 "-customer", "CUSTOMER",
+                                 "-description", "DEV_SYSTEM"])
+    yield result
+    result = runner.invoke(sap_cli,
+                           args=["delete",
+                                 "-system", "zzz",
+                                 "-mandant", "100",
+                                 "-user", "USER"])
+
+
+def test_add_record_exising_db(runner, add_system_to_existing_database):
+    """ Test LIST command with records in database created with command line """
+    result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
+    assert result.output == ('\n'
+                             '\n'
+                             '+--------------------------------------------------+\n'
+                             '|                Available systems                 |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| Customer | System | Mandant | Description | User |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
+                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+
+
+def test_pw_record_exising_db(runner, add_system_to_existing_database):
+    """ Test PW command in existing database"""
+    result = runner.invoke(sap_cli,
+                           args=["pw", "zzz", "100", "-c"])
+    password = pyperclip.paste()
+    assert password == '12345'
+
+
+def test_update_record_exising_db(runner, add_system_to_existing_database):
+    """ Test UPDATE command in existing database"""
+    result = runner.invoke(sap_cli,
+                           args=["update",
+                                 "-system", "zzz",
+                                 "-mandant", "100",
+                                 "-user", "USER",
+                                 "-password", "12345",
+                                 "-customer", "CUSTOMER",
+                                 "-description", "QAS_SYSTEM"])
+    result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
+    assert result.output == ('\n' '\n'
+                             '+--------------------------------------------------+\n'
+                             '|                Available systems                 |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| Customer | System | Mandant | Description | User |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| CUSTOMER | ZZZ    | 100     | QAS_SYSTEM  | USER |\n'
+                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')

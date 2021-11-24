@@ -43,7 +43,10 @@ def sap_cli(ctx, config_path: str):
         _config = cfg.read()
         ctx.obj['CONFIG_DATA'] = _config
 
-    ctx.obj['CRYPTO'] = Crypto(cfg.public_key_path, cfg.private_key_path)
+    if _config:
+        ctx.obj['CRYPTO'] = Crypto(_config.public_key_path, _config.private_key_path)
+    else:
+        ctx.obj['CRYPTO'] = Crypto(cfg.public_key_path, cfg.private_key_path)
     ctx.obj['DATABASE'] = SapDB()
     ctx.obj['DEBUG'] = config_path
     ctx.obj['CONFIG_METHODS'] = cfg
@@ -525,24 +528,29 @@ def config(ctx):
 
 
 @sap_cli.command("list")
-@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
+@click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-v", "--verbose", "verbose", help="Show password", is_flag=True)
+@click.option("-u", "--user", "user", help="Show systems by user", type=click.STRING)
+@click.option("-c", "--customer", "customer", help="Show systems by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Show systems by description", type=click.STRING)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True)
 @click.pass_context
-def list_systems(ctx, system, mandant, verbose):
+def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, verbose: bool):
     """
-    Print information about system(s)
+    Print information about SAP systems
 
     Optional arguments: \n
     1. System: System Id \n
     2. Mandant: Mandant num \n
 
-    If no arguments - print info about all systems
+    If no arguments - print information about all systems
     """
     _result = []
 
     with _sap_db(ctx.obj['CONFIG_DATA']):
-        sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None)
+        sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None,
+                                user if user else None, None, customer if customer else None,
+                                description if description else None)
         result = sap.query_system(sap_system)
 
         if not result:
@@ -551,10 +559,10 @@ def list_systems(ctx, system, mandant, verbose):
                     [
                         str(system).upper() if system else "",
                         str(mandant).zfill(3) if mandant else "",
+                        user.upper() if user else "",
                         "",
-                        "",
-                        "",
-                        "",
+                        str(customer).upper() if customer else "",
+                        description.upper() if description else "",
                     ]
                 ]
             )
@@ -574,8 +582,6 @@ def list_systems(ctx, system, mandant, verbose):
             if verbose:
                 click.pause("Press Enter. Information about passwords will be deleted from screen ...")
                 os.system("cls")
-            else:
-                pass
 
 
 @sap_cli.command("db")
