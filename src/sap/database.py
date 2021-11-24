@@ -7,7 +7,7 @@ import click
 import sap.utilities as utilities
 
 from sqlalchemy import Column, String, BLOB
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, asc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -104,7 +104,8 @@ class SapDB():  # noqa : E801
     def query_system(self, sap_system):
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description)
+                                   Sap.description).order_by(asc(Sap.customer), asc(Sap.system_id),
+                                                             asc(Sap.mandant_num), asc(Sap.user_id))
         if sap_system.system:
             # query = query.filter_by(system_id=sap_system.system)
             query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))

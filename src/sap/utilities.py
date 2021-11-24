@@ -153,7 +153,7 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
     if transaction:
         title = title + f"{click.style(' with transaction ', **color)}"
         title = title + f"{click.style(str(transaction).upper(), **color_sensitive)}"
-    click.echo(t.get_string(title=title, sort_key=operator.itemgetter(1, 0), sortby="System"))
+    click.echo(t.get_string(title=title))
     click.echo('\n')
 
 

@@ -28,7 +28,7 @@ from sap.file_names import CONFIG_NAME, DEBUG_FILE_NAME, PRIVATE_KEY_NAME, PUBLI
 
 @click.group()
 @click.pass_context
-@click.option('-path', '--config_path', 'config_path', help="Path to sap_config.ini folder", type=click.Path())
+@click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
 def sap_cli(ctx, config_path: str):
     """Command line tool to launch SAP systems from saplogon application"""
 
@@ -65,11 +65,13 @@ def logon(ctx):
 
 
 @sap_cli.command("run")
-@click.argument("system", type=utilities.LETTERS_NUMBERS_3)
+@click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
                                            "if several users exist for one system, or user outside of the database",
               )
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
 @click.option(
     "-eu", "--external_user", "external_user", help="Launch sap system with external user (outside database)",
     type=click.BOOL, default=False, is_flag=True,
@@ -78,14 +80,13 @@ def logon(ctx):
 @click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system", )
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.pass_context
-def run(ctx, system: str, mandant: int, user: str, external_user: bool, language: str, transaction: str,
-        parameter: str, ):
+def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool, language: str,
+        transaction: str, parameter: str, ):
     """
     Launch SAP system \n
-    Required arguments : \n
-    1. SYSTEM - system id from saplogon
 
     Optional arguments: \n
+    1. SYSTEM - system id from saplogon
     2. MANDANT - mandant or client id of sap system
     """
     password = ""
@@ -102,9 +103,12 @@ def run(ctx, system: str, mandant: int, user: str, external_user: bool, language
     else:
         with _sap_db(ctx.obj['CONFIG_DATA']):
             sap_system_sql = Sap_system(
-                system.upper(),
+                system.upper() if system else None,
                 str(mandant).zfill(3) if mandant else None,
                 user.upper() if user else None,
+                None,
+                customer if customer else None,
+                description if description else None,
             )
             result = sap.query_system(sap_system_sql)
 
@@ -112,12 +116,12 @@ def run(ctx, system: str, mandant: int, user: str, external_user: bool, language
             sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
-                        system.upper(),
+                        system.upper() if system else None,
                         str(mandant).zfill(3) if mandant else None,
                         user.upper() if user else None,
                         None,
-                        None,
-                        None,
+                        customer.upper() if customer else None,
+                        description.upper() if description else None,
                     ]
                 ]
             )

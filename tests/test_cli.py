@@ -91,8 +91,9 @@ def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_re
                              '+----------+--------+---------+-------------+------+\n' '\n' '\n')
 
 
-def test_add_record_temp_db(runner, config_tmp_path, db):
-    """ Test LIST command with records in temporary database created with command line """
+@pytest.fixture
+def add_system_to_temp_database(runner, config_tmp_path):
+    """ Fixture to add and delete system from existing database """
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "add",
@@ -102,6 +103,17 @@ def test_add_record_temp_db(runner, config_tmp_path, db):
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
                                  "-description", "DEV_SYSTEM"])
+    yield result
+    result = runner.invoke(sap_cli,
+                           args=["-path", config_tmp_path.config_path,
+                                 "delete",
+                                 "-system", "zzz",
+                                 "-mandant", "100",
+                                 "-user", "USER"])
+
+
+def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_database):
+    """ Test LIST command with records in temporary database created with command line """
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
     assert result.output == ('\n' '\n'
                              '+--------------------------------------------------+\n'
@@ -222,9 +234,37 @@ def add_system_to_existing_database(runner):
                                  "-user", "USER"])
 
 
-def test_add_record_exising_db(runner, add_system_to_existing_database):
+def test_list_record_exising_db(runner, add_system_to_existing_database):
     """ Test LIST command with records in database created with command line """
     result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
+    assert result.output == ('\n'
+                             '\n'
+                             '+--------------------------------------------------+\n'
+                             '|                Available systems                 |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| Customer | System | Mandant | Description | User |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
+                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+
+
+def test_list_record_by_description_exising_db(runner, add_system_to_existing_database):
+    """ Test LIST command with records in database created with command line """
+    result = runner.invoke(sap_cli, args=["list", "-d", "sys"])
+    assert result.output == ('\n'
+                             '\n'
+                             '+--------------------------------------------------+\n'
+                             '|                Available systems                 |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| Customer | System | Mandant | Description | User |\n'
+                             '+----------+--------+---------+-------------+------+\n'
+                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
+                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+
+
+def test_list_record_by_customer_exising_db(runner, add_system_to_existing_database):
+    """ Test LIST command with records in database created with command line """
+    result = runner.invoke(sap_cli, args=["list", "-c", "cust"])
     assert result.output == ('\n'
                              '\n'
                              '+--------------------------------------------------+\n'
