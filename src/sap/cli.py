@@ -86,7 +86,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
     Launch SAP system \n
 
     Optional arguments: \n
-    1. SYSTEM - system id from saplogon
+    1. SYSTEM - system id from saplogon \n
     2. MANDANT - mandant or client id of sap system
     """
     password = ""

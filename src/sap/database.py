@@ -5,6 +5,7 @@ import os
 import sys
 import click
 import sap.utilities as utilities
+from sap.file_names import DATABASE_NAME
 
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine, asc
@@ -39,28 +40,33 @@ class SapDB():  # noqa : E801
     """ Database processing class  """
     session = ''
 
-    def __init__(self, db_path='', db_type=''):  # type (str) -> ()
+    def __init__(self, db_path: str = '', db_type: str = ''):  # type (str) -> ()
         """
         Connect to database.
 
         :param db_path: Path to database including database name
         :param db_type: Database type: sqlite, Postgresql, mysql, etc.
         """
-        self.database_name = 'sap_systems.db'
+        self.database_name = DATABASE_NAME
         self.database_type = db_type if db_type else 'sqlite'
         self.database_path = db_path if db_path else os.path.join(utilities.path(), self.database_name)
 
-        # self.database_url = URL(
-        #     self.database_type,
-        #     username=credentials['username'],
-        #     password=credentials['password'],
-        #     host=credentials['host'],
-        #     port=credentials['port'],
-        #     database=credentials['database'],
-        #     query=dict(driver='SQL+Server')
-        # )
+        db_credentials = {'username': None,
+                          'password': None,
+                          'host': None,
+                          'database': str(self.database_path),
+                          'port': None}
 
-        self.database_url = f"{self.database_type}:///{self.database_path}"
+        self.database_url = URL.create(
+            drivername=self.database_type,
+            username=db_credentials['username'],
+            password=db_credentials['password'],
+            host=db_credentials['host'],
+            port=db_credentials['port'],
+            database=db_credentials['database'],
+        )
+
+        # self.database_url = f"{self.database_type}:///{self.database_path}"
 
         if database_exists(self.database_url):
             # Путь по умолчанию
