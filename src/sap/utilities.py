@@ -94,7 +94,7 @@ def choose_system(sap_system: Sap_system, verbose=False):
 
 
 def print_system_list(sap_system: Sap_system, title, color=color_success, verbose=False, enumerate=False,
-                      transaction: str = ''):
+                      transaction: str = '', url=False):
     row = []
 
     # Header for Pretty table
@@ -102,6 +102,8 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
         header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User']
     else:
         header = ['Customer', 'System', 'Mandant', 'Description', 'User']
+    if url:
+        header.append('URL')
     if verbose:
         header.append('Password')
 
@@ -140,6 +142,13 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
             t.align["User"] = "l"
         else:
             row.append('')
+
+        if url:
+            if sap_system.url[position] is not None:
+                row.append(sap_system.url[position])
+                t.align["URL"] = "l"
+            else:
+                row.append('')
 
         if verbose and sap_system.password[position] is not None:
             row.append(sap_system.password[position])

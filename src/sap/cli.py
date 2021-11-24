@@ -486,6 +486,10 @@ def update(ctx, system, mandant, user, password, customer, description, url: str
 @click.pass_context
 def delete(ctx, system, mandant, user):
     """Удаление указанной SAP системы из базы данных"""
+
+    # TODO: лучше сначала проверить, есть ли такая система и если есть, то удалять. Чем удалять не понятно, что
+    #  и за тем писать, что мол удалил, но хотя не удаляли, т.к. нет такой системы.
+
     mandant = int(str(mandant).zfill(3))
     sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper())
 
@@ -550,9 +554,10 @@ def config(ctx):
 @click.option("-u", "--user", "user", help="Show systems by user", type=click.STRING)
 @click.option("-c", "--customer", "customer", help="Show systems by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Show systems by description", type=click.STRING)
+@click.option("-u", "--url", "url", help="Display url", is_flag=True, type=click.BOOL, default=False)
 @click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True)
 @click.pass_context
-def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, verbose: bool):
+def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool, verbose: bool):
     """
     Print information about SAP systems
 
@@ -596,7 +601,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
 
             sap_system = utilities.sap_systems_list_into_nametuple(_result)
 
-            utilities.print_system_list(sap_system, "Available systems", verbose=verbose)
+            utilities.print_system_list(sap_system, "Available systems", verbose=verbose, url=url)
             if verbose:
                 click.pause("Press Enter. Information about passwords will be deleted from screen ...")
                 os.system("cls")
