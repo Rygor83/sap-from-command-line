@@ -5,8 +5,11 @@
 """ Test for Command Line """
 
 import os
+
+import click
 import pytest
 import pyperclip
+import time
 
 from click.testing import CliRunner
 from sap.cli import sap_cli
@@ -44,16 +47,16 @@ def db(database):
     database.create()
     yield database
     database.stop_sap_db()
-    database.drop()
+    # database.drop()
 
 
 @pytest.fixture
 def added_record(db, crypto):
     """ Add temporary record for testing purpose """
-    sys_list = ['XXX', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM']
+    sys_list = ['XXX', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '']
     system = Sap_system(*sys_list)
     db.add(system)
-    sys_list = ['YYY', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM']
+    sys_list = ['YYY', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '']
     system = Sap_system(*sys_list)
     db.add(system)
     return sys_list
@@ -102,7 +105,8 @@ def add_system_to_temp_database(runner, config_tmp_path):
                                  "-user", "USER",
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM"])
+                                 "-description", "DEV_SYSTEM",
+                                 "-url", ""])
     yield result
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -135,7 +139,8 @@ def test_update_record_temp_db(runner, config_tmp_path, db):
                                  "-user", "USER",
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM"])
+                                 "-description", "DEV_SYSTEM",
+                                 "-url", ""])
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "update",
@@ -144,7 +149,8 @@ def test_update_record_temp_db(runner, config_tmp_path, db):
                                  "-user", "USER",
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
-                                 "-description", "QAS_SYSTEM"])
+                                 "-description", "QAS_SYSTEM",
+                                 "-url", " "])
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
     assert result.output == ('\n' '\n'
                              '+--------------------------------------------------+\n'
@@ -166,7 +172,8 @@ def test_delete_record_temp_db(runner, config_tmp_path, db):
                                  "-user", "USER",
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM"])
+                                 "-description", "DEV_SYSTEM",
+                                 "-url", " "])
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "delete",
@@ -194,7 +201,8 @@ def test_pw_record_temp_db(runner, config_tmp_path, db):
                                  "-user", "USER",
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM"])
+                                 "-description", "DEV_SYSTEM",
+                                 "-url", ""])
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
                                  "pw", "zzz", "100", "-c"])
@@ -225,7 +233,8 @@ def add_system_to_existing_database(runner):
                                  "-user", "USER",
                                  "-password", "12345",
                                  "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM"])
+                                 "-description", "DEV_SYSTEM",
+                                 "-url", ""])
     yield result
     result = runner.invoke(sap_cli,
                            args=["delete",

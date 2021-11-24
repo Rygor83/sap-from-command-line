@@ -79,9 +79,10 @@ def logon(ctx):
 @click.option("-l", "--language", "language", help="Language to logon", default="RU")
 @click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system", )
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
+@click.option("-w", "--web", "web", is_flag=True, help="Launch system web site")
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool, language: str,
-        transaction: str, parameter: str, ):
+        transaction: str, parameter: str, web: bool = False):
     """
     Launch SAP system \n
 
@@ -109,10 +110,28 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 None,
                 customer if customer else None,
                 description if description else None,
+                None,
             )
             result = sap.query_system(sap_system_sql)
 
         if not result:
+            message = "NOTHING FOUND according to search criteria"
+            utilities.print_no_results(message, customer, description, mandant, system, user)
+            sys.exit()
+
+    for item in result:
+        pwd = ctx.obj['CRYPTO'].decrypto(item[3])
+        _result.append((item[0], item[1], item[2], pwd, item[4], item[5], item[6]))
+
+    argument, selected_system = utilities.prepare_parameters_to_launch_system(_result, password, language, user, "",
+                                                                              ctx.obj['CONFIG_DATA'].command_line_path)
+
+    if web:
+        if selected_system.url[0] != " ":
+            # TODO: доделать передачу пароля для авторизации
+
+            click.launch(url=f"{selected_system.url[0]}")
+        else:
             sap_system_output = utilities.sap_systems_list_into_nametuple(
                 [
                     [
@@ -122,67 +141,67 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                         None,
                         customer.upper() if customer else None,
                         description.upper() if description else None,
+                        None,
                     ]
                 ]
             )
 
             utilities.print_system_list(
                 sap_system_output,
-                "NOTHING FOUND according to search criteria",
+                "NO URL FOUND according to search criteria",
                 color=utilities.color_warning,
             )
             sys.exit()
-
-    for item in result:
-        pwd = ctx.obj['CRYPTO'].decrypto(item[3])
-        _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
-
-    argument, selected_system = utilities.prepare_parameters_to_launch_system(_result, password, language, user, "",
-                                                                              ctx.obj['CONFIG_DATA'].command_line_path)
-
-    if transaction:
-        item = "-type=transaction"
-        argument.append(item)
-
-        if parameter:
-            # TODO: Доделать запуск транзакции с параметрами
-
-            # param_data = sap.query_param(str(transaction).upper())
-
-            # item = f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""
-            # item = '-command=\"*TM_52 VTGFHA-BUKRS=TRM1; VTGFHA-RFHA=100000000057;\"'
-            item = '-command="/n*FBM1 BKPF-BUKRS=1000;"'
-            argument.append(item)
-
-            click.echo(item)
-        else:
-            item = "-command=" + transaction
-            argument.append(item)
-
-    if external_user:
-        message = "Trying to LAUNCH the following system with EXTERNAL USERS"
     else:
-        message = "Trying to LAUNCH the following system"
-    utilities.print_system_list(selected_system, message, transaction=transaction)
+        if transaction:
+            item = "-type=transaction"
+            argument.append(item)
 
-    # Запускаем SAP
-    ret = call(argument)
+            if parameter:
+                # TODO: Доделать запуск транзакции с параметрами: проблема с тем, что когда запускаешь код напрямую,
+                #  например, '-command="/n*FBM1 BKPF-BUKRS=1000;"', то все работает.
+                #  А если формировать код через переменные, например,
+                #  f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""- то все плохо.
 
-    if ret:
-        click.echo(ret)
+                # param_data = sap.query_param(str(transaction).upper())
+
+                # item = f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""
+                # item = '-command=\"*TM_52 VTGFHA-BUKRS=TRM1; VTGFHA-RFHA=100000000057;\"'
+                item = '-command="/n*FBM1 BKPF-BUKRS=1000;"'
+                argument.append(item)
+
+                click.echo(item)
+            else:
+                item = "-command=" + transaction
+                argument.append(item)
+
+        if external_user:
+            message = "Trying to LAUNCH the following system with EXTERNAL USERS"
+        else:
+            message = "Trying to LAUNCH the following system"
+        utilities.print_system_list(selected_system, message, transaction=transaction)
+
+        # Запускаем SAP
+        ret = call(argument)
+
+        if ret:
+            click.echo(ret)
 
 
 @sap_cli.command("debug")
 @click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="User")
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
 @click.option("-pw", "--password", "password", help="Password")
 @click.option("-l", "--language", "language", help="Logon language", default="RU")
 @click.option("-f", "--file", "file", help="Create debug file", is_flag=True, type=click.BOOL)
 @click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
               help='Do you need to open folder with debug file')
 @click.pass_context
-def debug(ctx, system, mandant="", user="", password="", language="RU", file=False, open_file=True):
+def debug(ctx, system, mandant="", user="", customer="", description="", password="", language="RU", file=False,
+          open_file=True):
     """
     System debug \n
     You can: \n
@@ -216,35 +235,24 @@ def debug(ctx, system, mandant="", user="", password="", language="RU", file=Fal
     else:
         with _sap_db(ctx.obj['CONFIG_DATA']):
             sap_system_sql = Sap_system(
-                str(system).upper(),
+                system.upper() if system else None,
                 str(mandant).zfill(3) if mandant else None,
-                str(user).upper() if user else None,
+                user.upper() if user else None,
+                None,
+                customer if customer else None,
+                description if description else None,
+                None,
             )
+
             result = sap.query_system(sap_system_sql)
 
             if not result:
-                sap_system_output = utilities.sap_systems_list_into_nametuple(
-                    [
-                        [
-                            str(system).upper(),
-                            str(mandant).zfill(3) if mandant else "",
-                            str(user).upper() if user else "",
-                            "",
-                            "",
-                            "",
-                        ]
-                    ]
-                )
-                utilities.print_system_list(
-                    sap_system_output,
-                    "NOTHING FOUND according to search criteria",
-                    color=utilities.color_warning,
-                )
+                message = "NOTHING FOUND according to search criteria"
+                utilities.print_no_results(message, customer, description, mandant, system, user)
             else:
-
                 for item in result:
                     pwd = ctx.obj['CRYPTO'].decrypto(item[3])
-                    _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
+                    _result.append((item[0], item[1], item[2], pwd, item[4], item[5], item[6]))
 
                 argument, selected_system = utilities.prepare_parameters_to_launch_system(_result, password, language,
                                                                                           user, "", ctx.obj[
@@ -308,7 +316,7 @@ def pw(ctx, system, mandant, clear_clipboard: bool = True, time_to_clear: int = 
 
             for item in result:
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
-                _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
+                _result.append((item[0], item[1], item[2], pwd, item[4], item[5], item[6]))
 
             sap_system_output = utilities.sap_systems_list_into_nametuple(_result)
             selected_system = utilities.choose_system(sap_system_output)
@@ -351,10 +359,11 @@ def pw(ctx, system, mandant, clear_clipboard: bool = True, time_to_clear: int = 
 @click.option("-mandant", prompt=True, help="Client", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="User")
 @click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
-@click.option("-customer", prompt=True, help="Customer", type=click.STRING)
-@click.option("-description", prompt=True, help="Description", type=click.STRING)
+@click.option("-customer", prompt=True, help="Customer", type=click.STRING, default="")
+@click.option("-description", prompt=True, help="Description", type=click.STRING, default="")
+@click.option("-url", prompt=True, help="Url", type=click.STRING, default="")
 @click.pass_context
-def add(ctx, system, mandant, user, password, description, customer):
+def add(ctx, system, mandant, user, password, description, customer, url: str = " "):
     """
     Add sap system with it's parameters to db.
 
@@ -371,6 +380,7 @@ def add(ctx, system, mandant, user, password, description, customer):
             encrypted_password,
             str(customer).upper(),
             str(description),
+            str(url),
         )
         result = sap.add(sap_system)
 
@@ -388,7 +398,7 @@ def add(ctx, system, mandant, user, password, description, customer):
 
             for item in result:
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
-                _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
+                _result.append((item[0], item[1], item[2], pwd, item[4], item[5], item[6]))
 
             sap_system = utilities.sap_systems_list_into_nametuple(_result)
             utilities.print_system_list(sap_system, "The following system is ADDED to the database: ")
@@ -399,10 +409,11 @@ def add(ctx, system, mandant, user, password, description, customer):
 @click.option("-mandant", prompt=True, help="Mandant", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="User")
 @click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
-@click.option("-customer", prompt=True, help="Customer", type=click.STRING)
-@click.option("-description", prompt=True, help="System description", type=click.STRING)
+@click.option("-customer", prompt=True, help="Customer", type=click.STRING, default="")
+@click.option("-description", prompt=True, help="System description", type=click.STRING, default="")
+@click.option("-url", prompt=True, help="Url", type=click.STRING, default=" ")
 @click.pass_context
-def update(ctx, system, mandant, user, password, customer, description):
+def update(ctx, system, mandant, user, password, customer, description, url: str = " "):
     """
     Update selected records of database
 
@@ -421,6 +432,7 @@ def update(ctx, system, mandant, user, password, customer, description):
         password,
         str(customer),
         str(description),
+        str(url),
     )
     sap_encrypted_system = Sap_system(
         str(system).upper(),
@@ -429,6 +441,7 @@ def update(ctx, system, mandant, user, password, customer, description):
         encrypted_password,
         str(customer),
         str(description),
+        str(url),
     )
 
     with _sap_db(ctx.obj['CONFIG_DATA']):
@@ -439,7 +452,7 @@ def update(ctx, system, mandant, user, password, customer, description):
 
             for item in result:
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
-                _result = [(item[0], item[1], item[2], pwd, item[4], item[5])]
+                _result = [(item[0], item[1], item[2], pwd, item[4], item[5], item[6])]
 
             sap_system_output = utilities.sap_systems_list_into_nametuple(_result)
 
@@ -478,7 +491,6 @@ def delete(ctx, system, mandant, user):
 
     with _sap_db(ctx.obj['CONFIG_DATA']):
         result = sap.delete(sap_system)
-
         result = sap.query_system(sap_system)
 
         if result == []:
@@ -488,6 +500,7 @@ def delete(ctx, system, mandant, user):
                         str(system).upper(),
                         str(mandant).zfill(3),
                         str(user).upper(),
+                        "",
                         "",
                         "",
                         "",
@@ -554,7 +567,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
     with _sap_db(ctx.obj['CONFIG_DATA']):
         sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None,
                                 user if user else None, None, customer if customer else None,
-                                description if description else None)
+                                description if description else None, None)
         result = sap.query_system(sap_system)
 
         if not result:
@@ -567,6 +580,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                         "",
                         str(customer).upper() if customer else "",
                         description.upper() if description else "",
+                        "",
                     ]
                 ]
             )
@@ -578,7 +592,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
         else:
             for item in result:
                 pwd = ctx.obj['CRYPTO'].decrypto(item[3])
-                _result.append((item[0], item[1], item[2], pwd, item[4], item[5]))
+                _result.append((item[0], item[1], item[2], pwd, item[4], item[5], item[6]))
 
             sap_system = utilities.sap_systems_list_into_nametuple(_result)
 
@@ -713,31 +727,6 @@ def backup(ctx, password, open_file=True):
             click.launch(url=back_path, locate=True)
     else:
         click.echo('Backup creation failed')
-
-
-@sap_cli.command("launch")
-@click.argument("system", type=utilities.LETTERS_NUMBERS_3)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="пользователь")
-@click.option("-pw", "--password", "password", help="пароль")
-@click.option("-l", "--language", "language", help="язык входа", default="RU")
-@click.option("-t", "--transaction", "transaction", help="код транзакции")
-@click.option("-p", "--parameter", "parameter", help="параметры для транзакции")
-@click.pass_context
-def launch(ctx,
-           system,
-           mandant="",
-           user="",
-           password="",
-           language="RU",
-           transaction="",
-           parameter="",
-           ):
-    """Launch sap system in web"""
-
-    # TODO: сделать таблицу https ардесов для SAP системы,
-    # путь до браузера, чтобы запускать их в браузере.
-    pass
 
 
 @contextmanager

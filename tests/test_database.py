@@ -37,7 +37,7 @@ def crypto(tmpdir):
 @pytest.fixture
 def added_record(db, crypto):
     """ Add temporary record for testing purpose """
-    sys_list = ['XXX', '111', 'rygor', crypto.encrypto(str.encode('123')), 'TEST', 'Dev']
+    sys_list = ['XXX', '111', 'rygor', crypto.encrypto(str.encode('123')), 'TEST', 'Dev', '']
     system = Sap_system(*sys_list)
     db.add(system)
     return sys_list
@@ -63,7 +63,7 @@ def test_delete_record_from_db(db, added_record):
 
 
 def test_update_record(db, added_record, crypto):
-    sys_list_updated = ['XXX', '111', 'rygor', crypto.encrypto(str.encode('123')), 'TEST_test', 'Development']
+    sys_list_updated = ['XXX', '111', 'rygor', crypto.encrypto(str.encode('123')), 'TEST_test', 'Development', '']
     system_updated = Sap_system(*sys_list_updated)
     db.update(system_updated)
     result_lst = db.query_system(Sap_system(system='XXX'))

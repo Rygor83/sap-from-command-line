@@ -55,8 +55,9 @@ def sap_systems_list_into_nametuple(result: list) -> Sap_system:
     passwords = [item[3] for item in result]
     customers = [item[4] for item in result]
     descriptions = [item[5] for item in result]
+    url = [item[6] for item in result]
 
-    sap_system = Sap_system(systems, mandants, users, passwords, customers, descriptions)
+    sap_system = Sap_system(systems, mandants, users, passwords, customers, descriptions, url)
 
     return sap_system
 
@@ -87,7 +88,7 @@ def choose_system(sap_system: Sap_system, verbose=False):
 
     system = Sap_system(
         [sap_system.system[ans]], [sap_system.mandant[ans]], [sap_system.user[ans]], [sap_system.password[ans]],
-        [sap_system.customer[ans]], [sap_system.description[ans]])
+        [sap_system.customer[ans]], [sap_system.description[ans]], [sap_system.url[ans]])
 
     return system
 
@@ -225,3 +226,20 @@ def get_reg(name):
         return value
     except WindowsError:
         return None
+
+
+def print_no_results(message, customer, description, mandant, system, user):
+    sap_system_output = sap_systems_list_into_nametuple(
+        [
+            [
+                system.upper() if system else None,
+                str(mandant).zfill(3) if mandant else None,
+                user.upper() if user else None,
+                None,
+                customer.upper() if customer else None,
+                description.upper() if description else None,
+                None,
+            ]
+        ]
+    )
+    print_system_list(sap_system_output, message, color=color_warning)
