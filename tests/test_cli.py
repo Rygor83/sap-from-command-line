@@ -42,31 +42,29 @@ def database(tmp_path):
 
 
 @pytest.fixture
-def db(database):
+def temp_db(database):
     """ Prepare temporary database """
     database.create()
     yield database
     database.stop_sap_db()
-    # database.drop()
+    database.drop()
 
 
 @pytest.fixture
-def added_record(db, crypto):
+def added_record(temp_db, crypto):
     """ Add temporary record for testing purpose """
-    sys_list = ['XXX', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '']
-    system = Sap_system(*sys_list)
-    db.add(system)
-    sys_list = ['YYY', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '']
-    system = Sap_system(*sys_list)
-    db.add(system)
-    return sys_list
+    system = Sap_system('XXX', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '')
+    temp_db.add(system)
+    system = Sap_system('YYY', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '')
+    temp_db.add(system)
+    return system
 
 
 @pytest.fixture
-def config_tmp_path(tmp_path, db, crypto):
+def config_tmp_path(tmp_path, temp_db, crypto):
     """ Create specific config with tmp_dir """
     cfg = Config(config_path=tmp_path,
-                 db_path=db.database_path,
+                 db_path=temp_db.database_path,
                  db_type='sqlite',
                  public_key_path=crypto.public_key_path,
                  private_key_path=crypto.private_key_path,
@@ -91,7 +89,7 @@ def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_re
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
                              '| CUSTOMER | XXX    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '+----------+--------+---------+-------------+------+\n')
 
 
 @pytest.fixture
@@ -114,7 +112,7 @@ def add_system_to_temp_database(runner, config_tmp_path):
                                  "-system", "zzz",
                                  "-mandant", "100",
                                  "-user", "USER",
-                                 "--yes"])
+                                 "--yes", "y\n"])
 
 
 def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_database):
@@ -127,10 +125,10 @@ def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_databas
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
                              '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '+----------+--------+---------+-------------+------+\n')
 
 
-def test_delete_record_temp_db(runner, config_tmp_path, db):
+def test_delete_record_temp_db(runner, config_tmp_path, temp_db):
     """ Test DELETE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -148,7 +146,7 @@ def test_delete_record_temp_db(runner, config_tmp_path, db):
                                  "-system", "zzz",
                                  "-mandant", "100",
                                  "-user", "USER",
-                                 "--yes"])
+                                 "y\n"])
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
     assert result.output == ('\n' '\n'
                              '+------------------------------------------------------------+\n'
@@ -157,10 +155,10 @@ def test_delete_record_temp_db(runner, config_tmp_path, db):
                              '| Customer   | System   | Mandant   | Description    | User  |\n'
                              '+------------+----------+-----------+----------------+-------+\n'
                              '|            | ZZZ      | 100       |                |       |\n'
-                             '+------------+----------+-----------+----------------+-------+\n' '\n' '\n')
+                             '+------------+----------+-----------+----------------+-------+\n')
 
 
-def test_pw_record_temp_db(runner, config_tmp_path, db):
+def test_pw_record_temp_db(runner, config_tmp_path, temp_db):
     """ Test PW command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -188,8 +186,7 @@ def test_debug_file(runner, config_tmp_path):
     assert text == '[FUNCTION]\nCommand =/H\nTitle=Debugger\nType=SystemCommand'
 
 
-@pytest.mark.skip
-def test_update_record_temp_db(runner, config_tmp_path, db):
+def test_update_record_temp_db(runner, config_tmp_path, temp_db):
     """ Test UPDATE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -218,8 +215,8 @@ def test_update_record_temp_db(runner, config_tmp_path, db):
                              '+----------+--------+---------+-------------+------+\n'
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | QAS_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
+                             '+----------+--------+---------+-------------+------+\n')
 
 
 ########################################################################################################################
@@ -243,7 +240,8 @@ def add_system_to_existing_database(runner):
                            args=["delete",
                                  "-system", "zzz",
                                  "-mandant", "100",
-                                 "-user", "USER"])
+                                 "-user", "USER",
+                                 "--yes"])
 
 
 def test_list_record_exising_db(runner, add_system_to_existing_database):
@@ -257,7 +255,7 @@ def test_list_record_exising_db(runner, add_system_to_existing_database):
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
                              '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '+----------+--------+---------+-------------+------+\n')
 
 
 def test_list_record_by_description_exising_db(runner, add_system_to_existing_database):
@@ -271,7 +269,7 @@ def test_list_record_by_description_exising_db(runner, add_system_to_existing_da
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
                              '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '+----------+--------+---------+-------------+------+\n')
 
 
 def test_list_record_by_customer_exising_db(runner, add_system_to_existing_database):
@@ -285,7 +283,7 @@ def test_list_record_by_customer_exising_db(runner, add_system_to_existing_datab
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
                              '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '+----------+--------+---------+-------------+------+\n')
 
 
 def test_pw_record_exising_db(runner, add_system_to_existing_database):
@@ -296,7 +294,6 @@ def test_pw_record_exising_db(runner, add_system_to_existing_database):
     assert password == '12345'
 
 
-@pytest.mark.skip
 def test_update_record_exising_db(runner, add_system_to_existing_database):
     """ Test UPDATE command in existing database"""
     result = runner.invoke(sap_cli,
@@ -314,5 +311,5 @@ def test_update_record_exising_db(runner, add_system_to_existing_database):
                              '+----------+--------+---------+-------------+------+\n'
                              '| Customer | System | Mandant | Description | User |\n'
                              '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | QAS_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n' '\n' '\n')
+                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
+                             '+----------+--------+---------+-------------+------+\n')

@@ -1,7 +1,7 @@
 #  ------------------------------------------
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
-
+import typing
 import click
 import sys
 import traceback
@@ -14,6 +14,7 @@ from operator import attrgetter
 import winreg
 import time
 
+import sap.api
 from sap.api import Sap_system
 
 # Цвета сообщений
@@ -23,8 +24,8 @@ color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
 
-def prepare_parameters_to_launch_system(result: list, password, language, user, transaction="",
-                                        sapshcut_exe_path: str = ""):
+def prepare_parameters_to_launch_system(selected_sap_systems: list, password, language, user, transaction="",
+                                        sapshcut_exe_path: str = "") -> typing.Tuple[list, Sap_system]:
     # cfg = sap.config.Config()
     # _config = cfg.read()
     # sapshcut_exe_path = _config.command_line_path
@@ -32,16 +33,16 @@ def prepare_parameters_to_launch_system(result: list, password, language, user, 
     if not os.path.exists(sapshcut_exe_path):
         raise utilities.WrongPath("sapshcut.exe", sapshcut_exe_path)
 
-    sap_system_output = sap_systems_list_into_nametuple(result)
-    selected_system = choose_system(sap_system_output)
+    # sap_system_output = sap_systems_list_into_nametuple(result)
+    selected_system: Sap_system = choose_system(selected_sap_systems)
 
     # Добавляем параметры для запуска SAP системы
     argument = [
         sapshcut_exe_path,  # Путь до sapshcut.exe
-        f"-system={selected_system.system[0]}",  # Id системы
-        f"-client={str(selected_system.mandant[0]).zfill(3)}",  # Номер манданта
-        f"-user={user}" if user else f"-user={selected_system.user[0]}",  # Пользователь
-        f"-pw={password}" if password else f"-pw={selected_system.password[0]}",  # Пароль
+        f"-system={selected_system.system}",  # Id системы
+        f"-client={str(selected_system.mandant).zfill(3)}",  # Номер манданта
+        f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
+        f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
         f"-language={language}",  # Язык для входа
         "-maxgui",  # Развернуть окно на весь экран
     ]
@@ -74,31 +75,36 @@ def launch_command_line_with_params(command_line_path, param):
     call(argument)
 
 
-def choose_system(sap_system: Sap_system, verbose=False):
+def choose_system(sap_systems: list, verbose=False) -> Sap_system:
     ans = 0
-    if len(sap_system[0]) >= 2:
-        print_system_list(sap_system, 'Available systems', verbose=verbose, enumerate=True)
+    if len(sap_systems) >= 2:
+        # print_system_list(sap_systems, 'Available systems', verbose=verbose, enum=True)
 
-        while int(ans) > len(sap_system[0]) or int(ans) < 1:
-            if 1 <= int(ans) <= len(sap_system[0]):
+        while int(ans) > len(sap_systems[0]) or int(ans) < 1:
+            if 1 <= int(ans) <= len(sap_systems[0]):
                 break
-            click.echo(click.style(f"\nAvailable values from 1 to {str(len(sap_system[0]))}.", **color_message))
+            click.echo(click.style(f"\nAvailable values from 1 to {str(len(sap_systems))}.", **color_message))
             ans = click.prompt('Choose system you want to logon \n>>>', type=int)
         ans = ans - 1
 
-    system = Sap_system(
-        [sap_system.system[ans]], [sap_system.mandant[ans]], [sap_system.user[ans]], [sap_system.password[ans]],
-        [sap_system.customer[ans]], [sap_system.description[ans]], [sap_system.url[ans]])
+    selected_system: Sap_system = Sap_system(
+        sap_systems[ans].system, sap_systems[ans].mandant, sap_systems[ans].user, sap_systems[ans].password,
+        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url)
 
-    return system
+    return selected_system
 
 
-def print_system_list(sap_system: Sap_system, title, color=color_success, verbose=False, enumerate=False,
-                      transaction: str = '', url=False):
+def print_system_list(sap_systems, title, color=color_success, verbose=False,
+                      enum=False, transaction: str = '', url=False):
+    # TODO: доделать формирование list(Sap_system) внутри этой подпрограммы
+
+    if isinstance(type(sap_systems), str):
+        sap_system = list(sap_systems)
+
     row = []
 
     # Header for Pretty table
-    if enumerate:
+    if enum:
         header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User']
     else:
         header = ['Customer', 'System', 'Mandant', 'Description', 'User']
@@ -110,48 +116,48 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
     # Table with data
     t = PrettyTable(header)
 
-    for position in range(len(sap_system[0])):
-        if enumerate:
-            row.append(position + 1)
-        if sap_system.customer[position] is not None:
-            row.append(sap_system.customer[position])
+    for index, sap_system in enumerate(sap_systems, start=1):
+        if enum:
+            row.append(index)
+        if sap_system.customer is not None:
+            row.append(sap_system.customer)
             t.align["Customer"] = "l"
         else:
             row.append('')
 
-        if sap_system.system[position] is not None:
-            row.append(sap_system.system[position])
+        if sap_system.system is not None:
+            row.append(sap_system.system)
             t.align["System"] = "l"
         else:
             row.append('')
 
-        if sap_system.mandant[position] is not None:
-            row.append(sap_system.mandant[position])
+        if sap_system.mandant is not None:
+            row.append(sap_system.mandant)
             t.align["Mandant"] = "l"
         else:
             row.append('')
 
-        if sap_system.description[position] is not None:
-            row.append(sap_system.description[position])
+        if sap_system.description is not None:
+            row.append(sap_system.description)
             t.align["Description"] = "l"
         else:
             row.append('')
 
-        if sap_system.user[position] is not None:
-            row.append(sap_system.user[position])
+        if sap_system.user is not None:
+            row.append(sap_system.user)
             t.align["User"] = "l"
         else:
             row.append('')
 
         if url:
-            if sap_system.url[position] is not None:
-                row.append(sap_system.url[position])
+            if sap_system.url is not None:
+                row.append(sap_system.url)
                 t.align["URL"] = "l"
             else:
                 row.append('')
 
-        if verbose and sap_system.password[position] is not None:
-            row.append(sap_system.password[position])
+        if verbose and sap_system.password is not None:
+            row.append(sap_system.password)
             t.align["Password"] = "l"
 
         t.add_row(row)
@@ -164,7 +170,6 @@ def print_system_list(sap_system: Sap_system, title, color=color_success, verbos
         title = title + f"{click.style(' with transaction ', **color)}"
         title = title + f"{click.style(str(transaction).upper(), **color_sensitive)}"
     click.echo(t.get_string(title=title))
-    click.echo('\n')
 
 
 def show_exception_and_exit(exc_type, exc_value, tb):

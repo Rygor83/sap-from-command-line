@@ -144,6 +144,7 @@ class SapDB():  # noqa : E801
             result.password = sap_system.password
             result.customer = sap_system.customer
             result.description = sap_system.description
+            result.url = sap_system.url
             self.session.commit()
 
     def delete(self, sap_system):  # type (namedtuple) -> bool
