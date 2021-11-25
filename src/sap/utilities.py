@@ -9,10 +9,10 @@ import os
 from subprocess import call
 import operator
 import re
-from appdirs import *
 from prettytable import PrettyTable
 from operator import attrgetter
 import winreg
+import time
 
 from sap.api import Sap_system
 
@@ -173,7 +173,7 @@ def show_exception_and_exit(exc_type, exc_value, tb):
 
 
 def path():
-    return user_data_dir('sap\\', appauthor=False)
+    return click.get_app_dir('sap', roaming=False)
 
 
 class WrongPath(Exception):
@@ -252,3 +252,11 @@ def print_no_results(message, customer, description, mandant, system, user):
         ]
     )
     print_system_list(sap_system_output, message, color=color_warning)
+
+
+def countdown(seconds):
+    for i in range(seconds, -1, -1):
+        # move to the beginning of the line and remove line
+        print("\r\033[K", end='', flush=True)
+        print(f"\r{i}", end='', flush=True)
+        time.sleep(1)

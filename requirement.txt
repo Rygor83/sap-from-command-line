@@ -1,6 +1,5 @@
 click
 cryptography
-appdirs
 prettytable
 pyperclip
 sqlalchemy
