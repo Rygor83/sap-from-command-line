@@ -6,6 +6,8 @@ from collections import namedtuple
 from six import string_types
 import sqlalchemy
 import click
+from sap.exceptions import DatabaseDoesNotExists
+import sys
 
 # Sap system parameters : [system: str, mandant: int, user: str, password: byte]
 Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'customer', 'description', 'url'])
@@ -92,8 +94,20 @@ def start_sap_db(db_path, db_type):
         raise TypeError('db_path must be a string')
     global _sapdb
     import sap.database
-    _sapdb = sap.database.start_sap_db(db_path, db_type)
+    try:
+        _sapdb = sap.database.start_sap_db(db_path, db_type)
+        _sapdb.make_session()
+    except DatabaseDoesNotExists as err:
+        click.echo(f"{err.message}")
+        sys.exit()
 
 
 def stop_sap_db():
     _sapdb.stop_sap_db()
+
+
+class Obj_structure:
+    def __init__(self):
+        config: sap.config.Config = None
+        crypto: Crypto = None
+        database: sap.database.SapDB = None

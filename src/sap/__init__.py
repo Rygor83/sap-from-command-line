@@ -11,6 +11,7 @@ from .api import (
     update,
     start_sap_db,
     stop_sap_db,
+    Obj_structure,
 )
 
 __version__ = '3.0'

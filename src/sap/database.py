@@ -6,6 +6,7 @@ import sys
 import click
 import sap.utilities as utilities
 from sap.file_names import DATABASE_NAME
+from sap.exceptions import DatabaseDoesNotExists
 
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine, asc
@@ -66,15 +67,14 @@ class SapDB():  # noqa : E801
             database=db_credentials['database'],
         )
 
-        # self.database_url = f"{self.database_type}:///{self.database_path}"
-
+    def make_session(self):
         if database_exists(self.database_url):
             # Путь по умолчанию
             engine = create_engine(self.database_url)
             session = sessionmaker(bind=engine)
             self.session = session()
         else:
-            pass  # raise DatabaseDoesNotExists
+            raise DatabaseDoesNotExists(self.database_path)
 
     def create(self):
         """
@@ -114,18 +114,14 @@ class SapDB():  # noqa : E801
                                    Sap.description, Sap.url).order_by(asc(Sap.customer), asc(Sap.system_id),
                                                                       asc(Sap.mandant_num), asc(Sap.user_id))
         if sap_system.system:
-            # query = query.filter_by(system_id=sap_system.system)
             query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
         if sap_system.mandant:
-            query = query.filter_by(mandant_num=sap_system.mandant)
+            query = query.filter(Sap.mandant_num.ilike(f"%{sap_system.mandant}%"))
         if sap_system.user:
-            # query = query.filter_by(user_id=sap_system.user)
             query = query.filter(Sap.user_id.ilike(f"%{sap_system.user}%"))
         if sap_system.customer:
-            # query = query.filter(customer=sap_system.customer)
             query = query.filter(Sap.customer.ilike(f"%{sap_system.customer}%"))
         if sap_system.description:
-            # query = query.filter_by(description=sap_system.description)
             query = query.filter(Sap.description.ilike(f"%{sap_system.description}%"))
         return query.all()
 
@@ -182,19 +178,3 @@ class SapDB():  # noqa : E801
 def start_sap_db(db_path, db_type):
     """Connect to db."""
     return SapDB(db_path, db_type)
-
-
-class DatabaseExists(Exception):
-    """Base class for other exceptions"""
-
-    def __init__(self, db_path, message="Database already exists"):
-        self.message = f"{message}. Path: {db_path}"
-        super().__init__(self.message)
-
-
-class DatabaseDoesNotExists(Exception):
-    """Base class for other exceptions"""
-
-    def __init__(self, message="Database does not exist"):
-        self.message = message
-        super().__init__(self.message)

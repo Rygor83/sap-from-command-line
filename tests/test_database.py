@@ -7,13 +7,13 @@ import os
 from sap.database import SapDB
 from sap.api import Sap_system
 from sap.crypto import Crypto
-from sap.file_names import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME
+from sap.file_names import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME
 
 
 @pytest.fixture
 def database(tmpdir):
     """ Initializing database with temporary path"""
-    path = tmpdir.join('sap_db.db')
+    path = tmpdir.join(DATABASE_NAME)
     return SapDB(db_path=path)
 
 
@@ -37,10 +37,10 @@ def crypto(tmpdir):
 @pytest.fixture
 def added_record(db, crypto):
     """ Add temporary record for testing purpose """
-    sys_list = ['XXX', '111', 'rygor', crypto.encrypto(str.encode('123')), 'TEST', 'Dev', '']
-    system = Sap_system(*sys_list)
+    system = Sap_system(system='XXX', mandant='111', user='rygor', password=crypto.encrypto(str.encode('123')),
+                        customer='Test', description='Dev', url='')
     db.add(system)
-    return sys_list
+    return system
 
 
 def test_create_database(db):
@@ -51,7 +51,7 @@ def test_create_database(db):
 def test_add_record_to_db(db, added_record):
     """ Test adding records to database """
     result_lst = db.query_system(Sap_system(system='XXX'))
-    assert list(result_lst[0]) == added_record
+    assert Sap_system(*result_lst[0]) == added_record
 
 
 def test_delete_record_from_db(db, added_record):
@@ -63,11 +63,12 @@ def test_delete_record_from_db(db, added_record):
 
 
 def test_update_record(db, added_record, crypto):
-    sys_list_updated = ['XXX', '111', 'rygor', crypto.encrypto(str.encode('123')), 'TEST_test', 'Development', '']
-    system_updated = Sap_system(*sys_list_updated)
+    system_updated = Sap_system(system='XXX', mandant='111', user='rygor', password=crypto.encrypto(str.encode('123')),
+                                customer='TEST_test', description='Development',
+                                url='')
     db.update(system_updated)
-    result_lst = db.query_system(Sap_system(system='XXX'))
-    assert list(result_lst[0]) == sys_list_updated
+    result_lst = db.query_system(Sap_system(system='XXX', mandant='111', user='rygor'))
+    assert Sap_system(*result_lst[0]) == system_updated
 
 
 def test_drop_database(database):

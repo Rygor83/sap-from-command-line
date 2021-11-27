@@ -13,7 +13,7 @@ from sap import utilities
 import pathlib
 import typing
 
-from sap.exceptions import FileDoesNotExists, ConfigExists
+from sap.exceptions import FileDoesNotExists, ConfigExists, ConfigDoesNotExists
 from sap.file_names import PRIVATE_KEY_NAME, PUBLIC_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
@@ -27,29 +27,40 @@ class Config:
 
     def __init__(
             self,
-            config_path: typing.Union[str, pathlib.Path] = '',
-            db_path: typing.Union[str, pathlib.Path] = '',
-            db_type: typing.Union[str, pathlib.Path] = 'sqlite',
-            command_line_path: typing.Union[str, pathlib.Path] = '',
-            saplogon_path: typing.Union[str, pathlib.Path] = '',
-            public_key_path: typing.Union[str, pathlib.Path] = '',
-            private_key_path: typing.Union[str, pathlib.Path] = '',
-            language: str = 'RU',
+            config_path: typing.Union[str, pathlib.Path] = None,
+            db_path=None,
+            db_type='sqlite',
+            command_line_path=None,
+            saplogon_path=None,
+            public_key_path=None,
+            private_key_path=None
+
     ):
+
         self.ini_name = CONFIG_NAME
         self.config_path = config_path if config_path else utilities.path()
         self.config_file_path = os.path.join(config_path, self.ini_name) if config_path else os.path.join(
             utilities.path(), self.ini_name)
 
-        if not self.exists():
-            self.db_path = db_path if db_path else os.path.join(self.config_path, DATABASE_NAME)
-            self.db_type = db_type
-            self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file'
-            self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file'
-            self.public_key_path = public_key_path if public_key_path else os.path.join(self.config_path,
-                                                                                        PUBLIC_KEY_NAME)
-            self.private_key_path = private_key_path if private_key_path else os.path.join(self.config_path,
-                                                                                           PRIVATE_KEY_NAME)
+        self.db_path = db_path if db_path else os.path.join(self.config_path, DATABASE_NAME)
+        self.db_type = db_type
+        self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file'
+        self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file'
+        self.public_key_path = public_key_path if public_key_path else os.path.join(self.config_path,
+                                                                                    PUBLIC_KEY_NAME)
+        self.private_key_path = private_key_path if private_key_path else os.path.join(self.config_path,
+                                                                                       PRIVATE_KEY_NAME)
+        self.language = 'RU'
+
+        # if not self.exists():
+        #     self.db_path = db_path if db_path else os.path.join(self.config_path, DATABASE_NAME)
+        #     self.db_type = db_type
+        #     self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file'
+        #     self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file'
+        #     self.public_key_path = public_key_path if public_key_path else os.path.join(self.config_path,
+        #                                                                                 PUBLIC_KEY_NAME)
+        #     self.private_key_path = private_key_path if private_key_path else os.path.join(self.config_path,
+        #                                                                                    PRIVATE_KEY_NAME)
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -58,13 +69,13 @@ class Config:
         if self.exists():
             parser.read(self.config_file_path)
 
-            db_path = parser.get('DATABASE', 'db_path')
-            db_type = parser.get('DATABASE', 'db_type')
-            command_line_path = parser.get('APPLICATION', 'command_line_path')
-            saplogon_path = parser.get('APPLICATION', 'saplogon_path')
-            public_key_path = parser.get('KEYS', 'public_key_path')
-            private_key_path = parser.get('KEYS', 'private_key_path')
-            language = parser.get('LOCALE', 'language')
+            self.db_path = parser.get('DATABASE', 'db_path')
+            self.db_type = parser.get('DATABASE', 'db_type')
+            self.command_line_path = parser.get('APPLICATION', 'command_line_path')
+            self.saplogon_path = parser.get('APPLICATION', 'saplogon_path')
+            self.public_key_path = parser.get('KEYS', 'public_key_path')
+            self.private_key_path = parser.get('KEYS', 'private_key_path')
+            self.language = parser.get('LOCALE', 'language')
 
             # if not os.path.exists(command_line_path):
             #     raise FileDoesNotExists(command_line_path, "[APPLICATION], 'command_line_path'")
@@ -75,8 +86,10 @@ class Config:
             # if not os.path.exists(private_key_path):
             #     raise FileDoesNotExists(command_line_path, "[KEYS], 'private_key_path'")
 
-            return SapConfig(db_path, db_type, command_line_path, saplogon_path, public_key_path, private_key_path,
-                             language)
+            return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
+                             self.public_key_path, self.private_key_path, self.language)
+        else:
+            raise ConfigDoesNotExists(self.config_path)
 
     def create(self):
         """
@@ -140,7 +153,7 @@ def open_config(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
     # cfg = Config()
-    ctx.obj['CONFIG_METHODS'].open_config()
+    ctx.obj.config.open_config()
     ctx.exit()
 
 
@@ -152,9 +165,9 @@ def create_config(ctx, param, value):
         return
 
     # cfg = Config()
-    if ctx.obj['CONFIG_METHODS'].exists():
+    if ctx.obj.config.exists():
         click.echo(click.style("Config уже существует \n", **utilities.color_warning))
         click.echo(utilities.path())
     else:
-        ctx.obj['CONFIG_METHODS'].create()
+        ctx.obj.config.create()
     ctx.exit()

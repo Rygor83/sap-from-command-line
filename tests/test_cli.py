@@ -12,7 +12,7 @@ import pyperclip
 import time
 
 from click.testing import CliRunner
-from sap.cli import sap_cli
+from sap.cli import sap_cli, delete
 from sap.database import SapDB
 from sap.crypto import Crypto
 from sap.api import Sap_system
@@ -35,15 +35,10 @@ def crypto(tmp_path):
 
 
 @pytest.fixture
-def database(tmp_path):
-    """ Prepare database with temporary path"""
-    database_path = tmp_path.joinpath(DATABASE_NAME)
-    return SapDB(db_path=database_path)
-
-
-@pytest.fixture
-def temp_db(database):
+def temp_db(tmp_path):
     """ Prepare temporary database """
+    database_path = tmp_path.joinpath(DATABASE_NAME)
+    database = SapDB(db_path=database_path)
     database.create()
     yield database
     database.stop_sap_db()
@@ -55,16 +50,14 @@ def added_record(temp_db, crypto):
     """ Add temporary record for testing purpose """
     system = Sap_system('XXX', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '')
     temp_db.add(system)
-    system = Sap_system('YYY', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '')
-    temp_db.add(system)
-    return system
 
 
 @pytest.fixture
-def config_tmp_path(tmp_path, temp_db, crypto):
+def config_tmp_path(tmp_path, crypto):
     """ Create specific config with tmp_dir """
     cfg = Config(config_path=tmp_path,
-                 db_path=temp_db.database_path,
+                 db_path=tmp_path.joinpath(DATABASE_NAME),
+                 # db_path=temp_db.database_path,
                  db_type='sqlite',
                  public_key_path=crypto.public_key_path,
                  private_key_path=crypto.private_key_path,
@@ -79,7 +72,7 @@ def runner():
     return CliRunner()
 
 
-def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_record):
+def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_record, temp_db):
     """ Test LIST command with records in temporary database created from api"""
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "xxx", "100"])
     assert result.output == ('\n' '\n'
@@ -93,7 +86,7 @@ def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_re
 
 
 @pytest.fixture
-def add_system_to_temp_database(runner, config_tmp_path):
+def add_system_to_temp_database(temp_db, config_tmp_path, runner):
     """ Fixture to add and delete system from existing database """
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -105,14 +98,10 @@ def add_system_to_temp_database(runner, config_tmp_path):
                                  "-customer", "CUSTOMER",
                                  "-description", "DEV_SYSTEM",
                                  "-url", "", '-v'])
-    yield result
-    result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
-                                 "delete",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "--yes", "y\n"])
+    # yield result
+    # result = runner.invoke(sap_cli,
+    #                        args=["-path", config_tmp_path.config_path,
+    #                              "delete", "zzz", "100", "-confirm", "y"])
 
 
 def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_database):
@@ -128,7 +117,7 @@ def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_databas
                              '+----------+--------+---------+-------------+------+\n')
 
 
-def test_delete_record_temp_db(runner, config_tmp_path, temp_db):
+def test_delete_record_temp_db(temp_db, config_tmp_path, runner):
     """ Test DELETE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -141,12 +130,7 @@ def test_delete_record_temp_db(runner, config_tmp_path, temp_db):
                                  "-description", "DEV_SYSTEM",
                                  "-url", " ", '-v'])
     result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
-                                 "delete",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "y\n"])
+                           args=["-path", config_tmp_path.config_path, "delete", "zzz", "100", "-confirm", "y"])
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
     assert result.output == ('\n' '\n'
                              '+------------------------------------------------------------+\n'
@@ -158,7 +142,7 @@ def test_delete_record_temp_db(runner, config_tmp_path, temp_db):
                              '+------------+----------+-----------+----------------+-------+\n')
 
 
-def test_pw_record_temp_db(runner, config_tmp_path, temp_db):
+def test_pw_record_temp_db(runner, temp_db, config_tmp_path):
     """ Test PW command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -186,7 +170,7 @@ def test_debug_file(runner, config_tmp_path):
     assert text == '[FUNCTION]\nCommand =/H\nTitle=Debugger\nType=SystemCommand'
 
 
-def test_update_record_temp_db(runner, config_tmp_path, temp_db):
+def test_update_record_temp_db(runner, temp_db, config_tmp_path):
     """ Test UPDATE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
@@ -237,11 +221,7 @@ def add_system_to_existing_database(runner):
                                  "-url", "", '-v'])
     yield result
     result = runner.invoke(sap_cli,
-                           args=["delete",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "--yes"])
+                           args=["delete", "zzz", "100", "-confirm", "y"])
 
 
 def test_list_record_exising_db(runner, add_system_to_existing_database):

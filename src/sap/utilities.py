@@ -30,8 +30,8 @@ def prepare_parameters_to_launch_system(selected_sap_systems: list, password, la
     # _config = cfg.read()
     # sapshcut_exe_path = _config.command_line_path
 
-    if not os.path.exists(sapshcut_exe_path):
-        raise utilities.WrongPath("sapshcut.exe", sapshcut_exe_path)
+    # if not os.path.exists(sapshcut_exe_path):
+    #     raise exceptions.WrongPath("sapshcut.exe", sapshcut_exe_path)
 
     # sap_system_output = sap_systems_list_into_nametuple(result)
     selected_system: Sap_system = choose_system(selected_sap_systems)
@@ -47,20 +47,6 @@ def prepare_parameters_to_launch_system(selected_sap_systems: list, password, la
         "-maxgui",  # Развернуть окно на весь экран
     ]
     return argument, selected_system
-
-
-def sap_systems_list_into_nametuple(result: list) -> Sap_system:
-    systems = [item[0] for item in result]
-    mandants = [item[1] for item in result]
-    users = [item[2] for item in result]
-    passwords = [item[3] for item in result]
-    customers = [item[4] for item in result]
-    descriptions = [item[5] for item in result]
-    url = [item[6] for item in result]
-
-    sap_system = Sap_system(systems, mandants, users, passwords, customers, descriptions, url)
-
-    return sap_system
 
 
 def launch_command_line_with_params(command_line_path, param):
@@ -80,11 +66,14 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
     if len(sap_systems) >= 2:
         # print_system_list(sap_systems, 'Available systems', verbose=verbose, enum=True)
 
-        while int(ans) > len(sap_systems[0]) or int(ans) < 1:
-            if 1 <= int(ans) <= len(sap_systems[0]):
+        while int(ans) > len(sap_systems) or int(ans) < 1:
+            if 1 <= int(ans) <= len(sap_systems):
                 break
-            click.echo(click.style(f"\nAvailable values from 1 to {str(len(sap_systems))}.", **color_message))
-            ans = click.prompt('Choose system you want to logon \n>>>', type=int)
+
+            click.echo()
+            ans = click.prompt(click.style(
+                f"\nChoose system you want to logon. Available values from 1 to {str(len(sap_systems))}: \n>>>",
+                **color_message), type=int)
         ans = ans - 1
 
     selected_system: Sap_system = Sap_system(
@@ -98,8 +87,8 @@ def print_system_list(sap_systems, title, color=color_success, verbose=False,
                       enum=False, transaction: str = '', url=False):
     # TODO: доделать формирование list(Sap_system) внутри этой подпрограммы
 
-    if isinstance(type(sap_systems), str):
-        sap_system = list(sap_systems)
+    if type(sap_systems) is Sap_system:
+        sap_systems = [sap_systems]
 
     row = []
 
@@ -181,14 +170,6 @@ def path():
     return click.get_app_dir('sap', roaming=False)
 
 
-class WrongPath(Exception):
-    """Base class for other exceptions"""
-
-    def __init__(self, file, path, message="Wrong path to"):
-        self.message = f'{message} {file} file: {path}'
-        super().__init__(self.message)
-
-
 class String_3(click.ParamType):
     """Click check class for parameters type"""
 
@@ -240,23 +221,6 @@ def get_reg(name):
         return value
     except WindowsError:
         return None
-
-
-def print_no_results(message, customer, description, mandant, system, user):
-    sap_system_output = sap_systems_list_into_nametuple(
-        [
-            [
-                system.upper() if system else None,
-                str(mandant).zfill(3) if mandant else None,
-                user.upper() if user else None,
-                None,
-                customer.upper() if customer else None,
-                description.upper() if description else None,
-                None,
-            ]
-        ]
-    )
-    print_system_list(sap_system_output, message, color=color_warning)
 
 
 def countdown(seconds):
