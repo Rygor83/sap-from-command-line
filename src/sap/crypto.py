@@ -4,7 +4,6 @@
 
 """ Passwords encryption with RSA for sap systems """
 
-import sys
 import os
 import click
 from cryptography.hazmat.backends import default_backend
@@ -14,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from sap import utilities
 from sap.file_names import PRIVATE_KEY_NAME, PUBLIC_KEY_NAME
+from sap.exceptions import EncryptionKeysAlreadyExist
 
 
 class Crypto:
@@ -43,8 +43,7 @@ class Crypto:
                                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
             self.save_key(public_pem, self.public_key_path)
         else:
-            click.echo(click.style("Ключи шифрования уже созданы", **utilities.color_warning))
-            sys.exit()
+            raise EncryptionKeysAlreadyExist(public_path=self.public_key_path, private_path=self.private_key_path)
 
     def save_key(self, pem, file_name):
         """ Save RSA keys """
@@ -59,10 +58,10 @@ class Crypto:
             with open(self.public_key_path, "rb") as key_file:
                 message = key_file.read()
                 public_key = serialization.load_pem_public_key(message, backend=default_backend())
-        except FileNotFoundError:
+        except FileNotFoundError as err:
             click.echo(
-                click.style('Публичный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
-            sys.exit()
+                click.style(f"\nPublic key does not exist. \nPath: {self.public_key_path}", **utilities.color_warning))
+            raise click.Abort from err
 
         encrypted_data = public_key.encrypt(
             password,
@@ -81,10 +80,11 @@ class Crypto:
                 message = key_file.read()
                 private_key = serialization.load_pem_private_key(message, password=None,
                                                                  backend=default_backend())
-        except FileNotFoundError:
+        except FileNotFoundError as err:
             click.echo(
-                click.style('Приватный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
-            sys.exit()
+                click.style(f"\nPrivate key does not exist. \nPath: {self.private_key_path}",
+                            **utilities.color_warning))
+            raise click.Abort from err
 
         decrypted_data = private_key.decrypt(encrypted_password,
                                              padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),

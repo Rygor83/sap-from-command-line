@@ -2,11 +2,7 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 import os
-import sys
 import click
-import sap.utilities as utilities
-from sap.file_names import DATABASE_NAME
-from sap.exceptions import DatabaseDoesNotExists
 
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine, asc
@@ -16,6 +12,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.engine.url import URL
 from sqlalchemy_utils import drop_database, database_exists
+
+import sap.utilities as utilities
+from sap.file_names import DATABASE_NAME
+from sap.exceptions import DatabaseDoesNotExists
+from sap.exceptions import DatabaseExists, DatabaseDoesNotExists
 
 Base = declarative_base()
 

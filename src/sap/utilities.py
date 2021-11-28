@@ -3,7 +3,6 @@
 #  ------------------------------------------
 import typing
 import click
-import sys
 import traceback
 import os
 from subprocess import call
@@ -16,6 +15,7 @@ import time
 
 import sap.api
 from sap.api import Sap_system
+from sap.exceptions import WrongPath
 
 # Цвета сообщений
 color_message = {'bg': 'black', 'fg': 'white'}
@@ -24,19 +24,12 @@ color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
 
-def prepare_parameters_to_launch_system(selected_sap_systems: list, password, language, user, transaction="",
-                                        sapshcut_exe_path: str = "") -> typing.Tuple[list, Sap_system]:
-    # cfg = sap.config.Config()
-    # _config = cfg.read()
-    # sapshcut_exe_path = _config.command_line_path
-
-    # if not os.path.exists(sapshcut_exe_path):
-    #     raise exceptions.WrongPath("sapshcut.exe", sapshcut_exe_path)
-
-    # sap_system_output = sap_systems_list_into_nametuple(result)
-    selected_system: Sap_system = choose_system(selected_sap_systems)
-
+def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, user, transaction="",
+                                        sapshcut_exe_path: str = "") -> list:
     # Добавляем параметры для запуска SAP системы
+    if not os.path.exists(sapshcut_exe_path):
+        raise WrongPath("sapshcut.exe", sapshcut_exe_path)
+
     argument = [
         sapshcut_exe_path,  # Путь до sapshcut.exe
         f"-system={selected_system.system}",  # Id системы
@@ -46,19 +39,28 @@ def prepare_parameters_to_launch_system(selected_sap_systems: list, password, la
         f"-language={language}",  # Язык для входа
         "-maxgui",  # Развернуть окно на весь экран
     ]
-    return argument, selected_system
+    return argument
 
 
 def launch_command_line_with_params(command_line_path, param):
     ''' Запуск sapshcut.exe с разными параметрами'''
     if not os.path.exists(command_line_path):
-        raise utilities.WrongPath('sapshcut.exe', command_line_path)
+        raise WrongPath('sapshcut.exe', command_line_path)
 
     # Добавляем путь к командному файлу
     argument = [command_line_path, param]
 
     # Запускаем SAP
     call(argument)
+
+
+def launch_saplogon_with_params(saplogon):
+    ''' Запуск sapshcut.exe с разными параметрами'''
+
+    if not os.path.exists(saplogon):
+        raise WrongPath('saplogon.exe', saplogon)
+
+    click.launch(url=saplogon)
 
 
 def choose_system(sap_systems: list, verbose=False) -> Sap_system:
@@ -159,11 +161,6 @@ def print_system_list(sap_systems, title, color=color_success, verbose=False,
         title = title + f"{click.style(' with transaction ', **color)}"
         title = title + f"{click.style(str(transaction).upper(), **color_sensitive)}"
     click.echo(t.get_string(title=title))
-
-
-def show_exception_and_exit(exc_type, exc_value, tb):
-    traceback.print_exception(exc_type, exc_value, tb)
-    sys.exit(-1)
 
 
 def path():

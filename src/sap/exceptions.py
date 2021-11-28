@@ -4,21 +4,23 @@
 """ Custom Exceptions """
 
 
-# TODO: оформить правильно все exceptions
+# TODO: Добавить обработчик для Crypto и убрать из Crypto любые сообщения
+
+# ===============+++++++++ CONFIG ===============+++++++++
 
 class ConfigExists(Exception):
-    """Base class for other exceptions"""
+    """ Exception. Config file already exists """
 
     def __init__(self, config_path, message="sap_config.ini already exists"):
-        self.message = f"{message}. \nPath: {config_path}"
+        self.message = f"\n{message}. \nPath: {config_path}"
         super().__init__(self.message)
 
 
 class ConfigDoesNotExists(Exception):
-    """Base class for other exceptions"""
+    """ Exception. Config file does not exist """
 
     def __init__(self, path, message="sap_config.ini does not exist"):
-        self.message = f"{message}. \nCheck path: {path}"
+        self.message = f"\n{message}. \nCheck path: {path}"
         super().__init__(self.message)
 
 
@@ -26,23 +28,25 @@ class FileDoesNotExists(Exception):
     """Base class for other exceptions"""
 
     def __init__(self, path, file_name):
-        self.message = f"Parameters {file_name}. Path does not exist: {path}"
+        self.message = f"\nParameters {file_name}. Path does not exist: {path}"
         super().__init__(self.message)
 
 
 class WrongPath(Exception):
     """Base class for other exceptions"""
 
-    def __init__(self, file, path, message="Wrong path to"):
-        self.message = f'{message} {file} file: {path}'
+    def __init__(self, file, path, message="SAP executable does not exist:"):
+        self.message = f'\n{message} {file} \nCheck the following path: {path}'
         super().__init__(self.message)
 
+
+# ===============+++++++++ CONFIG ===============+++++++++
 
 class DatabaseExists(Exception):
     """Base class for other exceptions"""
 
     def __init__(self, db_path, message="Database already exists"):
-        self.message = f"{message}. Path: {db_path}"
+        self.message = f"\n{message}. Path: {db_path}"
         super().__init__(self.message)
 
 
@@ -54,9 +58,43 @@ class DatabaseDoesNotExists(Exception):
         super().__init__(self.message)
 
 
-class WrongPath(Exception):
-    """Base class for other exceptions"""
+# ===============+++++++++ CRYPTO ===============+++++++++
 
-    def __init__(self, file, path, message="Wrong path to"):
-        self.message = f'{message} {file} file: {path}'
+class PublicKeyAlreadyExists(Exception):
+    """ Exception. Public key already exists """
+
+    def __init__(self, file, path, message="Public key already exists"):
+        self.message = f'\n{message} {file} file: {path}'
+        super().__init__(self.message)
+
+
+class PublicKeyDoesNotExist(Exception):
+    """ Exception. Public key does not exist """
+
+    def __init__(self, file, path, message="Public key does not exist"):
+        self.message = f'\n{message} {file} file: {path}'
+        super().__init__(self.message)
+
+
+class PrivateKeyAlreadyExists(Exception):
+    """ Exception. Public key already exists """
+
+    def __init__(self, file, path, message="Private key already exists"):
+        self.message = f'\n{message} {file} file: {path}'
+        super().__init__(self.message)
+
+
+class PrivateKeyDoesNotExist(Exception):
+    """ Exception. Public key does not exist """
+
+    def __init__(self, file, path, message="Private key does not exist"):
+        self.message = f'\n{message} {file} file: {path}'
+        super().__init__(self.message)
+
+
+class EncryptionKeysAlreadyExist(Exception):
+    """ Exception. Public key already exists """
+
+    def __init__(self, public_path, private_path, message="Encryption keys already exist"):
+        self.message = f'\n{message}: \nPrivate: {private_path} \nPublic: {public_path}'
         super().__init__(self.message)

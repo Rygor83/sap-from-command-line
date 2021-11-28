@@ -5,7 +5,6 @@
 import ctypes
 import getpass
 import os
-import sys
 from contextlib import contextmanager
 from datetime import datetime
 from subprocess import call
@@ -23,7 +22,8 @@ from sap.crypto import Crypto
 from sap.database import SapDB
 from sap.file_names import CONFIG_NAME, DEBUG_FILE_NAME, PRIVATE_KEY_NAME, PUBLIC_KEY_NAME, DATABASE_NAME, \
     TIMER_TO_CLEAR_SCREEN
-from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists
+from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
+    EncryptionKeysAlreadyExist, DatabaseExists
 
 
 @click.group()
@@ -44,12 +44,11 @@ def sap_cli(ctx, config_path: str):
         try:
             _config = ctx.obj.config.read()
         except ConfigDoesNotExists as err:
-            click.echo(f"{err}")
-            sys.exit()
+            click.echo(click.style(f"{err}", **utilities.color_warning))
+            raise click.Abort
 
         ctx.obj.config.db_path = _config.db_path
         ctx.obj.config.db_type = _config.db_type
-
         ctx.obj.config.private_key_path = _config.private_key_path
         ctx.obj.config.public_key_path = _config.public_key_path
         ctx.obj.config.command_line_path = _config.command_line_path
@@ -68,11 +67,11 @@ def sap_cli(ctx, config_path: str):
 def logon(ctx):
     """Launch SAPLogon application"""
 
-    saplogon_exe_path = ctx.obj.config.saplogon_path
-    if not os.path.exists(saplogon_exe_path):
-        raise WrongPath("saplogon.exe", ctx.obj.config.saplogon_path)
-
-    click.launch(url=saplogon_exe_path)
+    try:
+        utilities.launch_saplogon_with_params(ctx.obj.config.saplogon_path)
+    except WrongPath as err:
+        click.echo(f"{err}")
+        raise click.Abort
 
 
 @sap_cli.command("run")
@@ -123,10 +122,15 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
 
-        argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_sap_systems, password,
-                                                                                  language,
-                                                                                  user, "",
-                                                                                  ctx.obj.config.command_line_path)
+        selected_system = utilities.choose_system(selected_sap_systems)
+        try:
+            argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+                                                                     language,
+                                                                     user, "",
+                                                                     ctx.obj.config.command_line_path)
+        except WrongPath as err:
+            click.echo(f"{err}")
+            raise click.Abort
 
         if web:
             if selected_system.url != " ":
@@ -144,7 +148,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
                 utilities.print_system_list(no_system_found, "NO URL FOUND according to search criteria",
                                             color=utilities.color_warning, )
-                sys.exit()
+                raise click.Abort
         else:
             if transaction:
 
@@ -246,13 +250,17 @@ def debug(ctx, system, mandant="", user="", customer="", description="", passwor
             # As soon as dubugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
             #  as it influence whether to open new windows, or to debug the latest opened. All arguments
             #  values must be entered
-            argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_sap_systems, password,
-                                                                                      language,
-                                                                                      user, "",
-                                                                                      ctx.obj.config.command_line_path)
+            selected_system = utilities.choose_system(selected_sap_systems)
+            try:
+                argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+                                                                         language,
+                                                                         user, "",
+                                                                         ctx.obj.config.command_line_path)
+            except WrongPath as err:
+                click.echo(f"{err}")
+                raise click.Abort
 
-            # item = "-command=/H"
-            item = "-command=?STAT"
+            item = "-command=/H"
             argument.append(item)
             item = "-type=SystemCommand"
             argument.append(item)
@@ -290,10 +298,15 @@ def stat(ctx, system, mandant="", user="", customer="", description="", password
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
 
-        argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_sap_systems, password,
-                                                                                  language,
-                                                                                  user, "",
-                                                                                  ctx.obj.config.command_line_path)
+        selected_system = utilities.choose_system(selected_sap_systems)
+        try:
+            argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+                                                                     language,
+                                                                     user, "",
+                                                                     ctx.obj.config.command_line_path)
+        except WrongPath as err:
+            click.echo(f"{err}")
+            raise click.Abort
 
         item = "-command=?STAT"
         argument.append(item)
@@ -340,10 +353,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
 
-        argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_sap_systems, '',
-                                                                                  '',
-                                                                                  user, "",
-                                                                                  ctx.obj.config.command_line_path)
+        selected_system = utilities.choose_system(selected_sap_systems)
 
         pyperclip.copy(selected_system.password)
 
@@ -373,7 +383,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
             try:
                 utilities.countdown(time_to_clear)
             except KeyboardInterrupt:
-                print("\nAborted!")
+                click.echo("\nAborted!")
             if ctypes.windll.user32.OpenClipboard(None):
                 ctypes.windll.user32.EmptyClipboard()
             ctypes.windll.user32.CloseClipboard()
@@ -432,7 +442,7 @@ def add(ctx, system, mandant, user, password, description, customer, url: str = 
                 try:
                     utilities.countdown(TIMER_TO_CLEAR_SCREEN)
                 except KeyboardInterrupt:
-                    print("Aborted!")
+                    click.echo("Aborted!")
                 click.clear()
 
 
@@ -462,10 +472,7 @@ def update(ctx, system, mandant, user, customer, description, verbose: bool = Fa
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
 
-        argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_sap_systems, "",
-                                                                                  "",
-                                                                                  user, "",
-                                                                                  ctx.obj.config.command_line_path)
+        selected_system = utilities.choose_system(selected_sap_systems)
 
         password_new = click.prompt("\nEnter new password", default=selected_system.password)
         customer_new = click.prompt("Enter Customer", default=selected_system.customer)
@@ -498,7 +505,7 @@ def update(ctx, system, mandant, user, customer, description, verbose: bool = Fa
             try:
                 utilities.countdown(TIMER_TO_CLEAR_SCREEN)
             except KeyboardInterrupt:
-                print("Aborted!")
+                click.echo("Aborted!")
             click.clear()
         else:
             no_system_found = Sap_system(system.upper() if system else None,
@@ -534,10 +541,7 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
 
-        argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_sap_systems, "",
-                                                                                  "",
-                                                                                  user, "",
-                                                                                  ctx.obj.config.command_line_path)
+        selected_system = utilities.choose_system(selected_sap_systems)
 
         message = "Trying to DELETE the following systtem"
         utilities.print_system_list(selected_system, message)
@@ -641,7 +645,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                 try:
                     utilities.countdown(TIMER_TO_CLEAR_SCREEN)
                 except KeyboardInterrupt:
-                    print("Aborted!")
+                    click.echo("Aborted!")
                 click.clear()
 
             return sap_system
@@ -660,7 +664,11 @@ def database(ctx):
 @click.pass_context
 def keys(ctx):
     """ Создание ключей шифрования """
-    ctx.obj.crypto.generate_keys()
+    try:
+        ctx.obj.crypto.generate_keys()
+    except EncryptionKeysAlreadyExist as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
 
 
 @sap_cli.command("ver", help="Current version of SAP shortcut")
@@ -668,14 +676,20 @@ def keys(ctx):
 def shortcut_version(ctx):
     # Считываем конфигурационный файл
     parameter = "-version"
-    utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
+    try:
+        utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
+    except WrongPath as err:
+        click.echo(f"{err}")
 
 
 @sap_cli.command("help", help="SAP GUI shortcut help")
 @click.pass_context
 def shortcut_help(ctx):
     # Считываем конфигурационный файл
-    utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, "-help")
+    try:
+        utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, "-help")
+    except WrongPath as err:
+        click.echo(f"{err}")
 
 
 @sap_cli.command("start")
@@ -696,11 +710,20 @@ def start(ctx):
     try:
         ctx.obj.config.create()
     except ConfigExists as err:
-        click.echo(f"{err}")
-        sys.exit()
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
 
-    ctx.obj.crypto.generate_keys()
-    ctx.obj.database.create()
+    try:
+        ctx.obj.crypto.generate_keys()
+    except EncryptionKeysAlreadyExist as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
+
+    try:
+        ctx.obj.database.create()
+    except DatabaseExists as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
 
     print("\nThe following files are created:")
     print(f"1. [yellow]{PUBLIC_KEY_NAME}[/yellow] - used to encrypt passwords in database")
@@ -751,9 +774,7 @@ def backup(ctx, password, open_file=True):
 
     pwd = str.encode(password)
 
-    config_ini_path = ctx.obj.config.config_file_path  # os.path.join(utilities.path(), CONFIG_NAME)
-
-    # saplogon_ini_path = utilities.get_reg('CoreLandscapeFileOnServer')
+    config_ini_path = ctx.obj.config.config_file_path
     saplogon_ini_path = os.path.join(os.path.expandvars(r'%APPDATA%\SAP\Common'), 'SAPUILandscape.xml')
 
     back_file_name = f'backup_{datetime.now().strftime("%Y.%m.%d-%I.%M.%S")}.zip'
@@ -789,5 +810,4 @@ def _sap_db(cfg):
 
 
 if __name__ == "__main__":
-    sys.excepthook = utilities.show_exception_and_exit
     sap_cli(obj={})
