@@ -143,7 +143,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
         if web:
             if selected_system.url != " ":
-                # TODO: доделать передачу пароля для авторизации
+                # TODO: доделать передачу пароля для авторизации, если такая возможность есть
 
                 click.launch(url=f"{selected_system.url}")
             else:
@@ -208,6 +208,8 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
             utilities.print_system_list(sap_systems=selected_system, title=message,
                                         command=command, command_type=command_type)
+
+            # TODO: сделать Logging, чтобы можно было просмотреть с какими же аргументами запускали  тразакцию
 
             # Запускаем SAP
             ret = call(argument)
@@ -743,9 +745,6 @@ def start(ctx):
     2. ini file with config parameters createion.
     3. Usefull messages
     """
-
-    # TODO: Убрать вывод сообщения из классов базы данных, конфига и ключей шифрования и добавить сюда
-    #   https://towardsdatascience.com/rich-generate-rich-and-beautiful-text-in-the-terminal-with-python-541f39abf32e
 
     click.clear()
 

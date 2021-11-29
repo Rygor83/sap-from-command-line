@@ -85,8 +85,6 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
 
 def print_system_list(sap_systems, title, color=color_success, verbose=False,
                       enum=False, command: str = '', command_type: str = '', url=False):
-    # TODO: доделать формирование list(Sap_system) внутри этой подпрограммы
-
     if type(sap_systems) is Sap_system:
         sap_systems = [sap_systems]
 
