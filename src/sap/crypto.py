@@ -2,82 +2,66 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-import sap.config
+""" Passwords encryption with RSA for sap systems """
 
-import click
-import sys
 import os
-
-import sap.utilities as utilities
-
+import click
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import rsa
+from sap import utilities
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME
+from sap.exceptions import EncryptionKeysAlreadyExist
 
 
-class Crypto(object):
-    public = 'public_key.txt'
-    private = 'private_key.txt'
+class Crypto:
+    """ Encryption RSA class """
 
-    public_file = os.path.join(utilities.path(), public)
-    private_file = os.path.join(utilities.path(), private)
+    def __init__(self, public_key_path: str = '', private_key_path: str = ''):
+        self.public_key_file_name = PUBLIC_KEY_NAME
+        self.private_key_file_name = PRIVATE_KEY_NAME
+        self.public_key_path = public_key_path if public_key_path else os.path.join(
+            utilities.path(), self.public_key_file_name)
+        self.private_key_path = private_key_path if private_key_path else os.path.join(
+            utilities.path(), self.private_key_file_name)
 
-    @staticmethod
-    def generate_keys():
-        """
-        Создание ключей шифрования: публичный ключ и приватный ключа
-        """
+    def generate_keys(self):
+        """ Generate RSA encryption keys: public, private """
 
-        cfg = sap.config.Config()
-        _config = cfg.read()
-        path_public_key = _config.public_key_path
-        path_private_key = _config.private_key_path
-
-        if not os.path.isfile(path_public_key) and not os.path.isfile(path_private_key):
+        if not os.path.isfile(self.public_key_path) and not os.path.isfile(self.private_key_path):
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
             private_pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption())
-            Crypto.save_key(private_pem, Crypto.private_file)
+            self.save_key(private_pem, self.private_key_path)
 
             public_key = private_key.public_key()
             public_pem = public_key.public_bytes(encoding=serialization.Encoding.PEM,
                                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
-            Crypto.save_key(public_pem, Crypto.public_file)
-            click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
-                                   **utilities.color_success))
-            click.echo(click.style(f"Ключи шифрования созданы: {Crypto.public_file} и {Crypto.private_file}",
-                                   **utilities.color_success))
-            click.echo('Необходимо указать их расположение в файле *.ini')
-            click.echo(click.style(f"Файл {Crypto.private_file} должен находиться в зашифрованном хранилище",
-                                   **utilities.color_sensitive))
-            click.pause('Нажмите для продолжения ...')
+            self.save_key(public_pem, self.public_key_path)
         else:
-            click.echo(click.style("Ключи шифрования уже созданы", **utilities.color_warning))
-            sys.exit()
+            raise EncryptionKeysAlreadyExist(public_path=self.public_key_path, private_path=self.private_key_path)
 
-    @staticmethod
-    def save_key(pem, file_name):
-        with open(file_name, "w") as file:
+    def save_key(self, pem, file_name):
+        """ Save RSA keys """
+        with open(file_name, "w", encoding='utf-8') as file:
             for item in pem.splitlines():
                 # click.echo(item)
                 file.write(item.decode() + '\n')
 
-    @staticmethod
-    def encrypto(password):
-        public_key_file = Crypto.get_key(Crypto.public)
-
+    def encrypto(self, password):
+        """ Encrypt sensitive info """
         try:
-            with open(public_key_file, "rb") as key_file:
+            with open(self.public_key_path, "rb") as key_file:
                 message = key_file.read()
                 public_key = serialization.load_pem_public_key(message, backend=default_backend())
-        except FileNotFoundError:
+        except FileNotFoundError as err:
             click.echo(
-                click.style('Публичный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
-            sys.exit()
+                click.style(f"\nPublic key does not exist. \nPath: {self.public_key_path}", **utilities.color_warning))
+            raise click.Abort from err
 
         encrypted_data = public_key.encrypt(
             password,
@@ -89,19 +73,18 @@ class Crypto(object):
         )
         return encrypted_data
 
-    @staticmethod
-    def decrypto(encrypted_password):
-        private_key_file = Crypto.get_key(Crypto.private)
-
+    def decrypto(self, encrypted_password):
+        """ Decrypt sensitive info """
         try:
-            with open(private_key_file, "rb") as key_file:
+            with open(self.private_key_path, "rb") as key_file:
                 message = key_file.read()
                 private_key = serialization.load_pem_private_key(message, password=None,
                                                                  backend=default_backend())
-        except FileNotFoundError:
+        except FileNotFoundError as err:
             click.echo(
-                click.style('Приватный ключ шифрования не доступен. Проверьте доступ', **utilities.color_warning))
-            sys.exit()
+                click.style(f"\nPrivate key does not exist. \nPath: {self.private_key_path}",
+                            **utilities.color_warning))
+            raise click.Abort from err
 
         decrypted_data = private_key.decrypt(encrypted_password,
                                              padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -110,12 +93,7 @@ class Crypto(object):
 
         return decrypted_data
 
-    @staticmethod
-    def get_key(key_type):
-        cfg = sap.config.Config()
-        _config = cfg.read()
-
-        if key_type == Crypto.private:
-            return _config.private_key_path
-        elif key_type == Crypto.public:
-            return _config.public_key_path
+    def remove_keys(self):
+        """ Remove encryption keys """
+        os.remove(self.private_key_path)
+        os.remove(self.public_key_path)

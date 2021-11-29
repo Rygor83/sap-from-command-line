@@ -2,16 +2,21 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 import os
-import sys
 import click
-import sap.utilities as utilities
 
 from sqlalchemy import Column, String, BLOB
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, asc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.engine.url import URL
+from sqlalchemy_utils import drop_database, database_exists
+
+import sap.utilities as utilities
+from sap.api import DATABASE_NAME
+from sap.exceptions import DatabaseDoesNotExists
+from sap.exceptions import DatabaseExists, DatabaseDoesNotExists
 
 Base = declarative_base()
 
@@ -26,8 +31,6 @@ class Sap(Base):
     description = Column(String(20), primary_key=False)
     url = Column(String(250), primary_key=False)
 
-    # TODO: Добавить колонку "Описание" с описанием системы т.к. иногда не понятно, что за система и чья она
-
 
 class Param(Base):
     __tablename__ = 'parameters'
@@ -36,111 +39,91 @@ class Param(Base):
 
 
 class SapDB():  # noqa : E801
-    """ Класс по работе с базой данных   """
+    """ Database processing class  """
     session = ''
 
-    def __init__(self, db_path, db_type=''):  # type (str) -> ()
-        """Connect to db."""
-        self.database_name = 'database.db'
+    def __init__(self, db_path: str = '', db_type: str = ''):  # type (str) -> ()
+        """
+        Connect to database.
+
+        :param db_path: Path to database including database name
+        :param db_type: Database type: sqlite, Postgresql, mysql, etc.
+        """
+        self.database_name = DATABASE_NAME
         self.database_type = db_type if db_type else 'sqlite'
         self.database_path = db_path if db_path else os.path.join(utilities.path(), self.database_name)
 
-        if os.path.exists(db_path):
-            # Путь из файла
-            engine = create_engine(f"{self.database_type}:///{db_path}")
-            session = sessionmaker(bind=engine)
-            self.session = session()
-        elif os.path.exists(self.database_path):
+        db_credentials = {'username': None,
+                          'password': None,
+                          'host': None,
+                          'database': str(self.database_path),
+                          'port': None}
+
+        self.database_url = URL.create(
+            drivername=self.database_type,
+            username=db_credentials['username'],
+            password=db_credentials['password'],
+            host=db_credentials['host'],
+            port=db_credentials['port'],
+            database=db_credentials['database'],
+        )
+
+    def make_session(self):
+        if database_exists(self.database_url):
             # Путь по умолчанию
-            engine = create_engine(f"{self.database_type}:///{self.database_path}")
+            engine = create_engine(self.database_url)
             session = sessionmaker(bind=engine)
             self.session = session()
         else:
-            # Пути нет, значит создаем БД в пути по умолчанию
-            engine = create_engine(f"{self.database_type}:///{self.database_path}")
+            raise DatabaseDoesNotExists(self.database_path)
+
+    def create(self):
+        """
+        Database creation
+        :return:
+        """
+
+        if database_exists(self.database_url):
+            raise DatabaseExists(self.database_path)
+        else:
+            engine = create_engine(self.database_url)
             Base.metadata.create_all(engine)
 
             session = sessionmaker(bind=engine)
             self.session = session()
-
-            click.echo(click.style('База данных создана \n', **utilities.color_warning))
-            click.echo('Путь: %s \n' % click.format_filename(self.database_path))
-            click.echo(
-                click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', **utilities.color_sensitive))
-            click.echo(
-                click.style(f'Путь к базе данных следует указать в ini файле \n',
-                            **utilities.color_message))
-            click.pause('Нажмите для продолжения ...')
-
-    def create(self):  # db_path='', db_type=''
-        db_path = self.database_path.join(self.database_name)
-        if os.path.exists(db_path):  # self.exists():
-            click.echo(click.style('Базы данных существует. \n', **utilities.color_warning))
-            # sys.exit()
-        else:
-            engine = create_engine(f"sqlite:///{db_path}")
-            Base.metadata.create_all(engine)
-
-            click.echo(click.style('База данных создана \n', **utilities.color_success))
-            click.echo('Путь: %s \n' % click.format_filename(db_path))
-            click.echo(
-                click.style('!!! Базу данных нужно хранить в защищенном хранилище \n', **utilities.color_sensitive))
-            # click.echo(
-            #     click.style(f'Путь к базе данных следует указать в {cfg.Config.ini_file} \n',
-            #                 **utilities.color_message))
-            # click.pause('Нажмите для продолжения ...')
 
     def add(self, sap_system):  # type (namedtuple) -> list
         """Add a task dict to db."""
         record = Sap(system_id=sap_system.system,
-                     mandant_num=sap_system.mandant,
-                     user_id=str(sap_system.user).zfill(3),
+                     mandant_num=str(sap_system.mandant).zfill(3),
+                     user_id=sap_system.user,
                      password=sap_system.password,
                      customer=sap_system.customer,
-                     description=sap_system.description)
+                     description=sap_system.description,
+                     url=sap_system.url)
         result = self.session.add(record)
         try:
             self.session.commit()
         except IntegrityError:
+            self.session.rollback()
             return result
         return result
 
-    def run(self, sap_system):  # # type (namedtuple) -> list
-        """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
-
-        # TODO: бывает, что ошибаешься, вместо D7H пишешь D7 - нужно делать аля D7*,
-        #  чтобы система искала какие системы есть и выводила для выбора
+    def query_system(self, sap_system):
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description)
+                                   Sap.description, Sap.url).order_by(asc(Sap.customer), asc(Sap.system_id),
+                                                                      asc(Sap.mandant_num), asc(Sap.user_id))
         if sap_system.system:
-            query = query.filter_by(system_id=sap_system.system)
+            query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
         if sap_system.mandant:
-            query = query.filter_by(mandant_num=sap_system.mandant)
+            query = query.filter(Sap.mandant_num.ilike(f"%{sap_system.mandant}%"))
         if sap_system.user:
-            query = query.filter_by(user_id=sap_system.user)
-        return query.all()
-
-    def list_systems(self, system):  # type (str) -> list[dict]
-        """Return list of tasks."""
-
-        # TODO: Сделать Fuzzy search если пользователь ошибся
-
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description)
-        if system:
-            query = query.filter_by(system_id=system)
-        return query.all()
-
-    def pw(self, sap_system):  # # type (namedtuple) -> bool
-        """Return number of tasks in db."""
-
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password)
-        if sap_system.system:
-            query = query.filter_by(system_id=sap_system.system)
-        if sap_system.mandant:
-            query = query.filter_by(mandant_num=sap_system.mandant)
-
+            query = query.filter(Sap.user_id.ilike(f"%{sap_system.user}%"))
+        if sap_system.customer:
+            query = query.filter(Sap.customer.ilike(f"%{sap_system.customer}%"))
+        if sap_system.description:
+            query = query.filter(Sap.description.ilike(f"%{sap_system.description}%"))
         return query.all()
 
     def update(self, sap_system):  # type (namedtuple) -> list
@@ -158,6 +141,7 @@ class SapDB():  # noqa : E801
             result.password = sap_system.password
             result.customer = sap_system.customer
             result.description = sap_system.description
+            result.url = sap_system.url
             self.session.commit()
 
     def delete(self, sap_system):  # type (namedtuple) -> bool
@@ -183,11 +167,15 @@ class SapDB():  # noqa : E801
             query = query.filter_by(transaction=transaction)
         return query.all()
 
+    def drop(self):
+        """ Dropping datase"""
+        drop_database(self.database_url)
+
     def stop_sap_db(self):
         """Disconnect from DB."""
         self.session.close()
 
 
-def start_sap_db(db_path, db_type):  # type (str) -> TasksDB_MongoDB object
+def start_sap_db(db_path, db_type):
     """Connect to db."""
     return SapDB(db_path, db_type)

@@ -2,429 +2,830 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-import click
-import os
-import subprocess
-import time
 import ctypes
+import getpass
+import os
+from contextlib import contextmanager
+from datetime import datetime
+from subprocess import call
+
+import click
 import pyperclip
-import sys
-import time
+import pyzipper
+from rich import print
 
 import sap.config
-from contextlib import contextmanager
-from sap.api import Sap_system
+from sap import utilities
+from sap.api import Sap_system, Obj_structure
+from sap.config import create_config, open_config
 from sap.crypto import Crypto
-import sap.utilities as utilities
+from sap.database import SapDB
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, DEBUG_FILE_NAME, \
+    TIMER_TO_CLEAR_SCREEN
+from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
+    EncryptionKeysAlreadyExist, DatabaseExists
+
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
-@click.group()
-def sap_cli():
-    """ Скрипт для запуска SAP систем из командной строки """
+@click.group(context_settings=CONTEXT_SETTINGS)
+@click.pass_context
+@click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
+@click.version_option(version=sap.__version__)
+def sap_cli(ctx, config_path: str):
+    """
+    \b
+    Command line tool to launch SAP systems from SAPLogon\n
+    \b
+    Run 'sap start' to start working
+    """
+
+    # ctx.ensure_object(dict)
+
+    ctx.obj = Obj_structure()
+
+    # ========= CONFIG =========
+    ctx.obj.config = sap.config.Config(config_path)
+
+    if ctx.invoked_subcommand != "start" and ctx.invoked_subcommand != "config":
+        try:
+            _config = ctx.obj.config.read()
+        except ConfigDoesNotExists as err:
+            click.echo(click.style(f"{err}", **utilities.color_warning))
+            raise click.Abort
+
+        ctx.obj.config.db_path = _config.db_path
+        ctx.obj.config.db_type = _config.db_type
+        ctx.obj.config.private_key_path = _config.private_key_path
+        ctx.obj.config.public_key_path = _config.public_key_path
+        ctx.obj.config.command_line_path = _config.command_line_path
+        ctx.obj.config.saplogon_path = _config.saplogon_path
+
+    # ========= CRYPTO =========
+    ctx.obj.crypto = Crypto(ctx.obj.config.public_key_path, ctx.obj.config.private_key_path)
+
+    # ========= DATABASE =========
+
+    ctx.obj.database = SapDB(db_path=ctx.obj.config.db_path if ctx.obj.config.db_path else '')
 
 
-@sap_cli.command('logon')
-def logon():
-    """ Запуск SAPLogon """
+@sap_cli.command("logon")
+@click.pass_context
+def logon(ctx):
+    """Launch SAPLogon application"""
 
-    cfg = sap.config.Config()
-    _config = cfg.read()
-
-    saplogon_exe_path = _config.saplogon_path
-    if not os.path.exists(saplogon_exe_path):
-        click.echo(click.style(f'Путь до saplogon.exe не верный: \n{saplogon_exe_path} \n', **utilities.color_warning))
-        sys.exit()
-
-    click.launch(saplogon_exe_path)
+    try:
+        utilities.launch_saplogon_with_params(ctx.obj.config.saplogon_path)
+    except WrongPath as err:
+        click.echo(f"{err}")
+        raise click.Abort
 
 
-@sap_cli.command('pw')
-@click.argument('system')
-@click.argument('mandant', required=False, type=click.IntRange(1, 999))
-def pw(system, mandant):
-    """ Копирует пароль от заданной системы в буфер обмена. Стирает буфер обмена через 15 секунд \n
-        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
+@sap_cli.command("run")
+@click.argument("system", required=False, type=click.STRING)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
+                                           "if several users exist for one system, or user outside of the database",
+              )
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option(
+    "-eu", "--external_user", "external_user", help="Launch sap system with external user (outside database)",
+    type=click.BOOL, default=False, is_flag=True,
+)
+@click.option("-l", "--language", "language", help="Language to logon", default="RU")
+@click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system", )
+@click.option("-s", "--system_command", "system_command", help="Run system_command", )
+@click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
+@click.option("-w", "--web", "web", is_flag=True, help="Launch system web site")
+@click.pass_context
+def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
+        language: str, transaction: str, system_command: str, parameter: str, web: bool = False):
+    """
+    \b
+    Launch SAP system \n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
+    password = ""
 
-    with _sap_db():
-        timeout = 15
+    if external_user:
 
-        sap_system = Sap_system(str(system).upper(), str(mandant).upper() if mandant else '')
-        result = sap.pw(sap_system)
+        if not mandant:
+            mandant = input("Enter mandant: ")
+        user = input("Enter external user id: ")
+        password = getpass.getpass("Enter password for external user: ")
 
-        if not result:
-            # utilities.no_result_output(system, mandant)
-            utilities.print_system_list([Sap_system(str(system).upper(), mandant)],
-                                        'По следующим параметрам ничего не найдено', utilities.header_nsm)
+        query_result = [Sap_system(system.upper(), str(mandant).zfill(3), user.upper(), password, "", "", "")]
+    else:
+
+        query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                                  description=description,
+                                  url=False, verbose=False, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            for item in query_result]
+
+        selected_system = utilities.choose_system(selected_sap_systems)
+        try:
+            argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+                                                                     language,
+                                                                     user, "",
+                                                                     ctx.obj.config.command_line_path)
+        except WrongPath as err:
+            click.echo(f"{err}")
+            raise click.Abort
+
+        if web:
+            if selected_system.url != " ":
+                # TODO: доделать передачу пароля для авторизации
+
+                click.launch(url=f"{selected_system.url}")
+            else:
+                no_system_found = Sap_system(system.upper() if system else None,
+                                             str(mandant).zfill(3) if mandant else None,
+                                             user.upper() if user else None,
+                                             None,
+                                             customer.upper() if customer else None,
+                                             description.upper() if description else None,
+                                             None)
+
+                utilities.print_system_list(no_system_found, "NO URL FOUND according to search criteria",
+                                            color=utilities.color_warning, )
+                raise click.Abort
         else:
-            selected_system = utilities.choose_system(
-                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result])
-            pyperclip.copy(selected_system.password)
+            if transaction:
 
-            click.echo(
-                click.style(f'Пароль скопирован в буфер обмена.\nБуфер обмена будет очищен через {timeout} секунд.\n',
-                            **utilities.color_message))
+                item = "-type=transaction"
+                argument.append(item)
+
+                if parameter:
+                    # TODO: Доделать запуск транзакции с параметрами: проблема с тем, что когда запускаешь код напрямую,
+                    #  например, '-command="/n*FBM1 BKPF-BUKRS=1000;"', то все работает.
+                    #  А если формировать код через переменные, например,
+                    #  f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""- то все плохо.
+
+                    # param_data = sap.query_param(str(transaction).upper())
+
+                    # item = f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""
+                    # item = '-command=\"*TM_52 VTGFHA-BUKRS=TRM1; VTGFHA-RFHA=100000000057;\"'
+                    item = '-command="/n*FBM1 BKPF-BUKRS=1000;"'
+                    argument.append(item)
+
+                    click.echo(item)
+                else:
+                    item = "-command=" + transaction
+                    argument.append(item)
+
+            if system_command:
+                # TODO: можно как-нибудь сделать, чтобы можно было посылать системные конманды
+                #   item = "-type=SystemCommand" -
+                item = "-type=SystemCommand"
+                argument.append(item)
+                item = "-command=" + system_command
+                argument.append(item)
+
+            if external_user:
+                message = "Trying to LAUNCH the following system with EXTERNAL USERS"
+            else:
+                message = "Trying to LAUNCH the following system"
+            utilities.print_system_list(selected_system, message, transaction=transaction)
+
+            # Запускаем SAP
+            ret = call(argument)
+
+            if ret:
+                click.echo(ret)
+
+
+@sap_cli.command("debug", short_help="System debug: either create debug file or start system debuggin")
+@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User")
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-pw", "--password", "password", help="Password")
+@click.option("-l", "--language", "language", help="Logon language", default="RU")
+@click.option("-f", "--file", "file", help="Create debug file", is_flag=True, type=click.BOOL)
+@click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
+              help='Do you need to open folder with debug file')
+@click.pass_context
+def debug(ctx, system, mandant="", user="", customer="", description="", password="", language: str = "RU", file=False,
+          open_file=True):
+    """
+    \b
+    System debug
+    You can:
+    1. Creat debug file - to debug modal dialog box: run 'sap debug -f'
+    2. Start debuggin of the opened system (the last used windows will be used): SAP DEBUG <SYSTEM> <MANDANT>
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
+
+    if file:
+        debug_folder = ctx.obj.config.config_path if ctx.obj.config.config_path else utilities.path()
+        debug_file_path = os.path.join(debug_folder, DEBUG_FILE_NAME)
+
+        click.echo(f"\n{debug_file_path} file will be created.")
+        click.echo(f"After creation, a folder with {DEBUG_FILE_NAME} file will be opened \n")
+        click.echo("Drag the file to the SAP system to start debug mode \n")
+        click.pause("Press Enter to continue")
+
+        with open(debug_file_path, "w", encoding='utf-8') as writer:
+            writer.write("[FUNCTION]\n")
+            writer.write("Command =/H\n")
+            writer.write("Title=Debugger\n")
+            writer.write("Type=SystemCommand")
+
+        if open_file:
+            click.launch(url=debug_file_path, locate=True)
+
+    else:
+        query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                                  description=description,
+                                  url=False, verbose=False, enum=True)
+        # --------------------------
+        if query_result != []:
+            selected_sap_systems = [
+                Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+                for item in query_result]
+
+            # As soon as dubugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
+            #  as it influence whether to open new windows, or to debug the latest opened. All arguments
+            #  values must be entered
+            selected_system = utilities.choose_system(selected_sap_systems)
+            try:
+                argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+                                                                         language,
+                                                                         user, "",
+                                                                         ctx.obj.config.command_line_path)
+            except WrongPath as err:
+                click.echo(f"{err}")
+                raise click.Abort
+
+            item = "-command=/H"
+            argument.append(item)
+            item = "-type=SystemCommand"
+            argument.append(item)
+
+            utilities.print_system_list(selected_system, "Trying to DEBUG the following system")
+
+            ret = call(argument)
+
+
+@sap_cli.command("stat")
+@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User")
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-l", "--language", "language", help="Logon language", default="RU")
+@click.pass_context
+def stat(ctx, system, mandant="", user="", customer="", description="", language: str = "RU"):
+    """
+    \b
+    Displays sap system status\n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
+
+    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                              description=description,
+                              url=False, verbose=False, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            for item in query_result]
+
+        selected_system = utilities.choose_system(selected_sap_systems)
+        try:
+            argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
+                                                                     language,
+                                                                     user, "",
+                                                                     ctx.obj.config.command_line_path)
+        except WrongPath as err:
+            click.echo(f"{err}")
+            raise click.Abort
+
+        item = "-command=?STAT"
+        argument.append(item)
+        item = "-type=SystemCommand"
+        argument.append(item)
+
+        utilities.print_system_list(selected_system, "Opening STATUS of the following system")
+
+        ret = call(argument)
+
+
+@sap_cli.command("pw")
+@click.argument("system", required=False, type=click.STRING)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
+                                           "if several users exist for one system, or user outside of the database",
+              )
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option('-c', "--clear_clipboard", "clear_clipboard", is_flag=True, default=True,
+              help='Clear clipboard: True, False. Default value: True')
+@click.option('-t', "--time_to_clear", "time_to_clear", default=10, type=click.INT,
+              help='Timer in secornds to clear clipboard. Default value: 15')
+@click.pass_context
+def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool = True,
+       time_to_clear: int = 10):
+    """
+    \b
+    Copy password for the requested system into clipboard.
+    Script waits 15 seconds and clears clipboard.\n
+    \b
+    Optional argument:
+    1. SYSTEM ID - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
+
+    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                              description=description,
+                              url=False, verbose=False, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            for item in query_result]
+
+        selected_system = utilities.choose_system(selected_sap_systems)
+
+        pyperclip.copy(selected_system.password)
+
+        click.echo(
+            click.style(
+                f"\nPassword is copied into clipboard.\n",
+                **utilities.color_message,
+            )
+        )
+
+        if clear_clipboard:
             click.echo(
                 click.style(
-                    'Если пользуетесь Clipboard manager, то следует внести приложения PY.EXE, CMD.EXE в исключения,\n'
-                    'чтобы не хранить чувствительну информацию.\n',
-                    **utilities.color_sensitive))
+                    "If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n"
+                    "in order to keep sensitive information safe.",
+                    **utilities.color_sensitive,
+                )
+            )
 
-            time.sleep(timeout)
+            click.echo(
+                click.style(
+                    f"\nClipboard will be cleared in {time_to_clear} seconds.\n",
+                    **utilities.color_message,
+                )
+            )
+
+            try:
+                utilities.countdown(time_to_clear)
+            except KeyboardInterrupt:
+                click.echo("\nAborted!")
             if ctypes.windll.user32.OpenClipboard(None):
                 ctypes.windll.user32.EmptyClipboard()
             ctypes.windll.user32.CloseClipboard()
 
-            click.echo(click.style('Буфер обмена очищен. \n', **utilities.color_message))
+            click.echo(click.style("\nClipboard is cleared. \n", **utilities.color_success))
 
 
-@sap_cli.command('debug')
-@click.argument('system', required=False)
-@click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', '--user', 'user', help='пользователь')
-@click.option('-pw', '--password', 'password', help='пароль')
-@click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-f', '--file', 'file', help='создать файл для печати', is_flag=True, type=click.BOOL)
-def debug(system, mandant='', user='', password='', language='RU', file=False):
-    ''' Запуск дебага любой выбранной системы или создание файла для дебага диалоговых окон'''
+@sap_cli.command("add")
+@click.option("-system", prompt=True, help="System", type=utilities.LETTERS_NUMBERS_3)
+@click.option("-mandant", prompt=True, help="Client", type=click.IntRange(1, 999))
+@click.option("-user", prompt=True, help="User")
+@click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
+@click.option("-customer", prompt=True, help="Customer", type=click.STRING, default="")
+@click.option("-description", prompt=True, help="Description", type=click.STRING, default="")
+@click.option("-url", prompt=True, help="Url", type=click.STRING, default="")
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
+@click.pass_context
+def add(ctx, system, mandant, user, password, description, customer, url: str = " ", verbose: bool = True):
+    """
+    Add sap system with it's parameters to db. Just run 'sap add' and follow instructions.
+    """
 
-    if file:
-        file_name = 'DEBUG.TXT'
+    with _sap_db(ctx.obj.config):
+        encrypted_password = ctx.obj.crypto.encrypto(str.encode(password))
+        sap_system = Sap_system(
+            str(system).upper(),
+            str(mandant).zfill(3),
+            str(user).upper(),
+            encrypted_password,
+            str(customer).upper(),
+            str(description),
+            str(url),
+        )
+        result = sap.add(sap_system)
 
-        click.echo(f'Сейчас создастся файл {file_name}')
-        click.echo('Сразу после создания откроется папка с файлом\n')
-        click.pause('Нажмите любую клавишу')
+        if result is not None:
+            click.echo(
+                click.style(
+                    "Failed to add system to database ... \n",
+                    **utilities.color_sensitive,
+                )
+            )
+            click.echo(result)
+        else:
+            sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None)
+            result = sap.query_system(sap_system)
 
-        path = utilities.path()
-        file_path = path + '\\' + file_name
-        with open(file_path, 'w') as writer:
-            writer.write('[FUNCTION]\n')
-            writer.write('Command =/H\n')
-            writer.write('Title=Debugger\n')
-            writer.write('Type=SystemCommand')
-
-        raw_s = r'explorer /select,' + r'{}'.format(file_path)
-        subprocess.Popen(raw_s)
-
-    else:
-        with _sap_db():
-            sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
-                                    str(user).upper() if user else '')
-            result = sap.run(sap_system)
-
-            if not result:
-                utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
-
-            cfg = sap.config.Config()
-            _config = cfg.read()
-
-            sapshcut_exe_path = _config.command_line_path
-            if not os.path.exists(sapshcut_exe_path):
-                click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-                sys.exit()
-
-            selected_system = utilities.choose_system(
-                [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]), '', item[4], item[5]) for item in
-                 result])
-
-            # Добавляем параметры для запуска SAP системы
-            argument = [
-                sapshcut_exe_path,  # Путь до sapshcut.exe
-                f"-system={selected_system.system}",  # Id системы
-                f"-client={str.zfill(selected_system.mandant, 3)}",  # Номер манданта
-                f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
-                f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
-                f"-language={language}",  # Язык для входа
-                '-maxgui',  # Развернуть окно на весь экран
-            ]
-
-            item = '-command=/H'
-            argument.append(item)
-            item = '-type=SystemCommand'
-            argument.append(item)
-
-            ret = subprocess.call(argument)
+            added_system = [Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4],
+                                       item[5], item[6]) for item in result]
+            utilities.print_system_list(added_system, "The following system is ADDED to the database: ",
+                                        verbose=verbose)
+            if verbose:
+                click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
+                try:
+                    utilities.countdown(TIMER_TO_CLEAR_SCREEN)
+                except KeyboardInterrupt:
+                    click.echo("Aborted!")
+                click.clear()
 
 
-@sap_cli.command('run')
-@click.argument('system')
-@click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', '--user', 'user', help='пользователь')
-@click.option('-pw', '--password', 'password', help='пароль')
-@click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-t', '--transaction', 'transaction', help='код транзакции')
-@click.option('-p', '--parameter', 'parameter', help='параметры для транзакции')
-def run(system, mandant='', user='', password='', language='RU', transaction='', parameter=''):
-    """ Запуск указанной SAP системы \n
-        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
+@sap_cli.command("update", short_help="Update record from database")
+@click.argument("system", required=False, type=click.STRING)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
+                                           "if several users exist for one system, or user outside of the database",
+              )
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
+@click.pass_context
+def update(ctx, system, mandant, user, customer, description, verbose: bool = False):
+    """
+    \b
+    Update password, customer, system description or url of the selected record from database\n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
 
-    with _sap_db():
-        sap_system = Sap_system(str(system).upper(),
-                                str(mandant).zfill(3) if mandant else '',
-                                str(user).upper() if user else '', '', '', '', '')
-        result = sap.run(sap_system)
+    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                              description=description,
+                              url=False, verbose=False, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            for item in query_result]
+
+        selected_system = utilities.choose_system(selected_sap_systems)
+
+        password_new = click.prompt("\nEnter new password", default=selected_system.password)
+        customer_new = click.prompt("Enter Customer", default=selected_system.customer)
+        description_new = click.prompt("Enter system description", default=selected_system.description)
+        url_new = click.prompt("Enter URL", default=selected_system.url)
+
+        sap_encrypted_system = Sap_system(
+            str(selected_system.system).upper(),
+            str(selected_system.mandant).zfill(3),
+            str(selected_system.user).upper(),
+            ctx.obj.crypto.encrypto(str.encode(password_new)),
+            str(customer_new),
+            str(description_new),
+            str(url_new),
+        )
+
+        result = sap.update(sap_encrypted_system)
+
+        if result is None:
+            result = sap.query_system(sap_encrypted_system)
+
+            updated_system = [
+                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6])
+                for
+                item in result]
+
+            utilities.print_system_list(updated_system, "The following system is UPDATED", verbose=verbose)
+
+            click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
+            try:
+                utilities.countdown(TIMER_TO_CLEAR_SCREEN)
+            except KeyboardInterrupt:
+                click.echo("Aborted!")
+            click.clear()
+        else:
+            no_system_found = Sap_system(system.upper() if system else None,
+                                         str(mandant).zfill(3) if mandant else None,
+                                         user.upper() if user else None,
+                                         None,
+                                         customer.upper() if customer else None,
+                                         description.upper() if description else None,
+                                         None)
+
+            utilities.print_system_list(no_system_found, "FAILED TO UPDATE the following system",
+                                        color=utilities.color_warning, )
+
+
+@sap_cli.command("delete")
+@click.argument("system", required=False, type=click.STRING)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
+                                           "if several users exist for one system, or user outside of the database",
+              )
+@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command")
+@click.pass_context
+def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm: bool):
+    """
+    \b
+    Delete selected record from database\n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
+
+    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                              description=description, url=False, verbose=False, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            for item in query_result]
+
+        selected_system = utilities.choose_system(selected_sap_systems)
+
+        message = "Trying to DELETE the following systtem"
+        utilities.print_system_list(selected_system, message)
+
+        click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
+                      abort=True, default=confirm)
+
+        system_to_delete = Sap_system(selected_system.system,
+                                      selected_system.mandant,
+                                      selected_system.user,
+                                      selected_system.password,
+                                      selected_system.customer,
+                                      selected_system.description,
+                                      selected_system.url)
+
+        result = sap.delete(system_to_delete)
+
+        result = sap.query_system(system_to_delete)
+
+        if result == []:
+
+            utilities.print_system_list(system_to_delete, "The following system is DELETED from database")
+        else:
+            no_system_found = Sap_system(system.upper() if system else None,
+                                         str(mandant).zfill(3) if mandant else None,
+                                         user.upper() if user else None,
+                                         None,
+                                         customer.upper() if customer else None,
+                                         description.upper() if description else None,
+                                         None)
+
+            utilities.print_system_list(no_system_found, "FAILED TO UPDATE the following system",
+                                        color=utilities.color_warning, )
+
+
+@sap_cli.command("config")
+@click.option('-create', is_flag=True, callback=create_config, expose_value=False,
+              is_eager=True,
+              help='Create config file')
+@click.option('-open', is_flag=True, callback=open_config, expose_value=False,
+              is_eager=True,
+              help='Open config file')
+@click.pass_context
+def config(ctx):
+    """ Config file creation or editing """
+
+    click.echo("Enter one of subcommands:")
+    click.echo("\t -create - Create config file")
+    click.echo("\t -open   - Open config file")
+
+
+@sap_cli.command("list", short_help="Print information about SAP systems")
+@click.argument("system", required=False, type=click.STRING, default=None)
+@click.argument("mandant", required=False, type=click.IntRange(0, 999), default=None)
+@click.option("-u", "--user", "user", help="Show systems by user", type=click.STRING, default=None)
+@click.option("-c", "--customer", "customer", help="Show systems by customer", type=click.STRING, default=None)
+@click.option("-d", "--description", "description", help="Show systems by description", type=click.STRING, default=None)
+@click.option("-url", "--url", "url", help="Display url", is_flag=True, type=click.BOOL, default=False)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=False)
+@click.option("-e", "--enum", "enum", help="Enumerate systems", is_flag=True, default=False)
+@click.pass_context
+def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool,
+                 verbose: bool, enum: bool) -> list:
+    """
+    \b
+    Print information about SAP systems \b
+    \b
+    Optional arguments:
+    1. System: System Id
+    2. Mandant: Mandant num\n
+    \b
+    If no arguments - print information about all systems
+    """
+
+    result = ""
+
+    with _sap_db(ctx.obj.config):
+        sap_system_sql = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None,
+                                    user if user else None, None, customer if customer else None,
+                                    description if description else None, None)
+        result = sap.query_system(sap_system_sql)
 
         if not result:
-            utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
-
-        cfg = sap.config.Config()
-        _config = cfg.read()
-
-        sapshcut_exe_path = _config.command_line_path
-        if not os.path.exists(sapshcut_exe_path):
-            click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-            sys.exit()
-
-        selected_system = utilities.choose_system(
-            [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]), '', item[4], item[5]) for item in result])
-
-        # Добавляем параметры для запуска SAP системы
-        argument = [
-            sapshcut_exe_path,  # Путь до sapshcut.exe
-            f"-system={selected_system.system}",  # Id системы
-            f"-client={str.zfill(selected_system.mandant, 3)}",  # Номер манданта
-            f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
-            f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
-            f"-language={language}",  # Язык для входа
-            '-maxgui',  # Развернуть окно на весь экран
-        ]
-
-        if transaction:
-            item = '-type=transaction'
-            argument.append(item)
-
-            if parameter:
-                # TODO: Доделать запуск транзакции с параметрами
-
-                # param_data = sap.query_param(str(transaction).upper())
-
-                # item = f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""
-                # item = '-command=\"*TM_52 VTGFHA-BUKRS=TRM1; VTGFHA-RFHA=100000000057;\"'
-                item = '-command=\"/n*FBM1 BKPF-BUKRS=1000;\"'
-                argument.append(item)
-
-                print(item)
-            else:
-                item = '-command=' + transaction
-                argument.append(item)
-
-        # Показываем, что будем запускать
-        if transaction:
-            header = utilities.header_nsmut
+            no_system_found = [Sap_system(str(system).upper() if system else "",
+                                          str(mandant).zfill(3) if mandant else "",
+                                          user.upper() if user else "",
+                                          "",
+                                          str(customer).upper() if customer else "",
+                                          description.upper() if description else "",
+                                          "")]
+            utilities.print_system_list(no_system_found, "NOTHING FOUND according to search criteria",
+                                        color=utilities.color_warning, )
+            return list()
         else:
-            header = utilities.header_nsmu
+            sap_system = [
+                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6])
+                for item in result]
 
-        # TODO: Доработать вывод
+            utilities.print_system_list(sap_system, "Available systems", verbose=verbose, url=url, enum=enum)
+            if verbose:
+                click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
+                try:
+                    utilities.countdown(TIMER_TO_CLEAR_SCREEN)
+                except KeyboardInterrupt:
+                    click.echo("Aborted!")
+                click.clear()
 
-        utilities.print_system_list([Sap_system(selected_system.system,
-                                                selected_system.mandant,
-                                                selected_system.user,
-                                                '',
-                                                str(transaction).upper() if transaction else '',
-                                                selected_system.customer,
-                                                selected_system.description)],
-                                    'Пробуем запустить следующую систему',
-                                    header)
-
-        # Запускаем SAP
-        ret = subprocess.call(argument)
-
-        if ret:
-            click.echo(ret)
+            return sap_system
 
 
-@sap_cli.command('db')
-def database():
-    """ Создание базы данных для хранеия информкции о SAP системах """
+@sap_cli.command("db")
+@click.pass_context
+def database(ctx):
+    """ Database creation. This command is used for technical reasons. Better run 'sap start'. """
     pass
     # db = Database()
     # db.create()
 
 
-@sap_cli.command('add')
-@click.option('-system', prompt=True, help='SAP system')
-@click.option('-mandant', prompt=True, help='SAP Client', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='SAP user')
-@click.option('-password', help='SAP password', prompt=True, confirmation_prompt=True,
-              # hide_input=True,
-              )
-@click.option('-customer', prompt=True, help="Customer", type=click.STRING)
-@click.option('-description', prompt=True, help="System description", type=click.STRING)
-def add(system, mandant, user, password, description, customer):
-    """ Add sap system with it's parameters to db."""
-
-    with _sap_db():
-        encrypted_password = Crypto.encrypto(str.encode(password))
-        sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
-                                '', str(customer).upper(), str(description))
-        result = sap.add(sap_system)
-
-    if result:
-        click.echo(click.style('Не удалось добавить системы в базу данных ... \n', **utilities.color_sensitive))
-        click.echo(result)
-    else:
-        utilities.print_system_list([sap_system], 'Добавлена следующая система: ', utilities.header_nsmu)
+@sap_cli.command("keys")
+@click.pass_context
+def keys(ctx):
+    """ Encryption keys creation. This command is used for technical reasons. Better run 'sap start'. """
+    try:
+        ctx.obj.crypto.generate_keys()
+    except EncryptionKeysAlreadyExist as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
 
 
-@sap_cli.command('update')
-@click.option('-system', prompt=True, help='система')
-@click.option(
-    '-mandant', prompt=True, help='мандант', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='пользователь')
-@click.option(
-    '-password',
-    help='пароль',
-    prompt=True,
-    confirmation_prompt=True,
-    # hide_input=True
-)
-@click.option('-customer', prompt=True, help="Customer", type=click.STRING)
-@click.option('-description', prompt=True, help="System description", type=click.STRING)
-def update(system, mandant, user, password, customer, description):
-    """ Обновление пароля для SAP системы """
-
-    # TODO: вставлять данные уже сущетсвующей системы, чтобы пользователь мог
-    #  решить, изменять или не изменять.
-
-    encrypted_password = Crypto.encrypto(str.encode(password))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), password, '', str(customer),
-                            str(description))
-    sap_encrypted_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), encrypted_password,
-                                      '', str(customer), str(description))
-
-    with _sap_db():
-        result = sap.update(sap_encrypted_system)
-
-        if result is None:
-            utilities.print_system_list([sap_system], 'Обновленная система', utilities.header_nsmu, verbose=True)
-            click.pause('Нажмите для продолжения. Данные с паролем будут очищены с экрана ...')
-            os.system('cls')
-        else:
-            utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), str(user).upper())
-
-
-@sap_cli.command('delete')
-@click.option('-system', prompt=True, help='система')
-@click.option(
-    '-mandant', prompt=True, help='мандант', type=click.IntRange(1, 999))
-@click.option('-user', prompt=True, help='пользователь')
-def delete(system, mandant, user):
-    """ Удаление указанной SAP системы из базы данных """
-    mandant = int(str(mandant).zfill(3))
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3), str(user).upper(), '', '', '', '')
-
-    with _sap_db():
-        result = sap.delete(sap_system)
-
-        if not result:
-            utilities.no_result_output(system, mandant, user)
-            exit()
-
-        utilities.print_system_list([sap_system], 'Удалена следующая система', utilities.header_nsmu)
-
-
-@sap_cli.command('config')
-def config():
-    """ Создание конфигурационного ini файла """
-
-    cfg = sap.config.Config()
-
-    if cfg.exists():
-        click.echo(click.style('Config уже существует \n', **utilities.color_warning))
-        click.echo(utilities.path())
-    else:
-        cfg.create()
-
-
-@sap_cli.command('list')
-@click.option('-s', '--system', 'system', required=False, help='показать выбранную систему')
-@click.option('-v', '--verbose', 'verbose', help='показать пароли', is_flag=True)
-def list_systems(system, verbose):
-    """ Информация о SAP системах находящихся в базе данных """
-
-    with _sap_db():
-        result = sap.list_systems(str(system).upper() if system else '')
-
-        if not result:
-            utilities.no_result_output(system)
-
-        systems_list = [
-            Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3]) if verbose else '', '', item[4], item[5]) for
-            item in result]
-
-        utilities.print_system_list(systems_list, 'Список доступных систем', utilities.header_nsmu, verbose)
-        if verbose:
-            click.pause('Нажмите для продолжения. Данные о паролях будут очищены с экрана ...')
-            os.system('cls')
-        else:
-            pass
-
-
-@sap_cli.command('keys')
-def keys():
-    """ Создание ключей шифрования """
-
-    Crypto().generate_keys()
-
-
-@sap_cli.command('ver', help='Текущая версия SAP shortcut')
-def shortcut_version():
+@sap_cli.command("about", help="Show 'About SAP logon' window")
+@click.pass_context
+def about(ctx):
     # Считываем конфигурационный файл
-    cfg = sap.config.Config()
-    _config = cfg.read()
+    parameter = "-version"
+    try:
+        utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
+    except WrongPath as err:
+        click.echo(f"{err}")
 
-    parameter = '-version'
-    utilities.launch_command_line_with_params(_config.command_line_path, parameter)
 
-
-@sap_cli.command('help', help='SAP GUI shortcut help')
-def shortcut_help():
+@sap_cli.command("shortcut", help="Show 'SAP GUI Shortcut' window")
+@click.pass_context
+def shortcut(ctx):
     # Считываем конфигурационный файл
-    cfg = sap.config.Config()
-    _config = cfg.read()
-
-    utilities.launch_command_line_with_params(_config.command_line_path, '-help')
-
-
-@sap_cli.command('start')
-def start():
-    # TODO: создать команду для начального формирования ключей, базы данных, конфига и прописи всех данных в конфиг
-    pass
+    try:
+        utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, "-help")
+    except WrongPath as err:
+        click.echo(f"{err}")
 
 
-@sap_cli.command('backup')
-def backup():
-    # TODO: создать команду для бэкапа ini фалов, sap logon систем
-    # Бэкап должен шифроваться текущим ключом шифрования
+@sap_cli.command("start", short_help="Starting point for working wiht SAP command line tool")
+@click.pass_context
+def start(ctx):
+    """
+    \b
+    Starting point for working wiht SAP command line tool
+    1. Database creation.
+    2. ini file with config parameters createion.
+    3. Usefull messages
+    """
 
-    # Пути к saplogon.ini брать отсюда 2580439
-    pass
+    # TODO: Убрать вывод сообщения из классов базы данных, конфига и ключей шифрования и добавить сюда
+    #   https://towardsdatascience.com/rich-generate-rich-and-beautiful-text-in-the-terminal-with-python-541f39abf32e
+
+    click.clear()
+
+    try:
+        ctx.obj.config.create()
+    except ConfigExists as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
+
+    try:
+        ctx.obj.crypto.generate_keys()
+    except EncryptionKeysAlreadyExist as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
+
+    try:
+        ctx.obj.database.create()
+    except DatabaseExists as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
+
+    print("\nThe following files are created:")
+    print(f"1. [yellow]{PUBLIC_KEY_NAME}[/yellow] - used to encrypt passwords in database")
+    print(
+        f"      can be stored in any place. If you move it from default location then don't forget to put new place in {CONFIG_NAME} -> '[KEYS]' -> 'public_key_path'")
+    print(f"2. [yellow]{PRIVATE_KEY_NAME}[/yellow] - used to decrypt passwords")
+    print(
+        f"      must be stored in [bright_red]secure place[/bright_red]. For example, in Bestcrypt container. Don't forget to put new place in {CONFIG_NAME} -> '[KEYS]' -> 'private_key_path'")
+    print(f"3. [yellow]{DATABASE_NAME}[/yellow] - used to store all information about SAP systems")
+    print(
+        f"      must be stored in [bright_red]secure place[/bright_red]. For example, in Bestcrypt container. Don't forget to put new place in {CONFIG_NAME} -> '[DATABASE]' -> 'db_path'")
+    print(f"4. [yellow]{CONFIG_NAME}[/yellow] - used to store information about all previous files locations")
+    print(
+        f"      must be stored only in [bright_red] {ctx.obj.config.config_path} [/bright_red] folder.")
+    print("\n")
+    print(f"Extra work:")
+    print(
+        f"5. Find 'SAPSHCUT.EXE' file and put it's location in {CONFIG_NAME} -> '[APPLICATION]' -> 'command_line_path'")
+    print(f"5. Find 'SAPLOGON.EXE' file and put it's location in {CONFIG_NAME} -> '[APPLICATION]' -> 'saplogon_path'")
+
+    print("\n")
+    print("To start work with SAP commands after preparatory work:")
+    print("type 'SAP ADD' to add sap system into database")
+    print("type 'SAP RUN <system id> <mandant num>' to launch sap system")
+    print("type 'SAP --HELP' to learn more about programm")
+
+    click.pause('\nPress enter to open files folder and start working. Good luck.')
+
+    click.launch(ctx.obj.config.config_file_path, locate=True)
 
 
-@sap_cli.command('launch')
-@click.argument('system')
-@click.argument('mandant', required=False, type=click.IntRange(1, 999))
-@click.option('-u', '--user', 'user', help='пользователь')
-@click.option('-pw', '--password', 'password', help='пароль')
-@click.option('-l', '--language', 'language', help='язык входа', default='RU')
-@click.option('-t', '--transaction', 'transaction', help='код транзакции')
-@click.option('-p', '--parameter', 'parameter', help='параметры для транзакции')
-def launch(system, mandant='', user='', password='', language='RU', transaction='', parameter=''):
-    """ Launch sap system in web """
+@sap_cli.command("backup", short_help="Create backup")
+@click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
+              type=utilities.PASS_REQUIREMENT)
+@click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
+              help='Do you need to open folder with backup file')
+@click.pass_context
+def backup(ctx, password, open_file=True):
+    """
+    \b
+    Create backup for the following files:
+    1. list of saplogon systems (SAPUILandscape.xml)
+    2. database
+    3. encryption keys (private and public)
+    4. sap_config.ini
+    """
 
-    # TODO: сделать таблицу https ардесов для SAP системы,
-    # путь до браузера, чтобы запускать их в браузере.
-    pass
+    #  Paths to SAPUILandscape.xml: https://launchpad.support.sap.com/#/notes/2075150
+
+    pwd = str.encode(password)
+
+    config_ini_path = ctx.obj.config.config_file_path
+    saplogon_ini_path = os.path.join(os.path.expandvars(r'%APPDATA%\SAP\Common'), 'SAPUILandscape.xml')
+
+    back_file_name = f'backup_{datetime.now().strftime("%Y.%m.%d-%I.%M.%S")}.zip'
+    back_path = os.path.join(utilities.path(), back_file_name)
+    with pyzipper.AESZipFile(back_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
+        zf.setpassword(pwd)
+        zf.write(ctx.obj.config.db_path, os.path.basename(ctx.obj.config.db_path))
+        zf.write(ctx.obj.config.public_key_path, os.path.basename(ctx.obj.config.public_key_path))
+        zf.write(ctx.obj.config.private_key_path, os.path.basename(ctx.obj.config.private_key_path))
+        zf.write(config_ini_path, os.path.basename(config_ini_path))
+        zf.write(saplogon_ini_path, os.path.basename(saplogon_ini_path))
+
+        zf.comment = b""" 
+            \n 1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
+            \n 2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
+            \n 3. Other files - according to sap_config.ini paths
+            \n Or you can place whener you want, just enter new paths to sap_config.ini
+            \n !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
+
+    if os.path.exists(back_path):
+        click.echo(click.style('Backup succesfully created', **utilities.color_success))
+        if open_file:
+            click.launch(url=back_path, locate=True)
+    else:
+        click.echo('Backup creation failed')
 
 
 @contextmanager
-def _sap_db():
-    cfg = sap.config.Config()
-    _config = cfg.read()
-    sap.start_sap_db(_config.db_path, _config.db_type)
+def _sap_db(cfg):
+    sap.start_sap_db(cfg.db_path, cfg.db_type)
     yield
     sap.stop_sap_db()
 
 
-if __name__ == '__main__':
-    sys.excepthook = utilities.show_exception_and_exit
-    sap_cli()
+if __name__ == "__main__":
+    sap_cli(obj={})

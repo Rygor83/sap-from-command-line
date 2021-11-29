@@ -4,17 +4,14 @@
 
 from .api import (
     Sap_system,
-    TasksException,
+    query_system,
+    query_param,
     add,
-    run,
     delete,
     update,
-    pw,
     start_sap_db,
     stop_sap_db,
-    list_systems,
-    query_param,
-    database
+    Obj_structure,
 )
 
-__version__ = '0.2'
+__version__ = '3.0'

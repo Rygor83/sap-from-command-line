@@ -2,52 +2,101 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
+""" Config file management """
+
 import ctypes
 import os
-import click
-import sap.utilities as utilities
 from collections import namedtuple
 from configparser import ConfigParser
+import pathlib
+import typing
+import click
+from sap import utilities
+
+from sap.exceptions import ConfigExists, ConfigDoesNotExists
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
                                      'private_key_path', 'language'])
 
 
-class Config(object):
+class Config:
+    """
+    Class for working with config file: create, read
+    """
 
-    def __init__(self):
-        self.ini_name = 'sap_config.ini'
-        self.config_path = os.path.join(utilities.path(), self.ini_name)
+    def __init__(
+            self,
+            config_path: typing.Union[str, pathlib.Path] = None,
+            db_path=None,
+            db_type='sqlite',
+            command_line_path=None,
+            saplogon_path=None,
+            public_key_path=None,
+            private_key_path=None
+
+    ):
+
+        self.ini_name = CONFIG_NAME
+        self.config_path = config_path if config_path else utilities.path()
+        self.config_file_path = os.path.join(config_path, self.ini_name) if config_path else os.path.join(
+            utilities.path(), self.ini_name)
+
+        self.db_path = db_path if db_path else os.path.join(self.config_path, DATABASE_NAME)
+        self.db_type = db_type
+        self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file'
+        self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file'
+        self.public_key_path = public_key_path if public_key_path else os.path.join(self.config_path,
+                                                                                    PUBLIC_KEY_NAME)
+        self.private_key_path = private_key_path if private_key_path else os.path.join(self.config_path,
+                                                                                       PRIVATE_KEY_NAME)
+        self.language = 'RU'
 
     def read(self):
         """Return SapConfig object after reading config file."""
         parser = ConfigParser()
-        if not self.exists():
-            self.create()
+
+        if self.exists():
+            parser.read(self.config_file_path)
+
+            self.db_path = parser.get('DATABASE', 'db_path')
+            self.db_type = parser.get('DATABASE', 'db_type')
+            self.command_line_path = parser.get('APPLICATION', 'command_line_path')
+            self.saplogon_path = parser.get('APPLICATION', 'saplogon_path')
+            self.public_key_path = parser.get('KEYS', 'public_key_path')
+            self.private_key_path = parser.get('KEYS', 'private_key_path')
+            self.language = parser.get('LOCALE', 'language')
+
+            return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
+                             self.public_key_path, self.private_key_path, self.language)
         else:
-            a = parser.read(self.config_path)
-
-            db_path = parser.get('DATABASE', 'db_path')
-            db_type = parser.get('DATABASE', 'db_type')
-            command_line_path = parser.get('APPLICATION', 'command_line_path')
-            saplogon_path = parser.get('APPLICATION', 'saplogon_path')
-            public_key_path = parser.get('KEYS', 'public_key_path')
-            private_key_path = parser.get('KEYS', 'private_key_path')
-            language = parser.get('LOCALE', 'language')
-
-            return SapConfig(db_path, db_type, command_line_path, saplogon_path, public_key_path, private_key_path,
-                             language)
+            raise ConfigDoesNotExists(self.config_file_path)
 
     def create(self):
-        parser = ConfigParser()
-        parser['DATABASE'] = {'db_path': 'database.db',
-                              'db_type': 'sqlite'}
+        """
+        Create configuration file
+        """
+        if os.path.exists(self.config_file_path):
+            raise ConfigExists(self.config_file_path)
+        else:
+            parser = ConfigParser(allow_no_value=True)
+            parser['DATABASE'] = {
+                "; DB_PATH - Path to database. Database file must be placed in secure place": None,
+                'db_path': self.db_path,
+                "; DB_TYPE - database type. Default: sqlite": None,
+                'db_type': self.db_type}
 
-        parser['APPLICATION'] = {'command_line_path': 'путь до файла sapshcut.exe',
-                                 'saplogon_path': 'путь до файла saplogon.exe'}
+            parser['APPLICATION'] = {
+                "; COMMAND_LINE_PATH - Path to sapshcut.exe file": None,
+                'command_line_path': self.command_line_path,
+                "; SAPLOGON_PATH - Path to saplogon.exe file": None,
+                'saplogon_path': self.saplogon_path}
 
-        parser['KEYS'] = {'public_key_path': 'путь до публичного ключа',
-                          'private_key_path': 'путь до приватного ключа. !!! ключ хранить в защищенном хранилище'}
+            parser['KEYS'] = {
+                "; public_key_path - Path to public_key_file_name encryption key": None,
+                'public_key_path': self.public_key_path,
+                "; PRIVATE_KEY_PATH - Path to private_key_file_name encryption key. Private key must be placed in secure place": None,
+                'private_key_path': self.private_key_path}
 
         # Определение языка
         win_dll = ctypes.windll.kernel32
@@ -58,21 +107,49 @@ class Config(object):
             ini_lang = 'EN'
         parser['LOCALE'] = {'language': ini_lang}
 
-        with open(self.config_path, 'w') as configfile:
+        with open(self.config_file_path, 'w', encoding='utf-8') as configfile:
             parser.write(configfile)
 
-        click.echo('Путь: %s \n' % click.format_filename(self.config_path))
-        click.echo(click.style('INI файл создан', **utilities.color_success))
-        click.echo(click.style('!!! Заполните все требуемые параметры в файле !!! \n', **utilities.color_message))
-        click.pause('Нажмите для продолжения ...')
-
-        click.launch(self.config_path)
-
     def exists(self):
-        if os.path.exists(self.config_path):
-            return True
-        else:
-            return False
+        """
+        Check if config path is valid
+        """
+        return os.path.exists(self.config_file_path)
 
     def open_config(self):
-        click.launch(self.config_path)
+        """
+        Open config file in editor
+        """
+        click.launch(url=self.config_file_path)
+
+    def remove_config(self):
+        """ Remove encryption keys """
+        os.remove(self.config_file_path)
+
+
+def open_config(ctx, param, value):
+    """
+    Open configuration file for editing
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    ctx.obj.config.open_config()
+    ctx.exit()
+
+
+def create_config(ctx, param, value):
+    """
+    Open configuration file for editing
+    """
+    if not value or ctx.resilient_parsing:
+        return
+
+    try:
+        ctx.obj.config.create()
+    except ConfigExists as err:
+        print(f"{err}")
+        raise click.Abort
+
+    click.launch(ctx.obj.config.config_file_path, locate=True)
+
+    ctx.exit()

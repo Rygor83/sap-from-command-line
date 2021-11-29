@@ -1,17 +1,19 @@
 #  ------------------------------------------
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
-
+import typing
 import click
-import sys
 import traceback
 import os
-import subprocess
-
-from appdirs import *
-from sap.api import Sap_system
+from subprocess import call
+import operator
+import re
 from prettytable import PrettyTable
-from operator import attrgetter
+import time
+
+import sap.api
+from sap.api import Sap_system
+from sap.exceptions import WrongPath
 
 # Цвета сообщений
 color_message = {'bg': 'black', 'fg': 'white'}
@@ -19,148 +21,193 @@ color_success = {'bg': 'black', 'fg': 'green'}
 color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
-# Заголовки таблиц
-header_nsmup = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль']  # NSMUP: Number, System, Mandant, User, Password
-header_nsmu = ['№', 'Система', 'Мандант', 'Пользователь']  # NSMU: Number, System, Mandant, User
-header_nsmut = ['№', 'Система', 'Мандант', 'Пользователь', 'Транзакция']  # NSMU: Number, System, Mandant, User
-header_nsmutp = ['№', 'Система', 'Мандант', 'Пользователь', 'Пароль',
-                 'Транзакция']  # NSMU: Number, System, Mandant, User, Password, Transaction
-header_nsm = ['№', 'Система', 'Мандант']  # NSM: Number, System, Mandant
+
+def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, user, transaction="",
+                                        sapshcut_exe_path: str = "") -> list:
+    # Добавляем параметры для запуска SAP системы
+    if not os.path.exists(sapshcut_exe_path):
+        raise WrongPath("sapshcut.exe", sapshcut_exe_path)
+
+    argument = [
+        sapshcut_exe_path,  # Путь до sapshcut.exe
+        f"-system={selected_system.system}",  # Id системы
+        f"-client={str(selected_system.mandant).zfill(3)}",  # Номер манданта
+        f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
+        f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
+        f"-language={language}",  # Язык для входа
+        "-maxgui",  # Развернуть окно на весь экран
+    ]
+    return argument
 
 
 def launch_command_line_with_params(command_line_path, param):
     ''' Запуск sapshcut.exe с разными параметрами'''
     if not os.path.exists(command_line_path):
-        click.echo(
-            click.style(f'Путь до sapshcut.exe не верный: \n{command_line_path} \n', **color_warning))
-        sys.exit()
+        raise WrongPath('sapshcut.exe', command_line_path)
 
     # Добавляем путь к командному файлу
     argument = [command_line_path, param]
 
     # Запускаем SAP
-    subprocess.call(argument)
+    call(argument)
 
 
-def choose_system(result, verbose=False):
+def launch_saplogon_with_params(saplogon):
+    ''' Запуск sapshcut.exe с разными параметрами'''
+
+    if not os.path.exists(saplogon):
+        raise WrongPath('saplogon.exe', saplogon)
+
+    click.launch(url=saplogon)
+
+
+def choose_system(sap_systems: list, verbose=False) -> Sap_system:
     ans = 0
-    if len(result) >= 2:
-        print_system_list(result, 'Доступные системы', header_nsmu, verbose=verbose)
+    if len(sap_systems) >= 2:
+        # print_system_list(sap_systems, 'Available systems', verbose=verbose, enum=True)
 
-        while int(ans) > len(result) or int(ans) < 1:
-            if 1 <= int(ans) <= len(result):
+        while int(ans) > len(sap_systems) or int(ans) < 1:
+            if 1 <= int(ans) <= len(sap_systems):
                 break
-            click.echo(click.style(f"\nВозможно вводить значения только от 1 до {str(len(result))}.",
-                                   **color_message))
-            ans = click.prompt('Выберите систему, в которую хотите войти \n>>>', type=int)
+
+            click.echo()
+            ans = click.prompt(click.style(
+                f"\nChoose system you want to logon. Available values from 1 to {str(len(sap_systems))}: \n>>>",
+                **color_message), type=int)
         ans = ans - 1
 
-    system = Sap_system(result[ans].system, result[ans].mandant, result[ans].user, result[ans].password,
-                        result[ans].transaction, result[ans].customer, result[ans].description)
-    return system
+    selected_system: Sap_system = Sap_system(
+        sap_systems[ans].system, sap_systems[ans].mandant, sap_systems[ans].user, sap_systems[ans].password,
+        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url)
+
+    return selected_system
 
 
-def print_system_list(systems: list, title, header: list, verbose=False):
-    # TODO: Сделать универсальным:
-    #  на вход подавать так же и заголовок.
-    #  Затем функцию подавать в:
-    #  1. Когда пытаемся запустить системы: мол пробуем запустить то-то и то-то
-    #     вместо модуля NO_RESULT_OUTPUT
-    #  2. Когда не удалось получить данные системы
+def print_system_list(sap_systems, title, color=color_success, verbose=False,
+                      enum=False, transaction: str = '', url=False):
+    # TODO: доделать формирование list(Sap_system) внутри этой подпрограммы
 
-    sorted_systems = sorted(systems, key=attrgetter('system', 'mandant'))
+    if type(sap_systems) is Sap_system:
+        sap_systems = [sap_systems]
 
-    if verbose:
-        header.append('Пароль')
-        header.append('Заказчик')
-        header.append('Описание')
+    row = []
+
+    # Header for Pretty table
+    if enum:
+        header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User']
     else:
-        header.append('Заказчик')
-        header.append('Описание')
+        header = ['Customer', 'System', 'Mandant', 'Description', 'User']
+    if url:
+        header.append('URL')
+    if verbose:
+        header.append('Password')
 
-    # Создаем таблицу
+    # Table with data
     t = PrettyTable(header)
 
-    # Добавление информации в табилцу
-    for num, system in enumerate(sorted_systems, start=1):
-        row = [num, system.system]
-        if system.mandant:
-            row.append(system.mandant)
-        if system.user:
-            row.append(system.user)
-            t.align["Пользователь"] = "l"
-        if system.transaction:
-            row.append(system.transaction)
-        if verbose:
-            row.append(system.password)
-            t.align["Пароль"] = "l"
-        if system.customer:
-            row.append(system.customer)
-            t.align["Заказчик"] = "l"
-        if system.description:
-            row.append(system.description)
-            t.align["Описание"] = "l"
+    for index, sap_system in enumerate(sap_systems, start=1):
+        if enum:
+            row.append(index)
+        if sap_system.customer is not None:
+            row.append(sap_system.customer)
+            t.align["Customer"] = "l"
+        else:
+            row.append('')
+
+        if sap_system.system is not None:
+            row.append(sap_system.system)
+            t.align["System"] = "l"
+        else:
+            row.append('')
+
+        if sap_system.mandant is not None:
+            row.append(sap_system.mandant)
+            t.align["Mandant"] = "l"
+        else:
+            row.append('')
+
+        if sap_system.description is not None:
+            row.append(sap_system.description)
+            t.align["Description"] = "l"
+        else:
+            row.append('')
+
+        if sap_system.user is not None:
+            row.append(sap_system.user)
+            t.align["User"] = "l"
+        else:
+            row.append('')
+
+        if url:
+            if sap_system.url is not None:
+                row.append(sap_system.url)
+                t.align["URL"] = "l"
+            else:
+                row.append('')
+
+        if verbose and sap_system.password is not None:
+            row.append(sap_system.password)
+            t.align["Password"] = "l"
+
         t.add_row(row)
+        row.clear()
 
     # Вывод информации
     click.echo('\n')
-    click.echo(t.get_string(title=click.style(title, **color_success)))
-
-
-def no_result_output(system, mandant='', user=''):
-    ''' Выводит сообщение, если не получилось достать из базы данных информацию
-        Так же выводит данные запроса'''
-    click.echo(click.style(f'\nПо запрошенным данным системы в базе данных отсутствую:', **color_success))
-    if system:
-        click.echo(f'Система: {str(system).upper()}')
-    if mandant:
-        click.echo(f'Мандант: {mandant}')
-    if user:
-        click.echo(f'Пользователь: {str(user).upper()}')
-    sys.exit()
-
-
-def show_exception_and_exit(exc_type, exc_value, tb):
-    traceback.print_exception(exc_type, exc_value, tb)
-    sys.exit(-1)
+    title = f"{click.style(title, **color)}"
+    if transaction:
+        title = title + f"{click.style(' with transaction ', **color)}"
+        title = title + f"{click.style(str(transaction).upper(), **color_sensitive)}"
+    click.echo(t.get_string(title=title))
 
 
 def path():
-    return user_data_dir('sap', appauthor=False)
+    return click.get_app_dir('sap', roaming=False)
 
 
-def get_run_parameters(system, mandant='', user='', password='', language='RU', verbose=False):
-    """ Запуск указанной SAP системы \n
-        Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
+class String_3(click.ParamType):
+    """Click check class for parameters type"""
 
-    # with _sap_db():
-    sap_system = Sap_system(str(system).upper(), str(mandant).zfill(3) if mandant else '',
-                            str(user).upper() if user else '', '')
-    result = sap.run(sap_system)
+    name = "Only letters and numbers. 3 chars length"
 
-    if not result:
-        utilities.no_result_output(str(system).upper(), str(mandant).zfill(3), user)
+    def convert(self, value, param, ctx):
+        if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
+            return value
 
-    cfg = sap.config.Config()
-    _config = cfg.read()
+        self.fail(
+            f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers. Must be 3 chars length",
+            param,
+            ctx,
+        )
 
-    sapshcut_exe_path = _config.command_line_path
-    if not os.path.exists(sapshcut_exe_path):
-        click.echo(click.style('В INI файле не найден путь к sapshcut.exe \n', **utilities.color_warning))
-        sys.exit()
 
-    selected_system = utilities.choose_system(
-        [Sap_system(item[0], item[1], item[2], Crypto.decrypto(item[3])) for item in result], verbose)
+LETTERS_NUMBERS_3 = String_3()
 
-    # Добавляем параметры для запуска SAP системы
-    argument = [
-        sapshcut_exe_path,  # Путь до sapshcut.exe
-        f"-system={selected_system.system}",  # Id системы
-        f"-client={str.zfill(selected_system.mandant, 3)}",  # Номер манданта
-        f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
-        f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
-        f"-language={language}",  # Язык для входа
-        '-maxgui',  # Развернуть окно на весь экран
-    ]
 
-    return argument
+class Pass_requirement(click.ParamType):
+    """Click check class for parameters type"""
+
+    # TODO: долать требования к паролю, чтобы он был не простым
+
+    name = "Password"
+
+    def convert(self, value, param, ctx):
+        if re.match("^[A-Za-z0-9]*$", value):
+            return value
+
+        self.fail(
+            f"{value!r} Password is week. Use xxxxxx chars",
+            param,
+            ctx,
+        )
+
+
+PASS_REQUIREMENT = Pass_requirement()
+
+
+def countdown(seconds):
+    for i in range(seconds, -1, -1):
+        # move to the beginning of the line and remove line
+        print("\r\033[K", end='', flush=True)
+        print(f"\r{i}", end='', flush=True)
+        time.sleep(1)
