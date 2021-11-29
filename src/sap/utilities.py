@@ -9,8 +9,6 @@ from subprocess import call
 import operator
 import re
 from prettytable import PrettyTable
-from operator import attrgetter
-import winreg
 import time
 
 import sap.api
@@ -205,19 +203,6 @@ class Pass_requirement(click.ParamType):
 
 
 PASS_REQUIREMENT = Pass_requirement()
-
-
-def get_reg(name):
-    REG_PATH = r"Software\SAP\SAPLogon\Options"
-
-    try:
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0,
-                                      winreg.KEY_READ)
-        value, regtype = winreg.QueryValueEx(registry_key, name)
-        winreg.CloseKey(registry_key)
-        return value
-    except WindowsError:
-        return None
 
 
 def countdown(seconds):

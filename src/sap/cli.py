@@ -20,7 +20,7 @@ from sap.api import Sap_system, Obj_structure
 from sap.config import create_config, open_config
 from sap.crypto import Crypto
 from sap.database import SapDB
-from sap.file_names import CONFIG_NAME, DEBUG_FILE_NAME, PRIVATE_KEY_NAME, PUBLIC_KEY_NAME, DATABASE_NAME, \
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, DEBUG_FILE_NAME, \
     TIMER_TO_CLEAR_SCREEN
 from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
     EncryptionKeysAlreadyExist, DatabaseExists

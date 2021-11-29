@@ -7,7 +7,7 @@
 import os
 import pytest
 
-from file_names import DATABASE_NAME, PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, COMMAND_LINE_PATH, SAPLOGON_PATH
+from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME, COMMAND_LINE_PATH, SAPLOGON_PATH
 from sap.config import Config
 
 

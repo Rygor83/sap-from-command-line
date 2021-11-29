@@ -14,7 +14,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy_utils import drop_database, database_exists
 
 import sap.utilities as utilities
-from sap.file_names import DATABASE_NAME
+from sap.api import DATABASE_NAME
 from sap.exceptions import DatabaseDoesNotExists
 from sap.exceptions import DatabaseExists, DatabaseDoesNotExists
 

@@ -17,8 +17,8 @@ from sap.database import SapDB
 from sap.crypto import Crypto
 from sap.api import Sap_system
 from sap.config import Config
-from sap.file_names import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
-from sap.file_names import COMMAND_LINE_PATH, SAPLOGON_PATH, DEBUG_FILE_NAME
+from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, COMMAND_LINE_PATH, SAPLOGON_PATH, \
+    DEBUG_FILE_NAME
 
 
 ########################################################################################################################

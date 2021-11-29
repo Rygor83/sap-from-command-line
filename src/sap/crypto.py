@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from sap import utilities
-from sap.file_names import PRIVATE_KEY_NAME, PUBLIC_KEY_NAME
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME
 from sap.exceptions import EncryptionKeysAlreadyExist
 
 
