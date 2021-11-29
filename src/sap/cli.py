@@ -91,13 +91,14 @@ def logon(ctx):
 @click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
 @click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
 @click.option("-s", "--system_command", "system_command",
-              help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>")
+              help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>, /h")
+@click.option("-r", "--report", "report", help="Run report ", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True,
               show_default=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
-        language: str, transaction: str, system_command: str, parameter: str, web: bool):
+        language: str, transaction: str, system_command: str, report: str, parameter: str, web: bool):
     """
     \b
     Launch SAP system \n
@@ -154,11 +155,14 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                                              description.upper() if description else None,
                                              None)
 
-                utilities.print_system_list(no_system_found, "NO URL FOUND according to search criteria",
-                                            color=utilities.color_warning, )
+                utilities.print_system_list(sap_systems=no_system_found,
+                                            title="NO URL FOUND according to search criteria",
+                                            color=utilities.color_warning)
                 raise click.Abort
         else:
             if transaction:
+                command = transaction
+                command_type = 'transaction'
 
                 item = "-type=transaction"
                 argument.append(item)
@@ -180,21 +184,30 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 else:
                     item = "-command=" + transaction
                     argument.append(item)
+            elif system_command:
+                command = system_command
+                command_type = 'system command'
 
-            if system_command:
-                # TODO: можно как-нибудь сделать, чтобы можно было посылать системные конманды
-                #   item = "-type=SystemCommand" -
                 item = "-type=SystemCommand"
                 argument.append(item)
                 item = "-command=" + system_command
+                argument.append(item)
+            elif report:
+                command = report
+                command_type = 'report'
+
+                item = "-type=report"
+                argument.append(item)
+                item = "-command=" + report
                 argument.append(item)
 
             if external_user:
                 message = "Trying to LAUNCH the following system with EXTERNAL USERS"
             else:
-                message = "Trying to LAUNCH the following system"
-            utilities.print_system_list(selected_system, message,
-                                        transaction=transaction if transaction else system_command)
+                message = "Trying to LAUNCH the following system with "
+
+            utilities.print_system_list(sap_systems=selected_system, title=message,
+                                        command=command, command_type=command_type)
 
             # Запускаем SAP
             ret = call(argument)
@@ -656,7 +669,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                                           str(customer).upper() if customer else "",
                                           description.upper() if description else "",
                                           "")]
-            utilities.print_system_list(no_system_found, "NOTHING FOUND according to search criteria",
+            utilities.print_system_list(sap_systems=no_system_found, title="NOTHING FOUND according to search criteria",
                                         color=utilities.color_warning, )
             return list()
         else:
@@ -664,7 +677,8 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                 Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6])
                 for item in result]
 
-            utilities.print_system_list(sap_system, "Available systems", verbose=verbose, url=url, enum=enum)
+            utilities.print_system_list(sap_systems=sap_system, title="Available systems", verbose=verbose, url=url,
+                                        enum=enum)
             if verbose:
                 click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
                 try:
