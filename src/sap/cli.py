@@ -89,8 +89,7 @@ def logon(ctx):
     "-eu", "--external_user", "external_user", help="Flag. Launch sap system with external user (outside database)",
     default=False, is_flag=True, show_default=True)
 @click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
-@click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system",
-              type=click.STRING)
+@click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
 @click.option("-s", "--system_command", "system_command",
               help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>")
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
@@ -194,7 +193,8 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 message = "Trying to LAUNCH the following system with EXTERNAL USERS"
             else:
                 message = "Trying to LAUNCH the following system"
-            utilities.print_system_list(selected_system, message, transaction=transaction)
+            utilities.print_system_list(selected_system, message,
+                                        transaction=transaction if transaction else system_command)
 
             # Запускаем SAP
             ret = call(argument)
@@ -698,10 +698,10 @@ def keys(ctx):
         raise click.Abort
 
 
-@sap_cli.command("about", help="Show 'About SAP logon' window")
+@sap_cli.command("about", help="Display 'About SAP logon' window")
 @click.pass_context
 def about(ctx):
-    """ Show 'About SAP logon' window """
+    """ Displays a dialog box with version information about SAP shortcut """
     parameter = "-version"
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
@@ -709,10 +709,10 @@ def about(ctx):
         click.echo(f"{err}")
 
 
-@sap_cli.command("shortcut", help="Show 'SAP GUI Shortcut' window")
+@sap_cli.command("shortcut", help="Display 'SAP GUI Shortcut' window")
 @click.pass_context
 def shortcut(ctx):
-    """ Show 'SAP GUI Shortcut' window """
+    """ Displays a brief help text about the parameterization of SAP shortcut """
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, "-help")
     except WrongPath as err:
