@@ -40,8 +40,6 @@ def sap_cli(ctx, config_path: str):
     Run 'sap start' to start working
     """
 
-    # ctx.ensure_object(dict)
-
     ctx.obj = Obj_structure()
 
     # ========= CONFIG =========
@@ -84,30 +82,30 @@ def logon(ctx):
 @sap_cli.command("run")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
-                                           "if several users exist for one system, or user outside of the database",
-              )
-@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING)
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option(
-    "-eu", "--external_user", "external_user", help="Launch sap system with external user (outside database)",
-    type=click.BOOL, default=False, is_flag=True,
-)
-@click.option("-l", "--language", "language", help="Language to logon", default="RU")
-@click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system", )
-@click.option("-s", "--system_command", "system_command", help="Run system_command", )
+    "-eu", "--external_user", "external_user", help="Flag. Launch sap system with external user (outside database)",
+    default=False, is_flag=True, show_default=True)
+@click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
+@click.option("-t", "--transaction", "transaction", help="Transaction to start after loggin on to SAP system",
+              type=click.STRING)
+@click.option("-s", "--system_command", "system_command",
+              help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>")
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
-@click.option("-w", "--web", "web", is_flag=True, help="Launch system web site")
+@click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True,
+              show_default=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
-        language: str, transaction: str, system_command: str, parameter: str, web: bool = False):
+        language: str, transaction: str, system_command: str, parameter: str, web: bool):
     """
     \b
     Launch SAP system \n
     \b
     Optional arguments:
-    1. SYSTEM - system id from saplogon
-    2. MANDANT - mandant or client id of sap system
+    1. SYSTEM: Request a SAP system by systedm id
+    2. MANDANT: Request a SAP system by mandant/client
     """
     password = ""
 
@@ -129,6 +127,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         selected_sap_systems = [
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
+
+        if language is None:
+            language = ctx.obj.config.language
 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
@@ -205,27 +206,26 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debuggin")
 @click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="User")
-@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-pw", "--password", "password", help="Password")
-@click.option("-l", "--language", "language", help="Logon language", default="RU")
-@click.option("-f", "--file", "file", help="Create debug file", is_flag=True, type=click.BOOL)
-@click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
-              help='Do you need to open folder with debug file')
+@click.option("-u", "--user", "user", help="Request a SAP system by user")
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
+@click.option("-l", "--language", "language", help="Logon language")
+@click.option("-f", "--file", "file", help="Flag. Create debug file", is_flag=True, type=click.BOOL, show_default=True)
+@click.option('-o', "--open_debug_file", "open_file", help="Flag. Open file with debug file", is_flag=True,
+              default=True, show_default=True)
 @click.pass_context
-def debug(ctx, system, mandant="", user="", customer="", description="", password="", language: str = "RU", file=False,
-          open_file=True):
+def debug(ctx, system: str, mandant: str, user: str, customer: str, description: str, language: str, file: bool,
+          open_file: bool):
     """
     \b
     System debug
     You can:
     1. Creat debug file - to debug modal dialog box: run 'sap debug -f'
-    2. Start debuggin of the opened system (the last used windows will be used): SAP DEBUG <SYSTEM> <MANDANT>
+    2. Start debuggin of the opened system (the last used windows will be used): run 'sap debug <system> <mandant>'
     \b
     Optional arguments:
-    1. SYSTEM - system id from saplogon
-    2. MANDANT - mandant or client id of sap system
+    1. SYSTEM: Request a SAP system by system
+    2. MANDANT: Request a SAP system by mandant/clien
     """
 
     if file:
@@ -256,12 +256,15 @@ def debug(ctx, system, mandant="", user="", customer="", description="", passwor
                 Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
                 for item in query_result]
 
+            if language is None:
+                language = ctx.obj.config.language
+
             # As soon as dubugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
             #  as it influence whether to open new windows, or to debug the latest opened. All arguments
             #  values must be entered
             selected_system = utilities.choose_system(selected_sap_systems)
             try:
-                argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+                argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
                                                                          language,
                                                                          user, "",
                                                                          ctx.obj.config.command_line_path)
@@ -282,19 +285,19 @@ def debug(ctx, system, mandant="", user="", customer="", description="", passwor
 @sap_cli.command("stat")
 @click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="User")
-@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-l", "--language", "language", help="Logon language", default="RU")
+@click.option("-u", "--user", "user", help="Request a SAP system by user")
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
+@click.option("-l", "--language", "language", help="Logon language")
 @click.pass_context
-def stat(ctx, system, mandant="", user="", customer="", description="", language: str = "RU"):
+def stat(ctx, system: str, mandant: str, user: str, customer: str, description: str, language: str):
     """
     \b
-    Displays sap system status\n
+    Displays 'System: status' window \n
     \b
     Optional arguments:
-    1. SYSTEM - system id from saplogon
-    2. MANDANT - mandant or client id of sap system
+    1. SYSTEM: Request a SAP system by system id
+    2. MANDANT: Request a SAP system by mandant/client
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -305,6 +308,9 @@ def stat(ctx, system, mandant="", user="", customer="", description="", language
         selected_sap_systems = [
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
             for item in query_result]
+
+        if language is None:
+            language = ctx.obj.config.language
 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
@@ -329,26 +335,24 @@ def stat(ctx, system, mandant="", user="", customer="", description="", language
 @sap_cli.command("pw")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
-                                           "if several users exist for one system, or user outside of the database",
-              )
-@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
+@click.option("-u", "--user", "user", help="Request a SAP system by user")
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option('-c', "--clear_clipboard", "clear_clipboard", is_flag=True, default=True,
-              help='Clear clipboard: True, False. Default value: True')
+              help='Flag. Clear clipboard.', show_default=True)
 @click.option('-t', "--time_to_clear", "time_to_clear", default=10, type=click.INT,
-              help='Timer in secornds to clear clipboard. Default value: 15')
+              help='Timer in seconds to clear clipboard', show_default=True)
 @click.pass_context
-def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool = True,
-       time_to_clear: int = 10):
+def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool,
+       time_to_clear: int):
     """
     \b
     Copy password for the requested system into clipboard.
     Script waits 15 seconds and clears clipboard.\n
     \b
     Optional argument:
-    1. SYSTEM ID - system id from saplogon
-    2. MANDANT - mandant or client id of sap system
+    1. SYSTEM: Request a SAP system by system id
+    2. MANDANT: Request a SAP system by mandant/client
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -399,16 +403,18 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 
 
 @sap_cli.command("add")
-@click.option("-system", prompt=True, help="System", type=utilities.LETTERS_NUMBERS_3)
-@click.option("-mandant", prompt=True, help="Client", type=click.IntRange(1, 999))
+@click.option("-system", prompt=True, help="System Id", type=utilities.LETTERS_NUMBERS_3)
+@click.option("-mandant", prompt=True, help="Mandant/Client number", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="User")
 @click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
-@click.option("-customer", prompt=True, help="Customer", type=click.STRING, default="")
-@click.option("-description", prompt=True, help="Description", type=click.STRING, default="")
-@click.option("-url", prompt=True, help="Url", type=click.STRING, default="")
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
+@click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
+@click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
+@click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True,
+              show_default=True)
 @click.pass_context
-def add(ctx, system, mandant, user, password, description, customer, url: str = " ", verbose: bool = True):
+def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
+        verbose: bool):
     """
     Add sap system with it's parameters to db. Just run 'sap add' and follow instructions.
     """
@@ -454,21 +460,20 @@ def add(ctx, system, mandant, user, password, description, customer, url: str = 
 @sap_cli.command("update", short_help="Update record from database")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
-                                           "if several users exist for one system, or user outside of the database",
-              )
-@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
+@click.option("-u", "--user", "user", help="Request a SAP system by user")
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True,
+              show_default=True)
 @click.pass_context
-def update(ctx, system, mandant, user, customer, description, verbose: bool = False):
+def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, verbose: bool):
     """
     \b
-    Update password, customer, system description or url of the selected record from database\n
+    Update password, customer, system description or url of the requested record from database\n
     \b
     Optional arguments:
-    1. SYSTEM - system id from saplogon
-    2. MANDANT - mandant or client id of sap system
+    1. SYSTEM: Request a SAP system by system id
+    2. MANDANT: Request a SAP system by mandant/client
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -531,21 +536,20 @@ def update(ctx, system, mandant, user, customer, description, verbose: bool = Fa
 @sap_cli.command("delete")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
-                                           "if several users exist for one system, or user outside of the database",
-              )
-@click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command")
+@click.option("-u", "--user", "user", help="Request a SAP system by usdf")
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
+@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", default=None,
+              type=click.BOOL, show_default=True)
 @click.pass_context
 def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm: bool):
     """
     \b
-    Delete selected record from database\n
+    Delete requested record about SAP system from database\n
     \b
     Optional arguments:
-    1. SYSTEM - system id from saplogon
-    2. MANDANT - mandant or client id of sap system
+    1. SYSTEM: Request a SAP system by system id
+    2. MANDANT: Request a SAP system by mandant/client
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -611,12 +615,17 @@ def config(ctx):
 @sap_cli.command("list", short_help="Print information about SAP systems")
 @click.argument("system", required=False, type=click.STRING, default=None)
 @click.argument("mandant", required=False, type=click.IntRange(0, 999), default=None)
-@click.option("-u", "--user", "user", help="Show systems by user", type=click.STRING, default=None)
-@click.option("-c", "--customer", "customer", help="Show systems by customer", type=click.STRING, default=None)
-@click.option("-d", "--description", "description", help="Show systems by description", type=click.STRING, default=None)
-@click.option("-url", "--url", "url", help="Display url", is_flag=True, type=click.BOOL, default=False)
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=False)
-@click.option("-e", "--enum", "enum", help="Enumerate systems", is_flag=True, default=False)
+@click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING, default=None)
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING, default=None)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING,
+              default=None)
+@click.option("-url", "--show_url", "url", help="Flag. Display url of the requested SAP sytem", is_flag=True,
+              type=click.BOOL,
+              default=False, show_default=True)
+@click.option("-v", "--verbose", "verbose", help="Flag. Display passwords of the requested SAP sytem", is_flag=True,
+              type=click.BOOL, default=False, show_default=True)
+@click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, type=click.BOOL, default=False,
+              show_default=True)
 @click.pass_context
 def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool,
                  verbose: bool, enum: bool) -> list:
@@ -625,10 +634,10 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
     Print information about SAP systems \b
     \b
     Optional arguments:
-    1. System: System Id
-    2. Mandant: Mandant num\n
+    1. System: Request a SAP system by system id
+    2. Mandant: Request a SAP system by mandant/client\n
     \b
-    If no arguments - print information about all systems
+    If no arguments - print information about all SAP systems from database
     """
 
     result = ""
@@ -670,7 +679,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
 @sap_cli.command("db")
 @click.pass_context
 def database(ctx):
-    """ Database creation. This command is used for technical reasons. Better run 'sap start'. """
+    """ Database creation. This command is used for technical purpose. Better run 'sap start' command. """
     try:
         ctx.obj.database.create()
     except DatabaseExists as err:
@@ -681,7 +690,7 @@ def database(ctx):
 @sap_cli.command("keys")
 @click.pass_context
 def keys(ctx):
-    """ Encryption keys creation. This command is used for technical reasons. Better run 'sap start'. """
+    """ Encryption keys creation. This command is used for technical purpose. Better run 'sap start' command. """
     try:
         ctx.obj.crypto.generate_keys()
     except EncryptionKeysAlreadyExist as err:

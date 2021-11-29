@@ -57,11 +57,9 @@ def config_tmp_path(tmp_path, crypto):
     """ Create specific config with tmp_dir """
     cfg = Config(config_path=tmp_path,
                  db_path=tmp_path.joinpath(DATABASE_NAME),
-                 # db_path=temp_db.database_path,
                  db_type='sqlite',
                  public_key_path=crypto.public_key_path,
-                 private_key_path=crypto.private_key_path,
-                 language='RU')
+                 private_key_path=crypto.private_key_path)
     cfg.create()
     yield cfg
     cfg.remove_config()
@@ -98,10 +96,6 @@ def add_system_to_temp_database(temp_db, config_tmp_path, runner):
                                  "-customer", "CUSTOMER",
                                  "-description", "DEV_SYSTEM",
                                  "-url", "", '-v'])
-    # yield result
-    # result = runner.invoke(sap_cli,
-    #                        args=["-path", config_tmp_path.config_path,
-    #                              "delete", "zzz", "100", "-confirm", "y"])
 
 
 def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_database):
@@ -117,7 +111,7 @@ def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_databas
                              '+----------+--------+---------+-------------+------+\n')
 
 
-def test_delete_record_temp_db(temp_db, config_tmp_path, runner):
+def test_delete_record_temp_db(runner, temp_db, config_tmp_path):
     """ Test DELETE command in temporary database"""
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path,
