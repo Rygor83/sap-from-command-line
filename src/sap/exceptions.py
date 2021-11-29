@@ -6,12 +6,12 @@
 
 # TODO: Добавить обработчик для Crypto и убрать из Crypto любые сообщения
 
-# ===============+++++++++ CONFIG ===============+++++++++
+# ========================== CONFIG ==========================
 
 class ConfigExists(Exception):
     """ Exception. Config file already exists """
 
-    def __init__(self, config_path, message="sap_config.ini already exists"):
+    def __init__(self, config_path, message="SAP_CONFIG.INI already exists"):
         self.message = f"\n{message}. \nPath: {config_path}"
         super().__init__(self.message)
 
@@ -19,8 +19,8 @@ class ConfigExists(Exception):
 class ConfigDoesNotExists(Exception):
     """ Exception. Config file does not exist """
 
-    def __init__(self, path, message="sap_config.ini does not exist"):
-        self.message = f"\n{message}. \nCheck path: {path}"
+    def __init__(self, path, message="SAP_CONFIG.INI does not exist."):
+        self.message = f"\n{message}. \nCheck path: {path} \nEither run 'sap start' or 'sap config -create' to create and edit config"
         super().__init__(self.message)
 
 
@@ -40,7 +40,7 @@ class WrongPath(Exception):
         super().__init__(self.message)
 
 
-# ===============+++++++++ CONFIG ===============+++++++++
+# ========================== DATABASE ==========================
 
 class DatabaseExists(Exception):
     """Base class for other exceptions"""
@@ -58,7 +58,7 @@ class DatabaseDoesNotExists(Exception):
         super().__init__(self.message)
 
 
-# ===============+++++++++ CRYPTO ===============+++++++++
+# ========================== CRYPTO ==========================
 
 class PublicKeyAlreadyExists(Exception):
     """ Exception. Public key already exists """

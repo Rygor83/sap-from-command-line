@@ -25,13 +25,20 @@ from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAM
 from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
     EncryptionKeysAlreadyExist, DatabaseExists
 
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
-@click.group()
+
+@click.group(context_settings=CONTEXT_SETTINGS)
 @click.pass_context
 @click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
 @click.version_option(version=sap.__version__)
 def sap_cli(ctx, config_path: str):
-    """Command line tool to launch SAP systems from saplogon application"""
+    """
+    \b
+    Command line tool to launch SAP systems from SAPLogon\n
+    \b
+    Run 'sap start' to start working
+    """
 
     # ctx.ensure_object(dict)
 
@@ -40,7 +47,7 @@ def sap_cli(ctx, config_path: str):
     # ========= CONFIG =========
     ctx.obj.config = sap.config.Config(config_path)
 
-    if ctx.invoked_subcommand != "start":
+    if ctx.invoked_subcommand != "start" and ctx.invoked_subcommand != "config":
         try:
             _config = ctx.obj.config.read()
         except ConfigDoesNotExists as err:
@@ -95,10 +102,11 @@ def logon(ctx):
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, transaction: str, system_command: str, parameter: str, web: bool = False):
     """
+    \b
     Launch SAP system \n
-
-    Optional arguments: \n
-    1. SYSTEM - system id from saplogon \n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
     2. MANDANT - mandant or client id of sap system
     """
     password = ""
@@ -194,7 +202,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 click.echo(ret)
 
 
-@sap_cli.command("debug")
+@sap_cli.command("debug", short_help="System debug: either create debug file or start system debuggin")
 @click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="User")
@@ -209,14 +217,15 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 def debug(ctx, system, mandant="", user="", customer="", description="", password="", language: str = "RU", file=False,
           open_file=True):
     """
-    System debug \n
-    You can: \n
-    1. Creat debug file - to debug modal dialog box: SAP DEBUG -f \n
-    2. Start debuggin of the opened system (the last used windows will be used): SAP DEBUG <SYSTEM> <MANDANT> \n
-
-    Optional arguments: \n
-    1. SYSTEM - system id from saplogon \n
-    2. MANDANT - mandant or client id of sap system \n
+    \b
+    System debug
+    You can:
+    1. Creat debug file - to debug modal dialog box: run 'sap debug -f'
+    2. Start debuggin of the opened system (the last used windows will be used): SAP DEBUG <SYSTEM> <MANDANT>
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
     """
 
     if file:
@@ -276,17 +285,16 @@ def debug(ctx, system, mandant="", user="", customer="", description="", passwor
 @click.option("-u", "--user", "user", help="User")
 @click.option("-c", "--customer", "customer", help="Launch sap system by customer id", type=click.STRING)
 @click.option("-d", "--description", "description", help="Launch sap system by customer id", type=click.STRING)
-@click.option("-pw", "--password", "password", help="Password")
 @click.option("-l", "--language", "language", help="Logon language", default="RU")
 @click.pass_context
-def stat(ctx, system, mandant="", user="", customer="", description="", password="", language: str = "RU"):
+def stat(ctx, system, mandant="", user="", customer="", description="", language: str = "RU"):
     """
-    Displays sap system status \n
-    You can: \n
-
-    Optional arguments: \n
-    1. SYSTEM - system id from saplogon \n
-    2. MANDANT - mandant or client id of sap system \n
+    \b
+    Displays sap system status\n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -300,7 +308,7 @@ def stat(ctx, system, mandant="", user="", customer="", description="", password
 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
-            argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
+            argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
                                                                      language,
                                                                      user, "",
                                                                      ctx.obj.config.command_line_path)
@@ -334,14 +342,13 @@ def stat(ctx, system, mandant="", user="", customer="", description="", password
 def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool = True,
        time_to_clear: int = 10):
     """
+    \b
     Copy password for the requested system into clipboard.
-    Script waits 15 seconds and clears clipboard.
-
-    Required arguments: \n
-    1. SYSTEM ID - system id from saplogon \n \n
-
-    Optional argument: \n
-    2. MANDANT - mandant or client id of sap system \n
+    Script waits 15 seconds and clears clipboard.\n
+    \b
+    Optional argument:
+    1. SYSTEM ID - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -403,9 +410,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 @click.pass_context
 def add(ctx, system, mandant, user, password, description, customer, url: str = " ", verbose: bool = True):
     """
-    Add sap system with it's parameters to db.
-
-    Just run SAP ADD and enter system parameters
+    Add sap system with it's parameters to db. Just run 'sap add' and follow instructions.
     """
 
     with _sap_db(ctx.obj.config):
@@ -446,7 +451,7 @@ def add(ctx, system, mandant, user, password, description, customer, url: str = 
                 click.clear()
 
 
-@sap_cli.command("update")
+@sap_cli.command("update", short_help="Update record from database")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="User id. Either user from database to narrow system selection "
@@ -458,9 +463,12 @@ def add(ctx, system, mandant, user, password, description, customer, url: str = 
 @click.pass_context
 def update(ctx, system, mandant, user, customer, description, verbose: bool = False):
     """
-    Update selected records of database
-
-    Just run SAP UPDATE and enter system parameters to update
+    \b
+    Update password, customer, system description or url of the selected record from database\n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -531,7 +539,14 @@ def update(ctx, system, mandant, user, customer, description, verbose: bool = Fa
 @click.option("-confirm", "--confirm", "confirm", help="Confirm delete command")
 @click.pass_context
 def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm: bool):
-    """ Delete SAP system from database """
+    """
+    \b
+    Delete selected record from database\n
+    \b
+    Optional arguments:
+    1. SYSTEM - system id from saplogon
+    2. MANDANT - mandant or client id of sap system
+    """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
                               description=description, url=False, verbose=False, enum=True)
@@ -586,14 +601,14 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
               help='Open config file')
 @click.pass_context
 def config(ctx):
-    """Создание конфигурационного ini файла"""
+    """ Config file creation or editing """
 
     click.echo("Enter one of subcommands:")
     click.echo("\t -create - Create config file")
     click.echo("\t -open   - Open config file")
 
 
-@sap_cli.command("list")
+@sap_cli.command("list", short_help="Print information about SAP systems")
 @click.argument("system", required=False, type=click.STRING, default=None)
 @click.argument("mandant", required=False, type=click.IntRange(0, 999), default=None)
 @click.option("-u", "--user", "user", help="Show systems by user", type=click.STRING, default=None)
@@ -606,12 +621,13 @@ def config(ctx):
 def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool,
                  verbose: bool, enum: bool) -> list:
     """
-    Print information about SAP systems
-
-    Optional arguments: \n
-    1. System: System Id \n
-    2. Mandant: Mandant num \n
-
+    \b
+    Print information about SAP systems \b
+    \b
+    Optional arguments:
+    1. System: System Id
+    2. Mandant: Mandant num\n
+    \b
     If no arguments - print information about all systems
     """
 
@@ -654,7 +670,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
 @sap_cli.command("db")
 @click.pass_context
 def database(ctx):
-    """Создание базы данных для хранеия информкции о SAP системах"""
+    """ Database creation. This command is used for technical reasons. Better run 'sap start'. """
     pass
     # db = Database()
     # db.create()
@@ -663,7 +679,7 @@ def database(ctx):
 @sap_cli.command("keys")
 @click.pass_context
 def keys(ctx):
-    """ Создание ключей шифрования """
+    """ Encryption keys creation. This command is used for technical reasons. Better run 'sap start'. """
     try:
         ctx.obj.crypto.generate_keys()
     except EncryptionKeysAlreadyExist as err:
@@ -671,9 +687,9 @@ def keys(ctx):
         raise click.Abort
 
 
-@sap_cli.command("ver", help="Current version of SAP shortcut")
+@sap_cli.command("about", help="Show 'About SAP logon' window")
 @click.pass_context
-def shortcut_version(ctx):
+def about(ctx):
     # Считываем конфигурационный файл
     parameter = "-version"
     try:
@@ -682,9 +698,9 @@ def shortcut_version(ctx):
         click.echo(f"{err}")
 
 
-@sap_cli.command("help", help="SAP GUI shortcut help")
+@sap_cli.command("shortcut", help="Show 'SAP GUI Shortcut' window")
 @click.pass_context
-def shortcut_help(ctx):
+def shortcut(ctx):
     # Считываем конфигурационный файл
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, "-help")
@@ -692,10 +708,11 @@ def shortcut_help(ctx):
         click.echo(f"{err}")
 
 
-@sap_cli.command("start")
+@sap_cli.command("start", short_help="Starting point for working wiht SAP command line tool")
 @click.pass_context
 def start(ctx):
     """
+    \b
     Starting point for working wiht SAP command line tool
     1. Database creation.
     2. ini file with config parameters createion.
@@ -755,7 +772,7 @@ def start(ctx):
     click.launch(ctx.obj.config.config_file_path, locate=True)
 
 
-@sap_cli.command("backup")
+@sap_cli.command("backup", short_help="Create backup")
 @click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
               type=utilities.PASS_REQUIREMENT)
 @click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
@@ -763,11 +780,12 @@ def start(ctx):
 @click.pass_context
 def backup(ctx, password, open_file=True):
     """
-    Create back up for the following files: \n
-    1. saplogon systems (SAPUILandscape.xml) \n
-    2. database \n
-    3. cypher files \n
-    4. sap_config.ini \n
+    \b
+    Create backup for the following files:
+    1. list of saplogon systems (SAPUILandscape.xml)
+    2. database
+    3. encryption keys (private and public)
+    4. sap_config.ini
     """
 
     #  Paths to SAPUILandscape.xml: https://launchpad.support.sap.com/#/notes/2075150

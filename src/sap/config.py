@@ -149,4 +149,7 @@ def create_config(ctx, param, value):
     except ConfigExists as err:
         print(f"{err}")
         raise click.Abort
+
+    click.launch(ctx.obj.config.config_file_path, locate=True)
+
     ctx.exit()
