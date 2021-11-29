@@ -8,7 +8,6 @@ import sqlalchemy
 import click
 from sap.exceptions import DatabaseDoesNotExists
 
-# Sap system parameters : [system: str, mandant: int, user: str, password: byte]
 Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'customer', 'description', 'url'])
 Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None)
 
@@ -110,6 +109,7 @@ class Obj_structure:
         config: sap.config.Config = None
         crypto: Crypto = None
         database: sap.database.SapDB = None
+
 
 # File names
 PUBLIC_KEY_NAME = 'public_key.txt'

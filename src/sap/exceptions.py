@@ -4,8 +4,6 @@
 """ Custom Exceptions """
 
 
-# TODO: Добавить обработчик для Crypto и убрать из Crypto любые сообщения
-
 # ========================== CONFIG ==========================
 
 class ConfigExists(Exception):
@@ -24,16 +22,8 @@ class ConfigDoesNotExists(Exception):
         super().__init__(self.message)
 
 
-class FileDoesNotExists(Exception):
-    """Base class for other exceptions"""
-
-    def __init__(self, path, file_name):
-        self.message = f"\nParameters {file_name}. Path does not exist: {path}"
-        super().__init__(self.message)
-
-
 class WrongPath(Exception):
-    """Base class for other exceptions"""
+    """ Exception. SAP executables do not exist """
 
     def __init__(self, file, path, message="SAP executable does not exist:"):
         self.message = f'\n{message} {file} \nCheck the following path: {path}'
@@ -43,7 +33,7 @@ class WrongPath(Exception):
 # ========================== DATABASE ==========================
 
 class DatabaseExists(Exception):
-    """Base class for other exceptions"""
+    """ Exception. Database already exists """
 
     def __init__(self, db_path, message="Database already exists"):
         self.message = f"\n{message}. Path: {db_path}"
@@ -51,7 +41,7 @@ class DatabaseExists(Exception):
 
 
 class DatabaseDoesNotExists(Exception):
-    """Base class for other exceptions"""
+    """Exception. Database does not exist"""
 
     def __init__(self, path, message="Database does not exist or there is no possibility for connection."):
         self.message = f"\n{message}. \nCheck the following path: {path}"

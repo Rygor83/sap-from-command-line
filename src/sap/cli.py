@@ -671,9 +671,11 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
 @click.pass_context
 def database(ctx):
     """ Database creation. This command is used for technical reasons. Better run 'sap start'. """
-    pass
-    # db = Database()
-    # db.create()
+    try:
+        ctx.obj.database.create()
+    except DatabaseExists as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
 
 
 @sap_cli.command("keys")
@@ -690,7 +692,7 @@ def keys(ctx):
 @sap_cli.command("about", help="Show 'About SAP logon' window")
 @click.pass_context
 def about(ctx):
-    # Считываем конфигурационный файл
+    """ Show 'About SAP logon' window """
     parameter = "-version"
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
@@ -701,7 +703,7 @@ def about(ctx):
 @sap_cli.command("shortcut", help="Show 'SAP GUI Shortcut' window")
 @click.pass_context
 def shortcut(ctx):
-    # Считываем конфигурационный файл
+    """ Show 'SAP GUI Shortcut' window """
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, "-help")
     except WrongPath as err:
