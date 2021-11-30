@@ -25,7 +25,7 @@ from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAM
 from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
     EncryptionKeysAlreadyExist, DatabaseExists
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'], show_default=True, token_normalize_func=lambda x: x.lower())
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -87,15 +87,14 @@ def logon(ctx):
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option(
     "-eu", "--external_user", "external_user", help="Flag. Launch sap system with external user (outside database)",
-    default=False, is_flag=True, show_default=True)
+    default=False, is_flag=True)
 @click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
 @click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
 @click.option("-s", "--system_command", "system_command",
               help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>, /h")
 @click.option("-r", "--report", "report", help="Run report ", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
-@click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True,
-              show_default=True)
+@click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, transaction: str, system_command: str, report: str, parameter: str, web: bool):
@@ -200,6 +199,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 argument.append(item)
                 item = "-command=" + report
                 argument.append(item)
+            else:
+                command = None
+                command_type = None
 
             if external_user:
                 message = "Trying to LAUNCH the following system with EXTERNAL USERS"
@@ -225,9 +227,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option("-l", "--language", "language", help="Logon language")
-@click.option("-f", "--file", "file", help="Flag. Create debug file", is_flag=True, type=click.BOOL, show_default=True)
+@click.option("-f", "--file", "file", help="Flag. Create debug file", is_flag=True, type=click.BOOL)
 @click.option('-o', "--open_debug_file", "open_file", help="Flag. Open file with debug file", is_flag=True,
-              default=True, show_default=True)
+              default=True)
 @click.pass_context
 def debug(ctx, system: str, mandant: str, user: str, customer: str, description: str, language: str, file: bool,
           open_file: bool):
@@ -354,9 +356,9 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option('-c', "--clear_clipboard", "clear_clipboard", is_flag=True, default=True,
-              help='Flag. Clear clipboard.', show_default=True)
+              help='Flag. Clear clipboard.')
 @click.option('-t', "--time_to_clear", "time_to_clear", default=10, type=click.INT,
-              help='Timer in seconds to clear clipboard', show_default=True)
+              help='Timer in seconds to clear clipboard')
 @click.pass_context
 def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool,
        time_to_clear: int):
@@ -425,8 +427,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 @click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True,
-              show_default=True)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
 @click.pass_context
 def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
         verbose: bool):
@@ -478,8 +479,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True,
-              show_default=True)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
 @click.pass_context
 def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, verbose: bool):
     """
@@ -555,7 +555,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", default=None,
-              type=click.BOOL, show_default=True)
+              type=click.BOOL)
 @click.pass_context
 def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm: bool):
     """
@@ -636,11 +636,10 @@ def config(ctx):
               default=None)
 @click.option("-url", "--show_url", "url", help="Flag. Display url of the requested SAP sytem", is_flag=True,
               type=click.BOOL,
-              default=False, show_default=True)
+              default=False)
 @click.option("-v", "--verbose", "verbose", help="Flag. Display passwords of the requested SAP sytem", is_flag=True,
-              type=click.BOOL, default=False, show_default=True)
-@click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, type=click.BOOL, default=False,
-              show_default=True)
+              type=click.BOOL, default=False)
+@click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, type=click.BOOL, default=False)
 @click.pass_context
 def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool,
                  verbose: bool, enum: bool) -> list:
