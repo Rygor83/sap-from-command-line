@@ -10,7 +10,7 @@ setup(
     name='sap',
     version='3.0',  # Версию нужно править и в __init__.py
     license='MIT',
-    description='SAP launcher from command line',
+    description='Command line tool for launching SAP systems from SAPLogon',
 
     author='Rygor',
     author_email='pisemco@gmail.com',

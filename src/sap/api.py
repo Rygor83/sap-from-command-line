@@ -83,7 +83,6 @@ def query_param(transaction):
 
 
 _sapdb = None
-_config = None
 
 
 def start_sap_db(db_path, db_type):
