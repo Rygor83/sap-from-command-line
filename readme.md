@@ -1,10 +1,10 @@
-# sap
+# sap from command line
 
-[![Python 3.9+](resources/images/python-v3.9+-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.9+](docs/resources/images/python-v3.9+-blue.svg)](https://www.python.org/downloads/release/python-390/)
 
-[![Windows](resources/images/os-windows-blue.svg)](https://github.com/Rygor83/sap-command-line)
+[![Windows](docs/resources/images/os-windows-blue.svg)](https://github.com/Rygor83/sap-command-line)
 
-[![GitHub license](resources/images/license-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![GitHub license](docs/resources/images/license-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 
 Windows Command line tool for launching SAP systems from SAPlogon for SAP consultant and advanced SAP users.
 
