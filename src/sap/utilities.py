@@ -5,7 +5,7 @@ import typing
 import click
 import traceback
 import os
-from subprocess import call
+from subprocess import Popen
 import operator
 import re
 from prettytable import PrettyTable
@@ -23,20 +23,26 @@ color_sensitive = {'bg': 'red', 'fg': 'white'}
 
 
 def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, user, transaction="",
-                                        sapshcut_exe_path: str = "") -> list:
+                                        sapshcut_exe_path: str = "") -> str:  # list:
     # Добавляем параметры для запуска SAP системы
     if not os.path.exists(sapshcut_exe_path):
         raise WrongPath("sapshcut.exe", sapshcut_exe_path)
 
-    argument = [
-        sapshcut_exe_path,  # Путь до sapshcut.exe
-        f"-system={selected_system.system}",  # Id системы
-        f"-client={str(selected_system.mandant).zfill(3)}",  # Номер манданта
-        f"-user={user}" if user else f"-user={selected_system.user}",  # Пользователь
-        f"-pw={password}" if password else f"-pw={selected_system.password}",  # Пароль
-        f"-language={language}",  # Язык для входа
-        "-maxgui",  # Развернуть окно на весь экран
-    ]
+    argument: str = ""
+    argument = argument + f'"{sapshcut_exe_path}"'  # Путь до sapshcut.exe
+    argument = argument + f" -system={selected_system.system}"  # Id системы
+    argument = argument + f" -client={str(selected_system.mandant).zfill(3)}"  # Номер манданта
+    if user:
+        argument = argument + f" -user={user}"  # Пользователь
+    else:
+        argument = argument + f" -user={selected_system.user}"  # Пользователь
+    if password:
+        argument = argument + f" -pw={password}"  # Пароль
+    else:
+        argument = argument + f" -pw={selected_system.password}"  # Пароль
+    argument = argument + f" -language={language}"  # Язык для входа
+    argument = argument + " -maxgui"  # Развернуть окно на весь экран
+
     return argument
 
 
@@ -49,7 +55,11 @@ def launch_command_line_with_params(command_line_path, param):
     argument = [command_line_path, param]
 
     # Запускаем SAP
-    call(argument)
+    pop = Popen(argument)
+    pop.wait()
+
+    if pop.returncode:
+        click.echo(pop.returncode, pop.communicate()[0])
 
 
 def launch_saplogon_with_params(saplogon):

@@ -27,8 +27,8 @@ class Sap(Base):
     mandant_num = Column(String(3), primary_key=True)
     user_id = Column(String(10), primary_key=True)
     password = Column(BLOB)
-    customer = Column(String(20), primary_key=False)
-    description = Column(String(20), primary_key=False)
+    customer = Column(String(20))
+    description = Column(String(20))
     url = Column(String(250), primary_key=False)
 
 

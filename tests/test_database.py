@@ -30,8 +30,8 @@ def db(database, tmpdir):
 def crypto(tmpdir):
     crypto = Crypto(os.path.join(tmpdir, PUBLIC_KEY_NAME), os.path.join(tmpdir, PRIVATE_KEY_NAME))
     crypto.generate_keys()
-
-    return crypto
+    yield crypto
+    crypto.remove_keys()
 
 
 @pytest.fixture

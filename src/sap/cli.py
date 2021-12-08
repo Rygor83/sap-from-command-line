@@ -7,10 +7,9 @@ import getpass
 import os
 from contextlib import contextmanager
 from datetime import datetime
-from subprocess import call
+from subprocess import Popen
 import click_log
 import logging
-
 import click
 import pyperclip
 import pyzipper
@@ -32,12 +31,14 @@ click_log.basic_config(logger)
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'], show_default=True, token_normalize_func=lambda x: x.lower())
 
+log_level = ['--log_level', '-l']
+
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.pass_context
 @click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
 @click.version_option(version=sap.__version__)
-@click_log.simple_verbosity_option(logger, default='ERROR')
+@click_log.simple_verbosity_option(logger, *log_level, default='ERROR')
 def sap_cli(ctx, config_path: str, verbosity=''):
     """
     \b
@@ -91,9 +92,8 @@ def logon(ctx):
 @click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING)
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
-@click.option(
-    "-eu", "--external_user", "external_user", help="Flag. Launch sap system with external user (outside database)",
-    default=False, is_flag=True)
+@click.option("-eu", "--external_user", "external_user", default=False, is_flag=True,
+              help="Flag. Launch sap system with external user (outside database)")
 @click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
 @click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
 @click.option("-s", "--system_command", "system_command",
@@ -169,42 +169,26 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 command = transaction
                 command_type = 'transaction'
 
-                item = "-type=transaction"
-                argument.append(item)
+                argument = argument + " -type=transaction"
 
                 if parameter:
-                    # TODO: Доделать запуск транзакции с параметрами: проблема с тем, что когда запускаешь код напрямую,
-                    #  например, '-command="/n*FBM1 BKPF-BUKRS=1000;"', то все работает.
-                    #  А если формировать код через переменные, например,
-                    #  f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""- то все плохо.
-
-                    # param_data = sap.query_param(str(transaction).upper())
-
-                    # item = f"-command=\"*{transaction.upper()} {param_data[0][1]}={parameter}\""
-                    # item = '-command=\"*TM_52 VTGFHA-BUKRS=TRM1; VTGFHA-RFHA=100000000057;\"'
-                    item = '-command="/n*FBM1 BKPF-BUKRS=1000;"'
-                    argument.append(item)
-
-                    click.echo(item)
+                    param_data = sap.query_param(str(transaction).upper())
+                    argument = argument + f' -command="{transaction.upper()} {param_data[0][1]}={parameter};"'
                 else:
-                    item = "-command=" + transaction
-                    argument.append(item)
+                    argument = argument + " -command=" + transaction
             elif system_command:
                 command = system_command
                 command_type = 'system command'
 
-                item = "-type=SystemCommand"
-                argument.append(item)
-                item = "-command=" + system_command
-                argument.append(item)
+                argument = argument + " -type=SystemCommand"
+                argument = argument + " -command=" + system_command
+
             elif report:
                 command = report
                 command_type = 'report'
 
-                item = "-type=report"
-                argument.append(item)
-                item = "-command=" + report
-                argument.append(item)
+                argument = argument + " -type=report"
+                argument = argument + " -command=" + report
             else:
                 command = None
                 command_type = None
@@ -220,10 +204,11 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
             logger.info(f"{argument}")
 
             # Запускаем SAP
-            ret = call(argument)
+            pop = Popen(argument)
+            pop.wait()
 
-            if ret:
-                click.echo(ret)
+            if pop.returncode:
+                click.echo(pop.returncode, pop.communicate()[0])
 
 
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debuggin")
@@ -295,16 +280,17 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
                 click.echo(f"{err}")
                 raise click.Abort
 
-            item = "-command=/H"
-            argument.append(item)
-            item = "-type=SystemCommand"
-            argument.append(item)
+            argument = argument + " -command=/H" + " -type=SystemCommand"
 
             utilities.print_system_list(selected_system, title="Trying to DEBUG the following system")
 
             logger.info(f"{argument}")
 
-            ret = call(argument)
+            pop = Popen(argument)
+            pop.wait()
+
+            if pop.returncode:
+                click.echo(pop.returncode, pop.communicate()[0])
 
 
 @sap_cli.command("stat")
@@ -347,16 +333,17 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
             click.echo(f"{err}")
             raise click.Abort
 
-        item = "-command=?STAT"
-        argument.append(item)
-        item = "-type=SystemCommand"
-        argument.append(item)
+        argument = argument + " -command=?STAT" + " -type=SystemCommand"
 
         utilities.print_system_list(selected_system, title="Opening STATUS of the following system")
 
         logger.info(f"{argument}")
 
-        ret = call(argument)
+        pop = Popen(argument)
+        pop.wait()
+
+        if pop.returncode:
+            click.echo(pop.returncode, pop.communicate()[0])
 
 
 @sap_cli.command("pw")
@@ -841,12 +828,14 @@ def backup(ctx, password, open_file=True):
         zf.write(config_ini_path, os.path.basename(config_ini_path))
         zf.write(saplogon_ini_path, os.path.basename(saplogon_ini_path))
 
-        zf.comment = b""" 
-            \n 1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
-            \n 2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
-            \n 3. Other files - according to sap_config.ini paths
-            \n Or you can place whener you want, just enter new paths to sap_config.ini
-            \n !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
+        comment = r""" 
+            1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
+            2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
+            3. Other files - according to sap_config.ini paths
+            Or you can place whener you want, just enter new paths to sap_config.ini
+            !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
+
+        zf.comment = comment.encode()
 
     if os.path.exists(back_path):
         click.echo(click.style('Backup succesfully created', **utilities.color_success))

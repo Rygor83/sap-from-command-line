@@ -63,6 +63,9 @@ def config_tmp_path(tmp_path, crypto):
     cfg.create()
     yield cfg
     cfg.remove_config()
+    debug_file_path = os.path.join(tmp_path, DEBUG_FILE_NAME)
+    if os.path.exists(debug_file_path):
+        os.remove(debug_file_path)
 
 
 @pytest.fixture
