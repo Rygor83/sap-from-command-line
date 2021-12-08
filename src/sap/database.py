@@ -37,6 +37,11 @@ class Param(Base):
     transaction = Column(String(20), primary_key=True)
     parameter = Column(String(100))
 
+    # TODO: продумать как подавать несколько параметров. Например: FTR_EDIT -> БЕ и Номер сделки
+    #  добавить в таблицу parameters поле "номер поля" для нескольких параметров
+    #  с параметром "-p" передавать несколько значений через пробел:
+    #  -p "01 0100000000256"
+
 
 class SapDB():  # noqa : E801
     """ Database processing class  """

@@ -29,7 +29,8 @@ from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'], show_default=True, token_normalize_func=lambda x: x.lower())
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
+                        show_default=True, token_normalize_func=lambda x: x.lower())
 
 log_level = ['--log_level', '-l']
 
@@ -101,9 +102,11 @@ def logon(ctx):
 @click.option("-r", "--report", "report", help="Run report ", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
+@click.option("-r", "--reuse", "reuse", help="Flag. Defines whether an existing connection to an SAP is reused",
+              default=True, is_flag=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
-        language: str, transaction: str, system_command: str, report: str, parameter: str, web: bool):
+        language: str, transaction: str, system_command: str, report: str, parameter: str, web: bool, reuse: bool):
     """
     \b
     Launch SAP system \n
@@ -197,6 +200,11 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 message = "Trying to LAUNCH the following system with EXTERNAL USERS"
             else:
                 message = "Trying to LAUNCH the following system "
+
+            if reuse:
+                argument = argument + f' -reuse=1'
+            else:
+                argument = argument + f' -reuse=0'
 
             utilities.print_system_list(selected_system, title=message,
                                         command=command, command_type=command_type)
