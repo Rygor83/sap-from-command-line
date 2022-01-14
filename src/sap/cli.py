@@ -11,6 +11,8 @@ from subprocess import Popen
 import click_log
 import logging
 import click
+import time
+import pyautogui
 import pyperclip
 import pyzipper
 from rich import print
@@ -152,8 +154,20 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         if web:
             if selected_system.url != " ":
                 # TODO: доделать передачу пароля для авторизации, если такая возможность есть
+                #  1. https://towardsdatascience.com/controlling-the-web-with-python-6fceb22c5f08
+                #  2. https://learn.onemonth.com/automate-web-forms-with-python/
+
+                # Not enough good solution but it works
+                click.echo(f"\nLaunching web: {selected_system.description} of {selected_system.customer} ")
 
                 click.launch(url=f"{selected_system.url}")
+                time.sleep(2)
+                pyautogui.write(selected_system.user)
+                pyautogui.keyDown('tab')
+                pyautogui.write(selected_system.password)
+                pyautogui.keyDown('tab')
+                pyautogui.keyDown('tab')
+                pyautogui.keyDown('enter')
             else:
                 no_system_found = Sap_system(system.upper() if system else None,
                                              str(mandant).zfill(3) if mandant else None,
@@ -176,7 +190,13 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
                 if parameter:
                     param_data = sap.query_param(str(transaction).upper())
-                    argument = argument + f' -command="{transaction.upper()} {param_data[0][1]}={parameter};"'
+
+                    if param_data:
+                        argument = argument + f' -command="{transaction.upper()} {param_data[0][1]}={parameter};"'
+                    else:
+                        click.echo(click.style(f"\nThere is no parameter info for {transaction.upper()} transaction",
+                                               **utilities.color_sensitive))
+                        argument = argument + f' -command="{transaction.upper()}"'
                 else:
                     argument = argument + " -command=" + transaction
             elif system_command:

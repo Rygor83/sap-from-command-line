@@ -7,3 +7,4 @@ sqlalchemy_utils
 pyzipper
 rich
 click_log
+pyautogui
