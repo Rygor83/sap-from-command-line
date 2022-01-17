@@ -98,6 +98,12 @@ def logon(ctx):
 @click.option("-eu", "--external_user", "external_user", default=False, is_flag=True,
               help="Flag. Launch sap system with external user (outside database)")
 @click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
+@click.option("-g", "--guiparm", "guiparm", help="Parameter of sapgui.exe", type=click.STRING)
+@click.option("-sname", "--snc_name", "snc_name",
+              help="SNC name of the SAP system; required for the logon via Secure Network Communication (SNC)",
+              type=click.STRING)
+@click.option("-sqop", "--snc_qop", "snc_qop", help="Activation of the logon via Secure Network Communication (SNC)",
+              type=click.STRING)
 @click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
 @click.option("-s", "--system_command", "system_command",
               help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>, /h")
@@ -108,7 +114,8 @@ def logon(ctx):
               default=True, is_flag=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
-        language: str, transaction: str, system_command: str, report: str, parameter: str, web: bool, reuse: bool):
+        language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
+        parameter: str, web: bool, reuse: bool):
     """
     \b
     Launch SAP system \n
@@ -118,6 +125,11 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
     2. MANDANT: Request a SAP system by mandant/client
     """
     password = ""
+
+    if snc_name is not None and snc_qop is None or snc_name is None and snc_qop is not None:
+        click.echo(click.style(f"\nBoth parameters must be used: -sname/--snc_name and -sqop/--snc_qop",
+                               **utilities.color_warning))
+        raise click.Abort
 
     if external_user:
 
@@ -145,6 +157,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         try:
             argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
                                                                      language,
+                                                                     guiparm, snc_name, snc_qop,
                                                                      user, "",
                                                                      ctx.obj.config.command_line_path)
         except WrongPath as err:
@@ -249,12 +262,18 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option("-l", "--language", "language", help="Logon language")
+@click.option("-g", "--guiparm", "guiparm", help="Parameter of sapgui.exe", type=click.STRING)
+@click.option("-sname", "--snc_name", "snc_name",
+              help="SNC name of the SAP system; required for the logon via Secure Network Communication (SNC)",
+              type=click.STRING)
+@click.option("-sqop", "--snc_qop", "snc_qop", help="Activation of the logon via Secure Network Communication (SNC)",
+              type=click.STRING)
 @click.option("-f", "--file", "file", help="Flag. Create debug file", is_flag=True, type=click.BOOL)
 @click.option('-o', "--open_debug_file", "open_file", help="Flag. Open file with debug file", is_flag=True,
               default=True)
 @click.pass_context
-def debug(ctx, system: str, mandant: str, user: str, customer: str, description: str, language: str, file: bool,
-          open_file: bool):
+def debug(ctx, system: str, mandant: str, user: str, customer: str, description: str, language: str, guiparm: str,
+          snc_name: str, snc_qop: str, file: bool, open_file: bool):
     """
     \b
     System debug
@@ -305,6 +324,8 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
             try:
                 argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
                                                                          language,
+                                                                         guiparm, snc_name, snc_qop,
+                                                                         None,
                                                                          user, "",
                                                                          ctx.obj.config.command_line_path)
             except WrongPath as err:
@@ -358,6 +379,7 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
         try:
             argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
                                                                      language,
+                                                                     None, None, None,
                                                                      user, "",
                                                                      ctx.obj.config.command_line_path)
         except WrongPath as err:

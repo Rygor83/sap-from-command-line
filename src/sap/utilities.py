@@ -22,7 +22,8 @@ color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
 
 
-def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, user, transaction="",
+def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, guiparm, snc_name, snc_qop,
+                                        user, transaction="",
                                         sapshcut_exe_path: str = "") -> str:  # list:
     # Добавляем параметры для запуска SAP системы
     if not os.path.exists(sapshcut_exe_path):
@@ -32,15 +33,28 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, password, l
     argument = argument + f'"{sapshcut_exe_path}"'  # Путь до sapshcut.exe
     argument = argument + f" -system={selected_system.system}"  # Id системы
     argument = argument + f" -client={str(selected_system.mandant).zfill(3)}"  # Номер манданта
+
     if user:
         argument = argument + f" -user={user}"  # Пользователь
     else:
         argument = argument + f" -user={selected_system.user}"  # Пользователь
+
     if password:
         argument = argument + f" -pw={password}"  # Пароль
     else:
         argument = argument + f" -pw={selected_system.password}"  # Пароль
+
     argument = argument + f" -language={language}"  # Язык для входа
+
+    if guiparm:
+        argument = argument + f" -guiparm={guiparm}"  #
+
+    if snc_name:
+        argument = argument + f" -snc_name={snc_name}"  #
+
+    if snc_qop:
+        argument = argument + f" -snc_qop={snc_qop}"  #
+
     argument = argument + " -maxgui"  # Развернуть окно на весь экран
 
     return argument

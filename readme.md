@@ -28,3 +28,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+## Alternatives:
+1. [KeePass](https://blogs.sap.com/2012/01/29/using-keepass-instead-of-sap-logon/)
+2. [KeePass Plugin](https://edp.bg/kpsapbutton-project/)
