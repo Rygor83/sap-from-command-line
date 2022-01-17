@@ -153,12 +153,15 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
         if web:
             if selected_system.url != " ":
-                # TODO: доделать передачу пароля для авторизации, если такая возможность есть
-                #  1. https://towardsdatascience.com/controlling-the-web-with-python-6fceb22c5f08
-                #  2. https://learn.onemonth.com/automate-web-forms-with-python/
+                # TODO: доделать передачу пароля для авторизации по аналогии с KeePass
+                #   https://keepass.info/help/base/autotype.html
+                #   https://github.com/allo-/passautotype - РЕАЛИЗАЦИЯ
+                #   Сделать настройку для каждого сайта - т.е. отдельная таблица по параметрам сайтов
 
                 # Not enough good solution but it works
-                click.echo(f"\nLaunching web: {selected_system.description} of {selected_system.customer} ")
+                click.echo(
+                    click.style(f"\nLaunching web: {selected_system.description} of {selected_system.customer} ",
+                                **utilities.color_success))
 
                 click.launch(url=f"{selected_system.url}")
                 time.sleep(2)
