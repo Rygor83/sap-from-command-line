@@ -15,12 +15,13 @@ import time
 import pyautogui
 import pyperclip
 import pyzipper
+import rich_click as click
 from rich import print
 
 import sap.config
 from sap import utilities
 from sap.api import Sap_system, Obj_structure
-from sap.config import create_config, open_config
+from sap.config import create_config, open_config, open_folder
 from sap.crypto import Crypto
 from sap.database import SapDB
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, DEBUG_FILE_NAME, \
@@ -85,7 +86,7 @@ def logon(ctx):
     try:
         utilities.launch_saplogon_with_params(ctx.obj.config.saplogon_path)
     except WrongPath as err:
-        click.echo(f"{err}")
+        utilities.print_message(f"{err}", utilities.message_type_error)
         raise click.Abort
 
 
@@ -107,10 +108,10 @@ def logon(ctx):
 @click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
 @click.option("-s", "--system_command", "system_command",
               help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>, /h")
-@click.option("-r", "--report", "report", help="Run report ", type=click.STRING)
+@click.option("-r", "--report", "report", help="Run report (report name for SE38 transaction)", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
-@click.option("-r", "--reuse", "reuse", help="Flag. Defines whether an existing connection to an SAP is reused",
+@click.option("-n", "--new", "reuse", help="Flag. Defines whether a new connection to an SAP is reused",
               default=True, is_flag=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
@@ -127,8 +128,8 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
     password = ""
 
     if snc_name is not None and snc_qop is None or snc_name is None and snc_qop is not None:
-        click.echo(click.style(f"\nBoth parameters must be used: -sname/--snc_name and -sqop/--snc_qop",
-                               **utilities.color_warning))
+        utilities.print_message(f"\nBoth parameters must be used: -sname/--snc_name and -sqop/--snc_qop",
+                                utilities.message_type_warning)
         raise click.Abort
 
     if external_user:
@@ -161,7 +162,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                                                                      user, "",
                                                                      ctx.obj.config.command_line_path)
         except WrongPath as err:
-            click.echo(f"{err}")
+            utilities.print_message(f"{err}", message_type=utilities.message_type_error)
             raise click.Abort
 
         if web:
@@ -172,12 +173,11 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 #   Сделать настройку для каждого сайта - т.е. отдельная таблица по параметрам сайтов
 
                 # Not enough good solution but it works
-                click.echo(
-                    click.style(f"\nLaunching web: {selected_system.description} of {selected_system.customer} ",
-                                **utilities.color_success))
-
+                utilities.print_message(
+                    f"\nLaunching web site: {selected_system.description} of {selected_system.customer}",
+                    message_type=utilities.message_type_message)
                 click.launch(url=f"{selected_system.url}")
-                time.sleep(2)
+                time.sleep(4)
                 pyautogui.write(selected_system.user)
                 pyautogui.keyDown('tab')
                 pyautogui.write(selected_system.password)
@@ -210,8 +210,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                     if param_data:
                         argument = argument + f' -command="{transaction.upper()} {param_data[0][1]}={parameter};"'
                     else:
-                        click.echo(click.style(f"\nThere is no parameter info for {transaction.upper()} transaction",
-                                               **utilities.color_sensitive))
+                        utilities.print_message(f"\nThere is no parameter info for {transaction.upper()} transaction",
+                                                message_type=utilities.message_type_warning)
+
                         argument = argument + f' -command="{transaction.upper()}"'
                 else:
                     argument = argument + " -command=" + transaction
@@ -290,10 +291,20 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
         debug_folder = ctx.obj.config.config_path if ctx.obj.config.config_path else utilities.path()
         debug_file_path = os.path.join(debug_folder, DEBUG_FILE_NAME)
 
-        click.echo(f"\n{debug_file_path} file will be created.")
-        click.echo(f"After creation, a folder with {DEBUG_FILE_NAME} file will be opened \n")
-        click.echo("Drag the file to the SAP system to start debug mode \n")
-        click.pause("Press Enter to continue")
+        debug_markdown = f"""
+        # DEBUG
+        
+        {debug_file_path} file will be created.
+        After creation, a folder with {DEBUG_FILE_NAME} file will be opened
+        Drag the file to the SAP system to start debug mode
+        """
+
+        utilities.print_markdown(debug_markdown)
+
+        # click.echo(f"\n{debug_file_path} file will be created.")
+        # click.echo(f"After creation, a folder with {DEBUG_FILE_NAME} file will be opened \n")
+        # click.echo("Drag the file to the SAP system to start debug mode \n")
+        # click.pause("Press Enter to continue")
 
         with open(debug_file_path, "w", encoding='utf-8') as writer:
             writer.write("[FUNCTION]\n")
@@ -415,7 +426,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
     """
     \b
     Copy password for the requested system into clipboard.
-    Script waits 15 seconds and clears clipboard.\n
+    Script waits 10 seconds and clears clipboard.\n
     \b
     Optional argument:
     1. SYSTEM: Request a SAP system by system id
@@ -435,38 +446,28 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 
         pyperclip.copy(selected_system.password)
 
-        click.echo(
-            click.style(
-                f"\nPassword is copied into clipboard.\n",
-                **utilities.color_message,
-            )
-        )
+        utilities.print_message("Password is copied into clipboard.", message_type=utilities.message_type_message)
 
         if clear_clipboard:
-            click.echo(
-                click.style(
-                    "If you use Clipboard manager, you should add PY.EXE, CMD.EXE applications to the exclusion list,\n"
-                    "in order to keep sensitive information safe.",
-                    **utilities.color_sensitive,
-                )
-            )
+            utilities.print_message(
+                "If you use Clipboard managers, you should add PY.EXE, CMD.EXE applications to the exclusion list,\nin order to keep sensitive information safe from copying to clipboard manager.",
+                message_type=utilities.message_type_sensitive)
 
-            click.echo(
-                click.style(
-                    f"\nClipboard will be cleared in {time_to_clear} seconds.\n",
-                    **utilities.color_message,
-                )
-            )
+            utilities.print_message(f"Clipboard will be cleared in {time_to_clear} seconds.",
+                                    message_type=utilities.message_type_message)
 
             try:
                 utilities.countdown(time_to_clear)
             except KeyboardInterrupt:
-                click.echo("\nAborted!")
+                click.echo("\n")
+                utilities.print_message(f"Aborted",
+                                        message_type=utilities.message_type_error)
             if ctypes.windll.user32.OpenClipboard(None):
                 ctypes.windll.user32.EmptyClipboard()
             ctypes.windll.user32.CloseClipboard()
 
-            click.echo(click.style("\nClipboard is cleared. \n", **utilities.color_success))
+            click.echo("\n")
+            utilities.print_message(f"Clipboard is cleared.", message_type=utilities.message_type_message)
 
 
 @sap_cli.command("add")
@@ -662,19 +663,25 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
 
 
 @sap_cli.command("config")
-@click.option('-create', is_flag=True, callback=create_config, expose_value=False,
-              is_eager=True,
+@click.option('-create', is_flag=True, callback=create_config, expose_value=False, is_eager=True,
               help='Create config file')
-@click.option('-open', is_flag=True, callback=open_config, expose_value=False,
-              is_eager=True,
+@click.option('-open', is_flag=True, callback=open_config, expose_value=False, is_eager=True,
               help='Open config file')
+@click.option('-folder', is_flag=True, callback=open_folder, expose_value=False, is_eager=True,
+              help='Open config folder')
 @click.pass_context
 def config(ctx):
     """ Config file creation or editing """
 
-    click.echo("Enter one of subcommands:")
-    click.echo("\t -create - Create config file")
-    click.echo("\t -open   - Open config file")
+    config_markdown = """
+    Enter one of subcommands:
+
+    \t -create       Create config file
+    \t -open         Open config file
+    \t -folder       Open config folder
+    """
+
+    utilities.print_markdown(config_markdown)
 
 
 @sap_cli.command("list", short_help="Print information about SAP systems")
@@ -731,11 +738,13 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
             utilities.print_system_list(*sap_system, title="Available systems", verbose=verbose, url=url,
                                         enum=enum)
             if verbose:
-                click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
+                utilities.print_message(
+                    f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}",
+                    utilities.message_type_message)
                 try:
                     utilities.countdown(TIMER_TO_CLEAR_SCREEN)
                 except KeyboardInterrupt:
-                    click.echo("Aborted!")
+                    utilities.print_message("Aborted!", utilities.message_type_error)
                 click.clear()
 
             return sap_system
@@ -748,7 +757,7 @@ def database(ctx):
     try:
         ctx.obj.database.create()
     except DatabaseExists as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
+        utilities.print_message(f"{err}", utilities.message_type_warning)
         raise click.Abort
 
 
@@ -759,7 +768,7 @@ def keys(ctx):
     try:
         ctx.obj.crypto.generate_keys()
     except EncryptionKeysAlreadyExist as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
+        utilities.print_message(f"{err}", utilities.message_type_warning)
         raise click.Abort
 
 
@@ -772,7 +781,7 @@ def about(ctx):
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
     except WrongPath as err:
-        click.echo(f"{err}")
+        utilities.print_message(f"{err}", utilities.message_type_error)
 
 
 @sap_cli.command("shortcut", help="Display 'SAP GUI Shortcut' window")
@@ -784,7 +793,7 @@ def shortcut(ctx):
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
     except WrongPath as err:
-        click.echo(f"{err}")
+        utilities.print_message(f"{err}", utilities.message_type_error)
 
 
 @sap_cli.command("start", short_help="Starting point for working wiht SAP command line tool")
@@ -803,20 +812,22 @@ def start(ctx):
     try:
         ctx.obj.config.create()
     except ConfigExists as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
+        utilities.print_message(f"{err}", message_type=utilities.message_type_warning)
         raise click.Abort
 
     try:
         ctx.obj.crypto.generate_keys()
     except EncryptionKeysAlreadyExist as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
+        utilities.print_message(f"{err}", message_type=utilities.message_type_warning)
         raise click.Abort
 
     try:
         ctx.obj.database.create()
     except DatabaseExists as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
+        utilities.print_message(f"{err}", message_type=utilities.message_type_warning)
         raise click.Abort
+
+    # TODO: переделать на rich
 
     print("\nThe following files are created:")
     print(f"1. [yellow]{PUBLIC_KEY_NAME}[/yellow] - used to encrypt passwords in database")
@@ -891,11 +902,12 @@ def backup(ctx, password, open_file=True):
         zf.comment = comment.encode()
 
     if os.path.exists(back_path):
-        click.echo(click.style('Backup succesfully created', **utilities.color_success))
+        utilities.print_message('Backup succesfully created', message_type=utilities.message_type_message)
         if open_file:
             click.launch(url=back_path, locate=True)
     else:
-        click.echo('Backup creation failed')
+        utilities.print_message('Backup creation failed', message_type=utilities.message_type_error)
+        click.echo()
 
 
 @contextmanager

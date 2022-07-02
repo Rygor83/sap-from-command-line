@@ -15,11 +15,35 @@ import sap.api
 from sap.api import Sap_system
 from sap.exceptions import WrongPath
 
+from rich.markdown import Markdown
+from rich.console import Console
+from rich.table import Table
+from rich import box
+from rich.panel import Panel
+from rich.text import Text
+
+from rich_click.rich_click import (
+    ALIGN_ERRORS_PANEL,
+    ERRORS_PANEL_TITLE,
+    STYLE_ERRORS_PANEL_BORDER,
+    STYLE_HELPTEXT,
+    STYLE_HELPTEXT_FIRST_LINE,
+    STYLE_USAGE,
+    STYLE_USAGE_COMMAND,
+    STYLE_SWITCH,
+    STYLE_REQUIRED_LONG,
+)
+
 # Цвета сообщений
 color_message = {'bg': 'black', 'fg': 'white'}
 color_success = {'bg': 'black', 'fg': 'green'}
 color_warning = {'bg': 'black', 'fg': 'yellow'}
 color_sensitive = {'bg': 'red', 'fg': 'white'}
+
+message_type_message = "Message"
+message_type_warning = "Warning"
+message_type_sensitive = "Sensitive"
+message_type_error = "Error"
 
 
 def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, guiparm, snc_name, snc_qop,
@@ -94,10 +118,13 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
             if 1 <= int(ans) <= len(sap_systems):
                 break
 
+            # TODO: подсветить красным "Choose system you want to logon", чтобы было визуально видно, что
+            #  нужно еще что-то сделать перед логином.
             click.echo()
-            ans = click.prompt(click.style(
-                f"\nChoose system you want to logon. Available values from 1 to {str(len(sap_systems))}: \n>>>",
-                **color_message), type=int)
+            ans = click.prompt(
+                click.style("\nChoose system you want to logon.", **color_warning),
+                click.style(f"Available values from 1 to {str(len(sap_systems))}: \n>>>", **color_message),
+                type=int)
         ans = ans - 1
 
     selected_system: Sap_system = Sap_system(
@@ -109,9 +136,20 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
 
 def print_system_list(*sap_systems: Sap_system, title, color=color_success, verbose=False,
                       enum=False, command: str = '', command_type: str = '', url=False):
+    """ Print information in table style """
+
     row = []
 
-    # Header for Pretty table
+    # Title
+    title = f"{click.style(title, **color)}"
+    if command:
+        title = title + click.style(f"with {command_type} ", **color)
+        title = title + click.style(f"{str(command).upper()}", **color_sensitive)
+
+    # Table initializing
+    table = Table(title=title, box=box.SQUARE_DOUBLE_HEAD, expand=True)
+
+    # Header
     if enum:
         header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User']
     else:
@@ -121,63 +159,61 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
     if verbose:
         header.append('Password')
 
-    # Table with data
-    t = PrettyTable(header)
+    for item in header:
+        table.add_column(item)
 
+    # Rows
     for index, sap_system in enumerate(sap_systems, start=1):
         if enum:
-            row.append(index)
+            row.append(str(index))
         if sap_system.customer is not None:
             row.append(sap_system.customer)
-            t.align["Customer"] = "l"
+            # t.align["Customer"] = "l"
         else:
             row.append('')
 
         if sap_system.system is not None:
             row.append(sap_system.system)
-            t.align["System"] = "l"
+            # t.align["System"] = "l"
         else:
             row.append('')
 
         if sap_system.mandant is not None:
             row.append(sap_system.mandant)
-            t.align["Mandant"] = "l"
+            # t.align["Mandant"] = "l"
         else:
             row.append('')
 
         if sap_system.description is not None:
             row.append(sap_system.description)
-            t.align["Description"] = "l"
+            # t.align["Description"] = "l"
         else:
             row.append('')
 
         if sap_system.user is not None:
             row.append(sap_system.user)
-            t.align["User"] = "l"
+            # t.align["User"] = "l"
         else:
             row.append('')
 
         if url:
             if sap_system.url is not None:
                 row.append(sap_system.url)
-                t.align["URL"] = "l"
+                # t.align["URL"] = "l"
             else:
                 row.append('')
 
         if verbose and sap_system.password is not None:
             row.append(sap_system.password)
-            t.align["Password"] = "l"
+            # t.align["Password"] = "l"
 
-        t.add_row(row)
+        table.add_row(*row)
         row.clear()
 
-    # Вывод информации
+    # Information output
     click.echo('\n')
-    title = f"{click.style(title, **color)}"
-    if command:
-        title = title + click.style(f"with {command_type} ", **color)
-        title = title + click.style(f"{str(command).upper()}", **color_sensitive)
-    click.echo(t.get_string(title=title))
+    console = Console()
+    console.print(table)
 
 
 def path():
@@ -230,3 +266,33 @@ def countdown(seconds):
         print("\r\033[K", end='', flush=True)
         print(f"\r{i}", end='', flush=True)
         time.sleep(1)
+
+
+def print_message(message, message_type):
+    console = Console()
+
+    if message_type == message_type_error:
+        border_style = STYLE_ERRORS_PANEL_BORDER
+        title_align = ALIGN_ERRORS_PANEL
+    elif message_type == message_type_warning:
+        border_style = STYLE_USAGE
+        title_align = ALIGN_ERRORS_PANEL
+    elif message_type == message_type_sensitive:
+        border_style = 'bold red'
+        title_align = ALIGN_ERRORS_PANEL
+    elif message_type == message_type_message:
+        border_style = STYLE_SWITCH
+        title_align = ALIGN_ERRORS_PANEL
+
+    console.print(Panel(
+        Text.from_markup(message),
+        border_style=border_style,
+        title=message_type,
+        title_align=title_align, )
+    )
+
+
+def print_markdown(markdown):
+    console = Console()
+    md = Markdown(markdown)
+    console.print(md)

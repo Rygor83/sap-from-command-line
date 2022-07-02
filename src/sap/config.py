@@ -67,6 +67,15 @@ class Config:
             self.private_key_path = parser.get('KEYS', 'private_key_path')
             self.language = parser.get('LOCALE', 'language')
 
+            # TODO: Сделать проверку и уведомление, если приватный ключ и базаданных лежат в одной папке
+
+            # db_path = pathlib.Path(self.db_path)
+            # private_key_path = pathlib.Path(self.private_key_path)
+            # if db_path.parent == private_key_path.parent:
+            #     click.echo(click.style(
+            #         f"\nPrivate key ({db_path}) file and Database ({private_key_path}) file have to be in a separate folders for safety reason.",
+            #         bg='red', fg='white'))
+
             return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
                              self.public_key_path, self.private_key_path, self.language)
         else:
@@ -107,6 +116,8 @@ class Config:
             ini_lang = 'EN'
         parser['LOCALE'] = {'language': ini_lang}
 
+        parser['AUTO-TYPE'] = {"default": "{USERNAME}{TAB}{PASSWORD}{ENTER}"}
+
         with open(self.config_file_path, 'w', encoding='utf-8') as configfile:
             parser.write(configfile)
 
@@ -116,25 +127,16 @@ class Config:
         """
         return os.path.exists(self.config_file_path)
 
-    def open_config(self):
+    def open_config(self, locate=False):
         """
         Open config file in editor
+        ::param locate: True - open folder or web, False - open application
         """
-        click.launch(url=self.config_file_path)
+        return click.launch(url=self.config_file_path, locate=locate)
 
     def remove_config(self):
         """ Remove encryption keys """
         os.remove(self.config_file_path)
-
-
-def open_config(ctx, param, value):
-    """
-    Open configuration file for editing
-    """
-    if not value or ctx.resilient_parsing:
-        return
-    ctx.obj.config.open_config()
-    ctx.exit()
 
 
 def create_config(ctx, param, value):
@@ -147,9 +149,35 @@ def create_config(ctx, param, value):
     try:
         ctx.obj.config.create()
     except ConfigExists as err:
-        print(f"{err}")
+        utilities.print_message(f"{err}", message_type=utilities.message_type_error)
         raise click.Abort
 
     click.launch(ctx.obj.config.config_file_path, locate=True)
+
+    ctx.exit()
+
+
+def open_config(ctx, param, value):
+    """
+    Open configuration file for editing
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    utilities.print_message(f"Opening file: {ctx.obj.config.config_file_path}",
+                            message_type=utilities.message_type_message)
+    ctx.obj.config.open_config()
+    ctx.exit()
+
+
+def open_folder(ctx, param, value):
+    """
+     Open configuration file folder
+    """
+    if not value or ctx.resilient_parsing:
+        return
+
+    utilities.print_message(f"Opening folder: {utilities.path()}",
+                            message_type=utilities.message_type_message)
+    ctx.obj.config.open_config(locate=True)
 
     ctx.exit()
