@@ -156,6 +156,7 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
         header = ['Customer', 'System', 'Mandant', 'Description', 'User']
     if url:
         header.append('URL')
+        header.append('Autotype sequence')
     if verbose:
         header.append('Password')
 
@@ -168,44 +169,39 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
             row.append(str(index))
         if sap_system.customer is not None:
             row.append(sap_system.customer)
-            # t.align["Customer"] = "l"
         else:
             row.append('')
 
         if sap_system.system is not None:
             row.append(sap_system.system)
-            # t.align["System"] = "l"
         else:
             row.append('')
 
         if sap_system.mandant is not None:
             row.append(sap_system.mandant)
-            # t.align["Mandant"] = "l"
         else:
             row.append('')
 
         if sap_system.description is not None:
             row.append(sap_system.description)
-            # t.align["Description"] = "l"
         else:
             row.append('')
 
         if sap_system.user is not None:
             row.append(sap_system.user)
-            # t.align["User"] = "l"
         else:
             row.append('')
 
         if url:
             if sap_system.url is not None:
                 row.append(sap_system.url)
-                # t.align["URL"] = "l"
+                row.append(sap_system.autotype)
             else:
+                row.append('')
                 row.append('')
 
         if verbose and sap_system.password is not None:
             row.append(sap_system.password)
-            # t.align["Password"] = "l"
 
         table.add_row(*row)
         row.clear()

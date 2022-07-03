@@ -18,7 +18,10 @@ import pyzipper
 import re
 import rich_click as click
 from rich import print
+from rich.console import Console
+from rich.markdown import Markdown
 
+from pathlib import Path
 import sap.config
 from sap import utilities
 from sap.api import Sap_system, Obj_structure
@@ -168,11 +171,6 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
         if web:
             if selected_system.url != " ":
-                # TODO: доделать передачу пароля для авторизации по аналогии с KeePass
-                #   https://keepass.info/help/base/autotype.html
-                #   https://github.com/allo-/passautotype - РЕАЛИЗАЦИЯ
-                #   Сделать настройку для каждого сайта - т.е. отдельная таблица по параметрам сайтов
-
                 utilities.print_message(
                     f"\nLaunching web site: {selected_system.description} of {selected_system.customer}",
                     message_type=utilities.message_type_message)
@@ -486,10 +484,12 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 @click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
+@click.option("-a", "--autotype", prompt=True, help="Autotype sequence for logining to web site", type=click.STRING,
+              default="{USER}{TAB}{PASS}{ENTER}")
 @click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
 @click.pass_context
 def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
-        verbose: bool):
+        autotype: str, verbose: bool):
     """
     Add sap system with it's parameters to db. Just run 'sap add' and follow instructions.
     """
@@ -504,6 +504,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             str(customer).upper(),
             str(description),
             str(url),
+            str(autotype)
         )
         result = sap.add(sap_system)
 
@@ -521,7 +522,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             result = sap.query_system(sap_system)
 
             added_system = [Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4],
-                                       item[5], item[6]) for item in result]
+                                       item[5], item[6], item[7]) for item in result]
             utilities.print_system_list(*added_system, title="The following system is ADDED to the database: ",
                                         verbose=verbose)
             if verbose:
@@ -557,15 +558,20 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
     # --------------------------
     if query_result != []:
         selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
 
         selected_system = utilities.choose_system(selected_sap_systems)
 
         password_new = click.prompt("\nEnter new password", default=selected_system.password)
+        # TODO: попробовать переделать на
+        #  password = getpass.getpass("Enter password for external user: ")
+        #  если пользователь нажимает ENTER, а поле пустое, то запращивать хочет ли он оставить старый пароль
+
         customer_new = click.prompt("Enter Customer", default=selected_system.customer)
         description_new = click.prompt("Enter system description", default=selected_system.description)
         url_new = click.prompt("Enter URL", default=selected_system.url)
+        autotype_new = click.prompt("Enter Autotype sequence", default=selected_system.autotype)
 
         sap_encrypted_system = Sap_system(
             str(selected_system.system).upper(),
@@ -575,6 +581,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
             str(customer_new),
             str(description_new),
             str(url_new),
+            str(autotype_new),
         )
 
         result = sap.update(sap_encrypted_system)
@@ -583,8 +590,8 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
             result = sap.query_system(sap_encrypted_system)
 
             updated_system = [
-                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6])
-                for item in result]
+                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
+                           item[7]) for item in result]
 
             utilities.print_system_list(*updated_system, title="The following system is UPDATED", verbose=verbose)
 
@@ -601,7 +608,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
                                          None,
                                          customer.upper() if customer else None,
                                          description.upper() if description else None,
-                                         None)
+                                         None, None)
 
             utilities.print_system_list(no_system_found, title="FAILED TO UPDATE the following system",
                                         color=utilities.color_warning)
@@ -841,32 +848,17 @@ def start(ctx):
         utilities.print_message(f"{err}", message_type=utilities.message_type_warning)
         raise click.Abort
 
-    # TODO: переделать на rich
+    folder = Path(__file__)
+    filename = 'start.md'
+    path = folder.parent / filename
+    START_MARKDOWN = ""
 
-    print("\nThe following files are created:")
-    print(f"1. [yellow]{PUBLIC_KEY_NAME}[/yellow] - used to encrypt passwords in database")
-    print(
-        f"      can be stored in any place. If you move it from default location then don't forget to put new place in {CONFIG_NAME} -> '[KEYS]' -> 'public_key_path'")
-    print(f"2. [yellow]{PRIVATE_KEY_NAME}[/yellow] - used to decrypt passwords")
-    print(
-        f"      must be stored in [bright_red]secure place[/bright_red]. For example, in Bestcrypt container. Don't forget to put new place in {CONFIG_NAME} -> '[KEYS]' -> 'private_key_path'")
-    print(f"3. [yellow]{DATABASE_NAME}[/yellow] - used to store all information about SAP systems")
-    print(
-        f"      must be stored in [bright_red]secure place[/bright_red]. For example, in Bestcrypt container. Don't forget to put new place in {CONFIG_NAME} -> '[DATABASE]' -> 'db_path'")
-    print(f"4. [yellow]{CONFIG_NAME}[/yellow] - used to store information about all previous files locations")
-    print(
-        f"      must be stored only in [bright_red] {ctx.obj.config.config_path} [/bright_red] folder.")
-    print("\n")
-    print(f"Extra work:")
-    print(
-        f"5. Find 'SAPSHCUT.EXE' file and put it's location in {CONFIG_NAME} -> '[APPLICATION]' -> 'command_line_path'")
-    print(f"5. Find 'SAPLOGON.EXE' file and put it's location in {CONFIG_NAME} -> '[APPLICATION]' -> 'saplogon_path'")
+    with open(path, mode='rt') as file:
+        START_MARKDOWN = START_MARKDOWN + str(file.read())
 
-    print("\n")
-    print("To start work with SAP commands after preparatory work:")
-    print("type 'SAP ADD' to add sap system into database")
-    print("type 'SAP RUN <system id> <mandant num>' to launch sap system")
-    print("type 'SAP --HELP' to learn more about programm")
+    console = Console()
+    md = Markdown(str(START_MARKDOWN))
+    console.print(md)
 
     click.pause('\nPress enter to open files folder and start working. Good luck.')
 
