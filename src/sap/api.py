@@ -8,8 +8,8 @@ import sqlalchemy
 import click
 from sap.exceptions import DatabaseDoesNotExists
 
-Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'customer', 'description', 'url'])
-Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None)
+Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'customer', 'description', 'url', 'autotype'])
+Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None, None)
 
 
 def query_system(sap_system: Sap_system):

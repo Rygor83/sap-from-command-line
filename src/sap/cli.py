@@ -15,6 +15,7 @@ import time
 import pyautogui
 import pyperclip
 import pyzipper
+import re
 import rich_click as click
 from rich import print
 
@@ -148,7 +149,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
     # --------------------------
     if query_result != []:
         selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
 
         if language is None:
@@ -172,18 +173,24 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 #   https://github.com/allo-/passautotype - РЕАЛИЗАЦИЯ
                 #   Сделать настройку для каждого сайта - т.е. отдельная таблица по параметрам сайтов
 
-                # Not enough good solution but it works
                 utilities.print_message(
                     f"\nLaunching web site: {selected_system.description} of {selected_system.customer}",
                     message_type=utilities.message_type_message)
                 click.launch(url=f"{selected_system.url}")
+
                 time.sleep(4)
-                pyautogui.write(selected_system.user)
-                pyautogui.keyDown('tab')
-                pyautogui.write(selected_system.password)
-                pyautogui.keyDown('tab')
-                pyautogui.keyDown('tab')
-                pyautogui.keyDown('enter')
+
+                key_strokes = re.findall(r'{(.+?)}', selected_system.autotype)
+                logger.info(f"Autotype from database: {selected_system.autotype}")
+
+                for item in key_strokes:
+                    if item == 'USER':
+                        pyautogui.write(str(selected_system.user))
+                    elif item == 'PASS':
+                        pyautogui.write(str(selected_system.password))
+                    else:
+                        pyautogui.press(item)
+
             else:
                 no_system_found = Sap_system(system.upper() if system else None,
                                              str(mandant).zfill(3) if mandant else None,
@@ -191,6 +198,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                                              None,
                                              customer.upper() if customer else None,
                                              description.upper() if description else None,
+                                             None,
                                              None)
 
                 utilities.print_system_list(no_system_found,
@@ -714,9 +722,13 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
     result = ""
 
     with _sap_db(ctx.obj.config):
-        sap_system_sql = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None,
-                                    user if user else None, None, customer if customer else None,
-                                    description if description else None, None)
+        sap_system_sql = Sap_system(str(system).upper() if system else None,
+                                    str(mandant) if mandant else None,
+                                    user if user else None, None,
+                                    customer if customer else None,
+                                    description if description else None,
+                                    None,
+                                    None)
         result = sap.query_system(sap_system_sql)
 
         if not result:
@@ -726,13 +738,15 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                                          "",
                                          str(customer).upper() if customer else "",
                                          description.upper() if description else "",
+                                         "",
                                          "")
             utilities.print_system_list(no_system_found, title="NOTHING FOUND according to search criteria",
                                         color=utilities.color_warning, )
             return list()
         else:
             sap_system = [
-                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6])
+                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
+                           item[7])
                 for item in result]
 
             utilities.print_system_list(*sap_system, title="Available systems", verbose=verbose, url=url,

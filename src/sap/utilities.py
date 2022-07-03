@@ -129,7 +129,7 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
 
     selected_system: Sap_system = Sap_system(
         sap_systems[ans].system, sap_systems[ans].mandant, sap_systems[ans].user, sap_systems[ans].password,
-        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url)
+        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype)
 
     return selected_system
 

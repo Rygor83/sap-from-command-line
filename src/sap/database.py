@@ -29,7 +29,8 @@ class Sap(Base):
     password = Column(BLOB)
     customer = Column(String(20))
     description = Column(String(20))
-    url = Column(String(250), primary_key=False)
+    url = Column(String(250))
+    autotype = Column(String(250))
 
 
 class Param(Base):
@@ -105,7 +106,8 @@ class SapDB():  # noqa : E801
                      password=sap_system.password,
                      customer=sap_system.customer,
                      description=sap_system.description,
-                     url=sap_system.url)
+                     url=sap_system.url,
+                     autotype=sap_system.autotype)
         result = self.session.add(record)
         try:
             self.session.commit()
@@ -117,7 +119,7 @@ class SapDB():  # noqa : E801
     def query_system(self, sap_system):
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description, Sap.url).order_by(asc(Sap.customer), asc(Sap.system_id),
+                                   Sap.description, Sap.url, Sap.autotype).order_by(asc(Sap.customer), asc(Sap.system_id),
                                                                       asc(Sap.mandant_num), asc(Sap.user_id))
         if sap_system.system:
             query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
@@ -147,6 +149,7 @@ class SapDB():  # noqa : E801
             result.customer = sap_system.customer
             result.description = sap_system.description
             result.url = sap_system.url
+            result.autotype = sap_system.autotype
             self.session.commit()
 
     def delete(self, sap_system):  # type (namedtuple) -> bool
