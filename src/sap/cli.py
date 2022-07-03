@@ -73,6 +73,8 @@ def sap_cli(ctx, config_path: str, verbosity=''):
         ctx.obj.config.public_key_path = _config.public_key_path
         ctx.obj.config.command_line_path = _config.command_line_path
         ctx.obj.config.saplogon_path = _config.saplogon_path
+        ctx.obj.config.wait_site_to_load = _config.wait_site_to_load
+        ctx.obj.config.sequence = _config.sequence
 
     # ========= CRYPTO =========
     ctx.obj.crypto = Crypto(ctx.obj.config.public_key_path, ctx.obj.config.private_key_path)
@@ -172,14 +174,16 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         if web:
             if selected_system.url != " ":
                 utilities.print_message(
-                    f"\nLaunching web site: {selected_system.description} of {selected_system.customer}",
+                    f"Launching web site: {selected_system.description} of {selected_system.customer}",
                     message_type=utilities.message_type_message)
                 click.launch(url=f"{selected_system.url}")
 
-                time.sleep(4)
+                utilities.print_message(f"Waiting web site to load: {ctx.obj.config.wait_site_to_load} seconds",
+                                        utilities.message_type_message)
+                time.sleep(ctx.obj.config.wait_site_to_load)
 
                 key_strokes = re.findall(r'{(.+?)}', selected_system.autotype)
-                logger.info(f"Autotype from database: {selected_system.autotype}")
+                logger.info(f"Autotype sequence: {selected_system.autotype}")
 
                 for item in key_strokes:
                     if item == 'USER':
@@ -485,7 +489,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
 @click.option("-a", "--autotype", prompt=True, help="Autotype sequence for logining to web site", type=click.STRING,
-              default="{USER}{TAB}{PASS}{ENTER}")
+              default="{USER}{TAB}{PASS}{ENTER}")  # TODO: попробовать передать ctx.obj.config.sequence
 @click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
 @click.pass_context
 def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
@@ -914,6 +918,19 @@ def backup(ctx, password, open_file=True):
     else:
         utilities.print_message('Backup creation failed', message_type=utilities.message_type_error)
         click.echo()
+
+
+@sap_cli.command("param")
+@click.option('-add', is_flag=True, callback=create_config, expose_value=False, is_eager=True,
+              help='Add parameters to transaction')
+@click.option('-list', is_flag=True, callback=open_config, expose_value=False, is_eager=True,
+              help='List all parameters')
+@click.pass_context
+def parameter():
+    """ Adding/Viewing parameters for transactions """
+    # TODO: реализовать добавление параметров для транзакций
+
+    pass
 
 
 @contextmanager

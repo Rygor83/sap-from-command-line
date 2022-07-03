@@ -41,7 +41,8 @@ def test_read_tmp_path_config(config_tmp_path):
                    info.public_key_path == config_tmp_path.public_key_path) and (
                    info.command_line_path == config_tmp_path.command_line_path) and (
                    info.saplogon_path == config_tmp_path.saplogon_path) and (
-                   info.language == 'RU')
+                   info.language == 'RU') and (info.sequence == "{USER}{TAB}{PASS}{ENTER}") and (
+                   info.wait_site_to_load == 4)
 
 
 @pytest.fixture

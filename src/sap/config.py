@@ -17,7 +17,7 @@ from sap.exceptions import ConfigExists, ConfigDoesNotExists
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
-                                     'private_key_path', 'language'])
+                                     'private_key_path', 'language', 'sequence', 'wait_site_to_load'])
 
 
 class Config:
@@ -33,8 +33,9 @@ class Config:
             command_line_path=None,
             saplogon_path=None,
             public_key_path=None,
-            private_key_path=None
-
+            private_key_path=None,
+            sequence=None,
+            wait_site_to_load=None,
     ):
 
         self.ini_name = CONFIG_NAME
@@ -50,7 +51,10 @@ class Config:
                                                                                     PUBLIC_KEY_NAME)
         self.private_key_path = private_key_path if private_key_path else os.path.join(self.config_path,
                                                                                        PRIVATE_KEY_NAME)
-        self.language = 'RU'
+        self.language = 'RU'  # TODO: сделать мультиязычность
+
+        self.sequence = '{USER}{TAB}{PASS}{ENTER}'
+        self.wait_site_to_load = 4
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -61,11 +65,17 @@ class Config:
 
             self.db_path = parser.get('DATABASE', 'db_path')
             self.db_type = parser.get('DATABASE', 'db_type')
+
             self.command_line_path = parser.get('APPLICATION', 'command_line_path')
             self.saplogon_path = parser.get('APPLICATION', 'saplogon_path')
+
             self.public_key_path = parser.get('KEYS', 'public_key_path')
             self.private_key_path = parser.get('KEYS', 'private_key_path')
+
             self.language = parser.get('LOCALE', 'language')
+
+            self.sequence = parser.get('AUTO-TYPE', 'sequence')
+            self.wait_site_to_load = int(parser.get('AUTO-TYPE', 'wait'))
 
             # TODO: Сделать проверку и уведомление, если приватный ключ и базаданных лежат в одной папке
 
@@ -77,7 +87,8 @@ class Config:
             #         bg='red', fg='white'))
 
             return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
-                             self.public_key_path, self.private_key_path, self.language)
+                             self.public_key_path, self.private_key_path, self.language, self.sequence,
+                             self.wait_site_to_load)
         else:
             raise ConfigDoesNotExists(self.config_file_path)
 
@@ -107,6 +118,12 @@ class Config:
                 "; PRIVATE_KEY_PATH - Path to private_key_file_name encryption key. Private key must be placed in secure place": None,
                 'private_key_path': self.private_key_path}
 
+            parser['AUTO-TYPE'] = {
+                "; sequence - default autotype sequence": None,
+                'sequence': "{USER}{TAB}{PASS}{ENTER}",
+                "; wait - Time to wait a web site to load": None,
+                'wait': 4}
+
         # Определение языка
         win_dll = ctypes.windll.kernel32
         lng_code = win_dll.GetUserDefaultUILanguage()
@@ -115,8 +132,6 @@ class Config:
         else:
             ini_lang = 'EN'
         parser['LOCALE'] = {'language': ini_lang}
-
-        parser['AUTO-TYPE'] = {"default": "{USERNAME}{TAB}{PASSWORD}{ENTER}"}
 
         with open(self.config_file_path, 'w', encoding='utf-8') as configfile:
             parser.write(configfile)
