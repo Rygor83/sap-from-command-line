@@ -577,6 +577,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
         selected_system = utilities.choose_system(selected_sap_systems)
 
         password_new = click.prompt("\nEnter new password", default=selected_system.password)
+
         # TODO: попробовать переделать на
         #  password = getpass.getpass("Enter password for external user: ")
         #  если пользователь нажимает ENTER, а поле пустое, то запращивать хочет ли он оставить старый пароль

@@ -21,6 +21,7 @@ from rich.table import Table
 from rich import box
 from rich.panel import Panel
 from rich.text import Text
+from rich.prompt import IntPrompt
 
 from rich_click.rich_click import (
     ALIGN_ERRORS_PANEL,
@@ -118,13 +119,9 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
             if 1 <= int(ans) <= len(sap_systems):
                 break
 
-            # TODO: подсветить красным "Choose system you want to logon", чтобы было визуально видно, что
-            #  нужно еще что-то сделать перед логином.
             click.echo()
-            ans = click.prompt(
-                click.style("\nChoose system you want to logon.", **color_warning),
-                click.style(f"Available values from 1 to {str(len(sap_systems))}: \n>>>", **color_message),
-                type=int)
+            ans = IntPrompt.ask(
+                f"\n[bold red]Choose a system you want to login.[/bold red] Available values from 1 to {str(len(sap_systems))}: \n>>>")
         ans = ans - 1
 
     selected_system: Sap_system = Sap_system(
@@ -143,13 +140,9 @@ def choose_parameter(parameters: list, verbose=False):
             if 1 <= int(ans) <= len(parameters):
                 break
 
-            # TODO: подсветить красным "Choose system you want to logon", чтобы было визуально видно, что
-            #  нужно еще что-то сделать перед логином.
             click.echo()
-            ans = click.prompt(
-                click.style("\nChoose parameters.", **color_warning),
-                click.style(f"Available values from 1 to {str(len(parameters))}: \n>>>", **color_message),
-                type=int)
+            ans = IntPrompt.ask(
+                f"\n[bold red]Choose a transaction with parameter.[/bold red] Available values from 1 to {str(len(parameters))}: \n>>>")
         ans = ans - 1
 
     selected_params = Parameter(parameters[ans].transaction, parameters[ans].parameter)
