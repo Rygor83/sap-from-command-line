@@ -4,8 +4,12 @@
 
 from .api import (
     Sap_system,
+    Parameter,
     query_system,
     query_param,
+    add_param,
+    delete_param,
+    update_param,
     add,
     delete,
     update,

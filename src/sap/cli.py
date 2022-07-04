@@ -24,7 +24,7 @@ from rich.markdown import Markdown
 from pathlib import Path
 import sap.config
 from sap import utilities
-from sap.api import Sap_system, Obj_structure
+from sap.api import Sap_system, Obj_structure, Parameter
 from sap.config import create_config, open_config, open_folder
 from sap.crypto import Crypto
 from sap.database import SapDB
@@ -215,10 +215,19 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 argument = argument + " -type=transaction"
 
                 if parameter:
-                    param_data = sap.query_param(str(transaction).upper())
+                    param = Parameter(str(transaction).upper())
+                    param_data = sap.query_param(param)
 
                     if param_data:
-                        argument = argument + f' -command="{transaction.upper()} {param_data[0][1]}={parameter};"'
+                        param_list = param_data[0][1].split(',')
+                        param_value = parameter.split(',')
+
+                        param_list_value = zip(param_list, param_value)
+
+                        argument = argument + f' -command="*{transaction.upper()}'
+                        for item in param_list_value:
+                            argument = argument + f' {item[0]}={item[1]};'
+                        argument = argument + '"'
                     else:
                         utilities.print_message(f"\nThere is no parameter info for {transaction.upper()} transaction",
                                                 message_type=utilities.message_type_warning)
@@ -872,7 +881,7 @@ def start(ctx):
 @sap_cli.command("backup", short_help="Create backup")
 @click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
               type=utilities.PASS_REQUIREMENT)
-@click.option('-o', "--open_debug_file", "open_file", is_flag=True, default=True,
+@click.option('-o', "--open_file", "open_file", is_flag=True, default=True,
               help='Do you need to open folder with backup file')
 @click.pass_context
 def backup(ctx, password, open_file=True):
@@ -920,17 +929,127 @@ def backup(ctx, password, open_file=True):
         click.echo()
 
 
-@sap_cli.command("param")
-@click.option('-add', is_flag=True, callback=create_config, expose_value=False, is_eager=True,
-              help='Add parameters to transaction')
-@click.option('-list', is_flag=True, callback=open_config, expose_value=False, is_eager=True,
-              help='List all parameters')
+@sap_cli.command("parlist")
+@click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
+@click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, type=click.BOOL, default=False)
 @click.pass_context
-def parameter():
-    """ Adding/Viewing parameters for transactions """
-    # TODO: реализовать добавление параметров для транзакций
+def parameter_list(ctx, transaction, enum):
+    """
+    List transaction's parameter from databse 'Parameters'
+    """
 
-    pass
+    param = Parameter(str(transaction).upper() if transaction else None, None)
+
+    with _sap_db(ctx.obj.config):
+        result = sap.query_param(param)
+
+        parameters = [Parameter(item[0], item[1]) for item in result]
+
+        utilities.print_parameters_list(*parameters, title="Available transactions and parameters", enum=enum)
+
+        return result
+
+
+@sap_cli.command("pardel")
+@click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
+@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", default=None,
+              type=click.BOOL)
+@click.pass_context
+def parameter_delete(ctx, transaction, confirm: bool):
+    """
+    Delete transaction's parameter from databse 'Parameters'
+    """
+
+    param = Parameter(str(transaction).upper() if transaction else None, None)
+
+    query_result = ctx.invoke(parameter_list, transaction=param.transaction, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_parameters = [Parameter(item[0], item[1]) for item in query_result]
+
+        selected_params = utilities.choose_parameter(selected_parameters)
+
+        message = "Trying to DELETE the following transaction"
+        # utilities.print_system_list(selected_system, title=message)
+
+        click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
+                      abort=True, default=confirm)
+
+        parameter_to_delete = Parameter(selected_params.transaction,
+                                        selected_params.parameter)
+
+        result = sap.delete_param(parameter_to_delete)
+
+        result = sap.query_param(parameter_to_delete)
+
+        if result is None:
+
+            utilities.print_parameters_list(parameter_to_delete,
+                                            title="The following parameter is DELETED from database")
+        else:
+            no_parameter_found = Parameter(parameter_to_delete.transaction, parameter_to_delete.parameter)
+
+            utilities.print_parameters_list(no_parameter_found, title="FAILED TO UPDATE the following system",
+                                            color=utilities.color_warning)
+
+
+@sap_cli.command("paradd")
+@click.option("-t", "--transaction", "transaction", prompt=True, help="Transaction code", type=click.STRING)
+@click.option("-p", "--parameter", "parameter", prompt=True, help="Transaction's parameter", type=click.STRING)
+@click.pass_context
+def parameter_add(ctx, transaction, parameter):
+    """
+    Add transaction's parameter to databse 'Parameters'
+    """
+
+    param = Parameter(str(transaction).upper(), str(parameter).upper())
+
+    with _sap_db(ctx.obj.config):
+        result = sap.add_param(param)
+
+        if result is not None:
+            utilities.print_message("Failed to add system to database ... \n", utilities.message_type_error)
+            click.echo(result)
+        else:
+            result = ctx.invoke(parameter_list, transaction=param.transaction)
+
+
+@sap_cli.command("parupdate", short_help="Update record from database")
+@click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
+@click.pass_context
+def parameter_update(ctx, transaction: str):
+    """
+    \b
+    Update parameters for selected transaction
+    """
+
+    param = Parameter(str(transaction).upper() if transaction else None, None)
+
+    query_result = ctx.invoke(parameter_list, transaction=param.transaction, enum=True)
+    # --------------------------
+    if query_result != []:
+        selected_parameters = [Parameter(item[0], item[1]) for item in query_result]
+
+        selected_params = utilities.choose_parameter(selected_parameters)
+
+        parameter_new = click.prompt(f"Enter new parameters for transaction {transaction.upper()}",
+                                     default=selected_params.parameter)
+
+        parameter_updated = Parameter(str(transaction).upper(), str(parameter_new).upper())
+
+        result = sap.update_param(parameter_updated)
+
+        print(result)
+
+        if result is None:
+
+            utilities.print_parameters_list(parameter_updated,
+                                            title="The following system is UPDATED")
+        else:
+            no_parameter_found = Parameter(parameter_updated.transaction, parameter_updated.parameter)
+
+            utilities.print_parameters_list(no_parameter_found, title="FAILED TO UPDATE the following system",
+                                            color=utilities.color_warning)
 
 
 @contextmanager

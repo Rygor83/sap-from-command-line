@@ -12,7 +12,7 @@ from prettytable import PrettyTable
 import time
 
 import sap.api
-from sap.api import Sap_system
+from sap.api import Sap_system, Parameter
 from sap.exceptions import WrongPath
 
 from rich.markdown import Markdown
@@ -112,7 +112,7 @@ def launch_saplogon_with_params(saplogon):
 def choose_system(sap_systems: list, verbose=False) -> Sap_system:
     ans = 0
     if len(sap_systems) >= 2:
-        # print_system_list(sap_systems, 'Available systems', verbose=verbose, enum=True)
+        # print_system_list(parameters, 'Available systems', verbose=verbose, enum=True)
 
         while int(ans) > len(sap_systems) or int(ans) < 1:
             if 1 <= int(ans) <= len(sap_systems):
@@ -132,6 +132,29 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
         sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype)
 
     return selected_system
+
+
+def choose_parameter(parameters: list, verbose=False):
+    ans = 0
+    if len(parameters) >= 2:
+        # print_system_list(parameters, 'Available systems', verbose=verbose, enum=True)
+
+        while int(ans) > len(parameters) or int(ans) < 1:
+            if 1 <= int(ans) <= len(parameters):
+                break
+
+            # TODO: подсветить красным "Choose system you want to logon", чтобы было визуально видно, что
+            #  нужно еще что-то сделать перед логином.
+            click.echo()
+            ans = click.prompt(
+                click.style("\nChoose parameters.", **color_warning),
+                click.style(f"Available values from 1 to {str(len(parameters))}: \n>>>", **color_message),
+                type=int)
+        ans = ans - 1
+
+    selected_params = Parameter(parameters[ans].transaction, parameters[ans].parameter)
+
+    return selected_params
 
 
 def print_system_list(*sap_systems: Sap_system, title, color=color_success, verbose=False,
@@ -202,6 +225,50 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
 
         if verbose and sap_system.password is not None:
             row.append(sap_system.password)
+
+        table.add_row(*row)
+        row.clear()
+
+    # Information output
+    click.echo('\n')
+    console = Console()
+    console.print(table)
+
+
+def print_parameters_list(*parameters: Parameter, title, color=color_success, enum=False):
+    """ Print information in table style """
+
+    row = []
+
+    # Title
+    title = f"{click.style(title, **color)}"
+
+    # Table initializing
+    table = Table(title=title, box=box.SQUARE_DOUBLE_HEAD, expand=True)
+
+    # Header
+    if enum:
+        header = ['Id', 'Transaction', 'Parameters']
+    else:
+        header = ['Transaction', 'Parameters']
+
+    for item in header:
+        table.add_column(item)
+
+    # Rows
+    for index, parameter in enumerate(parameters, start=1):
+        if enum:
+            row.append(str(index))
+
+        if parameter.transaction is not None:
+            row.append(parameter.transaction)
+        else:
+            row.append('')
+
+        if parameter.parameter is not None:
+            row.append(parameter.parameter)
+        else:
+            row.append('')
 
         table.add_row(*row)
         row.clear()

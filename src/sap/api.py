@@ -11,6 +11,9 @@ from sap.exceptions import DatabaseDoesNotExists
 Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'customer', 'description', 'url', 'autotype'])
 Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None, None)
 
+Parameter = namedtuple('parameters', ['transaction', 'parameter'])
+Parameter.__new__.__defaults__ = (None, None)
+
 
 def query_system(sap_system: Sap_system):
     """ Запуск указанной SAP системы \n Обязательные параметры: 1. система, 2. мандант (не обязательно)  """
@@ -78,8 +81,20 @@ def delete(sap_system: Sap_system):
     return _sapdb.delete(sap_system)
 
 
-def query_param(transaction):
-    return _sapdb.query_param(transaction)
+def query_param(parameter: Parameter):
+    return _sapdb.query_param(parameter)
+
+
+def add_param(parameter: Parameter):
+    return _sapdb.add_param(parameter)
+
+
+def delete_param(parameter: Parameter):
+    return _sapdb.delete_param(parameter)
+
+
+def update_param(parameter: Parameter):
+    return _sapdb.update_param(parameter)
 
 
 _sapdb = None

@@ -3,6 +3,7 @@
 #  ------------------------------------------
 import os
 import click
+from numpy.core._rational_tests import test_add_rationals
 
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine, asc
@@ -37,11 +38,6 @@ class Param(Base):
     __tablename__ = 'parameters'
     transaction = Column(String(20), primary_key=True)
     parameter = Column(String(100))
-
-    # TODO: продумать как подавать несколько параметров. Например: FTR_EDIT -> БЕ и Номер сделки
-    #  добавить в таблицу parameters поле "номер поля" для нескольких параметров
-    #  с параметром "-p" передавать несколько значений через пробел:
-    #  -p "01 0100000000256"
 
 
 class SapDB():  # noqa : E801
@@ -170,12 +166,55 @@ class SapDB():  # noqa : E801
 
         return result
 
-    def query_param(self, transaction):
-        """Remove all tasks from db."""
+    def query_param(self, parameter):
+        """List all transactions and it's parameters"""
         query = self.session.query(Param.transaction, Param.parameter)
-        if transaction:
-            query = query.filter_by(transaction=transaction)
+        if parameter.transaction:
+            query = query.filter(Param.transaction.ilike(f"%{parameter.transaction}%"))
         return query.all()
+
+    def delete_param(self, parameter):
+        """Delete transactions and it's parameters"""
+        result = ''
+
+        query = self.session.query(Param)
+        try:
+            result = query.filter(Param.transaction == parameter.transaction).one()
+        except NoResultFound:
+            return result
+
+        self.session.delete(result)
+        self.session.commit()
+
+        return result
+
+    def add_param(self, parameter):  # type (namedtuple) -> list
+        """Add a task dict to db."""
+        record = Param(transaction=parameter.transaction,
+                       parameter=parameter.parameter)
+
+        result = self.session.add(record)
+        try:
+            self.session.commit()
+        except IntegrityError:
+            self.session.rollback()
+            return result
+        return result
+
+    def update_param(self, parameter):  # type (namedtuple) -> list
+        """Modify task in db with given task_id."""
+        result = ''
+
+        query = self.session.query(Param)
+        try:
+            result = query.filter(Param.transaction == parameter.transaction).one()
+        except NoResultFound:
+            return None
+
+        if result:
+            result.transaction = parameter.transaction
+            result.parameter = parameter.parameter
+            self.session.commit()
 
     def drop(self):
         """ Dropping datase"""
