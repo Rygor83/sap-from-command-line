@@ -222,6 +222,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                         param_list = param_data[0][1].split(',')
                         param_value = parameter.split(',')
 
+                        # TODO: сделать проверку, что кол-во параметров (param_list) совпадает с кол-вом значений (param_value)
+                        #  Как вариант можно сделать через zip(param_list, param_value, strict=True), но это будет python 3.10
+
                         param_list_value = zip(param_list, param_value)
 
                         argument = argument + f' -command="*{transaction.upper()}'
@@ -437,8 +440,8 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option('-c', "--clear_clipboard", "clear_clipboard", is_flag=True, default=True,
               help='Flag. Clear clipboard.')
-@click.option('-t', "--time_to_clear", "time_to_clear", default=10, type=click.INT,
-              help='Timer in seconds to clear clipboard')
+@click.option('-t', "--time_to_clear", "time_to_clear", default=utilities.default_time_to_clear(), show_default=True,
+              type=click.INT, help='Timer in seconds to clear clipboard')
 @click.pass_context
 def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool,
        time_to_clear: int):
@@ -490,6 +493,7 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 
 
 @sap_cli.command("add")
+@click.pass_context
 @click.option("-system", prompt=True, help="System Id", type=utilities.LETTERS_NUMBERS_3)
 @click.option("-mandant", prompt=True, help="Mandant/Client number", type=click.IntRange(1, 999))
 @click.option("-user", prompt=True, help="User")
@@ -498,9 +502,8 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
 @click.option("-a", "--autotype", prompt=True, help="Autotype sequence for logining to web site", type=click.STRING,
-              default="{USER}{TAB}{PASS}{ENTER}")  # TODO: попробовать передать ctx.obj.config.sequence
+              default=utilities.default_sequence(), show_default=True)
 @click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
-@click.pass_context
 def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
         autotype: str, verbose: bool):
     """

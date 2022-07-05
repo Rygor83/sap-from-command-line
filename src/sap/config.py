@@ -17,7 +17,7 @@ from sap.exceptions import ConfigExists, ConfigDoesNotExists
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
-                                     'private_key_path', 'language', 'sequence', 'wait_site_to_load'])
+                                     'private_key_path', 'language', 'sequence', 'wait_site_to_load', 'time_to_clear'])
 
 
 class Config:
@@ -36,6 +36,7 @@ class Config:
             private_key_path=None,
             sequence=None,
             wait_site_to_load=None,
+            time_to_clear=None,
     ):
 
         self.ini_name = CONFIG_NAME
@@ -53,8 +54,10 @@ class Config:
                                                                                        PRIVATE_KEY_NAME)
         self.language = 'RU'  # TODO: сделать мультиязычность
 
-        self.sequence = '{USER}{TAB}{PASS}{ENTER}'
-        self.wait_site_to_load = 4
+        self.sequence = sequence
+        self.wait_site_to_load = wait_site_to_load
+
+        self.time_to_clear = time_to_clear
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -77,6 +80,8 @@ class Config:
             self.sequence = parser.get('AUTO-TYPE', 'sequence')
             self.wait_site_to_load = int(parser.get('AUTO-TYPE', 'wait'))
 
+            self.time_to_clear = int(parser.get('PASSWORD', 'time_to_clear'))
+
             # TODO: Сделать проверку и уведомление, если приватный ключ и базаданных лежат в одной папке
 
             # db_path = pathlib.Path(self.db_path)
@@ -88,7 +93,7 @@ class Config:
 
             return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
                              self.public_key_path, self.private_key_path, self.language, self.sequence,
-                             self.wait_site_to_load)
+                             self.wait_site_to_load, self.time_to_clear)
         else:
             raise ConfigDoesNotExists(self.config_file_path)
 
@@ -123,6 +128,10 @@ class Config:
                 'sequence': "{USER}{TAB}{PASS}{ENTER}",
                 "; wait - Time to wait a web site to load": None,
                 'wait': 4}
+
+            parser['PASSWORD'] = {
+                "; time_to_clear - Time to wait to clear clipboard with password": None,
+                'time_to_clear': 10}
 
         # Определение языка
         win_dll = ctypes.windll.kernel32

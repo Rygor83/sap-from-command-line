@@ -352,3 +352,33 @@ def print_markdown(markdown):
     console = Console()
     md = Markdown(markdown)
     console.print(md)
+
+
+def default_sequence():
+    """
+    Default values from configuration file for CLICK.OPTION for [AUTO-TYPE]->sequence
+    """
+    config = ""
+    config = sap.config.Config()
+    try:
+        _config = config.read()
+    except ConfigDoesNotExists as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
+
+    return _config.sequence
+
+
+def default_time_to_clear():
+    """
+    Default values from configuration file for CLICK.OPTION for [PASSWORD]->time_to_clear
+    """
+    config = ""
+    config = sap.config.Config()
+    try:
+        _config = config.read()
+    except ConfigDoesNotExists as err:
+        click.echo(click.style(f"{err}", **utilities.color_warning))
+        raise click.Abort
+
+    return _config.time_to_clear
