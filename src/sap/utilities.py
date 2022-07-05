@@ -362,9 +362,8 @@ def default_sequence():
     config = sap.config.Config()
     try:
         _config = config.read()
-    except ConfigDoesNotExists as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
-        raise click.Abort
+    except:
+        return ""
 
     return _config.sequence
 
@@ -377,8 +376,7 @@ def default_time_to_clear():
     config = sap.config.Config()
     try:
         _config = config.read()
-    except ConfigDoesNotExists as err:
-        click.echo(click.style(f"{err}", **utilities.color_warning))
-        raise click.Abort
+    except:
+        return ""
 
     return _config.time_to_clear

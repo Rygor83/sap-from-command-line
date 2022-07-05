@@ -841,8 +841,9 @@ def start(ctx):
     \b
     Starting point for working wiht SAP command line tool
     1. Database creation.
-    2. ini file with config parameters createion.
-    3. Usefull messages
+    2. ini file with config parameters creation.
+    3. Private and public encryption keys.
+    4. Usefull messages.
     """
 
     click.clear()
