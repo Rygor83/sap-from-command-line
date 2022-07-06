@@ -88,3 +88,4 @@ class EncryptionKeysAlreadyExist(Exception):
     def __init__(self, public_path, private_path, message="Encryption keys already exist"):
         self.message = f'\n{message}: \nPrivate: {private_path} \nPublic: {public_path}'
         super().__init__(self.message)
+

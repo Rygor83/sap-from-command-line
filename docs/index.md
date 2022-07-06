@@ -7,47 +7,49 @@ Windows Command line tool for launching SAP systems from SAPlogon for SAP consul
 ## Possibilities:
 
 Like all SAP consultants, I work with different clients in different systems. Each system has its own security levels.
-Some customers require changing the password every 3 months, some once a month. You can remember passwords for those
+Some customers require changing the password every 3 months, some - once a month. You can remember passwords for those
 systems in which you work all the time, but what to do with customers who contact you once every 2-3 months. And
-besides, trying to synchronize all passwords to all systems is unsafe, and a waste of time.
+besides, trying to synchronize all passwords to all sap systems is unsafe, and a waste of time.
 
 A long time ago, I wanted to create a database where I could securely store all data about systems, as well as
-passwords. And run systems from the command line. This is how this instrument was born.
+passwords. And launch systems from the command line. This is how this instrument was born.
 
 What this tool can do:
 
-1. Run SAP systems from the command line. This is possible with the built-in SAP tool - sapshcut.exe A detailed
+1. Launch SAP systems from the command line. This is possible with the built-in SAP tool "sapshcut.exe". A detailed
    description of this tool can be found in note [103019](https://launchpad.support.sap.com/#/notes/103019) (local pdf
    version
    is [here](https://github.com/Rygor83/sap-from-command-line/blob/master/Note%20103019_SAP_Command_lines__v57.pdf)). I
-   just took this tool and adapted the commands to my tool.
+   just took this tool and adapted the commands.
 2. All system data (System ID, client, user, password, system description, customer name) are stored in a database, the
-   password is encrypted by PCA
-3. You can also store the URL - if the SAP system can be run in a browser, as well as an autotype sequence to
+   password is encrypted with [RSA](https://en.wikipedia.org/wiki/RSA_(cryptosystem)).
+3. You can also store the URL if SAP system can be launched in a web browser, as well as an autotype sequence to
    automatically fill in the username and password in the web version of the system.
 4. Ability to launch a transaction at sap system startup, as well as transferring the parameters of this transaction.
-   For example, you run tr. CE11 and say open table T001. The data for this is also maintained in the database.
-5. Launch sap system with user/password not in database.
-6. Start SAP with additional commands: system command (like, /n, /nend, /nex, /o), reports (tr. SE38 -> report name),
-   etc
-7. Copying the password for the requested system to the clipboard. Useful for the case of tr. STMS when you import a
-   request into another system and a password is requested.
+   For example, you run tr. SE11 and say open table T001. The data for this is also maintained in the database.
+5. Launch sap system with user/password not in database so-called external user.
+6. Start SAP with additional commands:
+    1. transaction (SE37, FB03, etc)
+    2. system command (like, /n, /nend, /nex, /o)
+    3. reports (tr. SE38 -> report name)
+    4. etc
+7. Copy a password for the requested system into the clipboard.
 8. Creating a password-protected backup with tool's files: configuration file, database, public and private encryption
-   key + XML file with a system list for SAPLogon
+   keys + XML file with a sap system list in SAPLogon
 
 # Installation
 
 1. Install [Python](https://www.python.org/downloads/). Use version 3.9 and above.
 2. Download [source code](https://github.com/Rygor83/sap-from-command-line/archive/refs/heads/master.zip) and extract
    it.
-3. Use the package manager [pip](https://pip.pypa.io/en/stable/) to install.
+3. Use the package manager [pip](https://pip.pypa.io/en/stable/) to install:
 
 ```cmd
 pip install <path to sap package folder>
 ``` 
 
 4. Download a tool to create and mount an encrypted virtual drive. We will use it to keep safe a private encryption key.
-   For example, [Bestcrypt](https://www.jetico.com)
+   For example, [Bestcrypt](https://www.jetico.com).
 
 # Prerequisites
 
@@ -56,11 +58,12 @@ etc).
 
 # Usage
 
-The commands are described below as they are used. Which one to start with and which one to use next
+The commands are described below as they are used: which one to start with and which one to use next
 
 ## help (-h, --help)
 
-If you need any help about commands - just type -h/--help command and you'll get the list of all possible commands.
+If you need any help about application or commands - just type -h/--help and you'll get the list of all possible
+commands.
 
 ```cmd
 sap -h
@@ -139,7 +142,7 @@ Options
 
 ## sap start
 
-Starting point for working with SAP command line tool
+Starting point for working with SAP command line tool.
 Type the following command and follow the instructions.
 
 ```cmd
@@ -199,8 +202,8 @@ seconds for verification and the data will be cleared from the screen.
 System: XXX
 Mandant: 100
 User: USER
-Password:
-Repeat for confirmation:
+Password: any password
+Repeat for confirmation: any password
 Customer []: Customer
 Description []: Dev
 Url []:
@@ -217,14 +220,14 @@ Information about passwords will be deleted from screen in 10:
 
 ```
 
-Try to add the following information into database with 'sap add' command
+Try to add yourself the following information into database with 'sap add' command
 
 ```
 System: YYY
 Mandant: 200
 User: XXX
-Password:
-Repeat for confirmation:
+Password: any password
+Repeat for confirmation: any password
 Customer []: BESTCUSTOMER
 Description []: Test
 Url []: www.sap.com
@@ -294,7 +297,7 @@ sap list % 200
 └─────────────────────────┴──────────────┴────────────────┴──────────────────────────┴─────────────────────────────────┘
 ```
 
-5. If you'd like to list information about system for specific customer the type 'sap list -c customer_name'
+5. If you'd like to list information about system for a specific customer then type 'sap list -c customer_name'
 
 ```cmd
 sap list -c bestcustomer
@@ -310,19 +313,19 @@ sap list -c bestcustomer
 └────────────────────────────────┴───────────────────┴─────────────────────┴─────────────────────────────┴─────────────┘
 ```
 
-6. To list system with specific user - use the following command
+6. To list systems with a specific user - use the following command
 
 ```cmd
 sap list -u username 
 ```
 
-7. To list system with specific description - use the following command
+7. To list systems with a specific description - use the following command
 
 ```cmd
 sap list -d system_description 
 ```
 
-8. To list system with url and autotype sequence - just add '-url' option to any command above
+8. To list systems with an url and autotype sequence - just add '-url' option to any command above
 
 ```cmd
 sap list yyy -url
@@ -337,7 +340,7 @@ sap list yyy -url
 └────────────────────┴───────────┴─────────────┴───────────────┴─────────┴─────────────┴────────────────────────────┘
 ```
 
-9. To list system with password - just add '-v' option to any command above
+9. To list systems with password - just add '-v' option to any command above
 
 ```cmd
 sap list xxx -v
@@ -357,6 +360,8 @@ sap list xxx -v
 
 10. You can request information with incomplete values
 
+For example, you remember part of customer's name - 'cust'
+
 ```cmd
 sap list -c cust
 ```
@@ -373,9 +378,14 @@ A list of systems will be displayed with the customer's name that contains a "cu
 └────────────────────────────────┴───────────────────┴─────────────────────┴─────────────────────────────┴─────────────┘
 ```
 
+The same works for any command's arguments and options.
+
+If you remember first values and last values, but don't remember values in between - use '%' as delimiter
+For example: option '-c be%er' will find all customer which have 'be' at the beginning and 'er' at the end.
+
 ## sap run
 
-To start the sap system, 'sap run' command is used.
+To launch sap system, 'sap run' command is used.
 
 1. If you run 'sap run' without any options
 
@@ -383,7 +393,7 @@ To start the sap system, 'sap run' command is used.
 sap run 
 ```
 
-then the list of all possible sap system will be printed. And you have to choose which system you want to launch.
+then the list of all possible sap systems will be printed. And you have to choose which system you want to launch.
 
 ```
                                               Available systems
@@ -395,7 +405,7 @@ then the list of all possible sap system will be printed. And you have to choose
 └───────┴───────────────────────┴─────────────┴───────────────┴────────────────────────┴───────────────────────────────┘
 
 
-Choose a system you want to login. Available values from 1 to 26:
+Choose a system you want to login. Available values from 1 to 2:
 >>>: 2
 
                                    Trying to LAUNCH the following system
@@ -435,7 +445,7 @@ a system to launch the way we did it with 'sap run' command without any options.
 
 3. sap run with additional options
 
-You can try to launch system with additional options
+You can try to launch sap system with additional options.
 
 ```
 ╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
@@ -452,7 +462,7 @@ For example, by user
 sap run -u xxx
 ```
 
-Database is being searched for a system with specific user and all results are printed. If results contain several
+Looking for a system in the database with a specific user and all results are printed. If results contain several
 records then you need to choose a system you want to launch.
 
 ```
@@ -512,7 +522,7 @@ sap run xxx -t se11
 └────────────────────────────────┴───────────────────┴─────────────────────┴─────────────────────────────┴─────────────┘
 ```
 
-also you can specify additional parameter - parameter's value for transaction. For example, for tr. SE11 - table name
+also you can specify additional parameters - parameter's value for transaction. For example, for tr. SE11 - table name
 
 ```cmd
 sap run xxx -t se11 -p t001
@@ -523,6 +533,8 @@ Trying to launch XXX system with system command
 ```cmd
 sap run xxx -s /nex
 ```
+
+This will force all opened XXX sap systems to close.
 
 ```
                                               Available systems
@@ -564,9 +576,9 @@ sap run xxx -r RFITEMAP
 └────────────────────────────────┴───────────────────┴─────────────────────┴─────────────────────────────┴─────────────┘
 ```
 
-5. launching web version of sap system or other site
+5. launching web version of sap system or other site:
 
-If you've specified an url for sap system then it is possible to run it in browser.
+If you've specified an url for sap system then it is possible to run it in a web browser.
 
 Let's take a look at system with url.
 
@@ -585,8 +597,8 @@ sap list yyy -url
 
 URL - www.sap.com will be launched.
 YYY system have autotype sequence by default: {USER}{TAB}{PASS}{ENTER}. It means that USER id will be pasted into Login
-field, then TAB will be pressed to get to PASSWORD field, and PASSWORD will be pasted, then ENTER will be pressed.
-Voila!
+field (if login field have focus), then TAB will be pressed to get to PASSWORD field, and PASSWORD will be pasted, then
+ENTER will be pressed. Voila!
 
 ```cmd
 sap run yyy -w
@@ -607,7 +619,7 @@ sap run yyy -w
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-5. launching new connection to the same system.
+6. launching new connection to the same system.
 
 If you need to open new connection (let's say, you have 6 windows of XXX system opened, and you need more!!!) then you
 can use '-n' option
@@ -616,16 +628,41 @@ can use '-n' option
 sap run xxx -n
 ```
 
+7. launching existing sap system in your database with user/password not in your database. So-called external user.
+
+```cmd
+sap run yyy 200 -eu
+```
+
+```
+                                              Available systems
+┌─────────┬──────────────────────────────┬─────────────────┬───────────────────┬──────────────────────────┬────────────┐
+│ Id      │ Customer                     │ System          │ Mandant           │ Description              │ User       │
+╞═════════╪══════════════════════════════╪═════════════════╪═══════════════════╪══════════════════════════╪════════════╡
+│ 1       │ BESTCUSTOMER                 │ XXX             │ 100               │ Dev                      │ XXX        │
+└─────────┴──────────────────────────────┴─────────────────┴───────────────────┴──────────────────────────┴────────────┘
+
+Enter external user id: external_user_id
+Enter password for external user: 12345678
+
+                          Trying to LAUNCH the following system with EXTERNAL USER
+┌────────────────────┬────────────────┬──────────────────┬──────────────────────────┬──────────────────────────────────┐
+│ Customer           │ System         │ Mandant          │ Description              │ User                             │
+╞════════════════════╪════════════════╪══════════════════╪══════════════════════════╪══════════════════════════════════╡
+│ BESTCUSTOMER       │ YYY            │ 200              │ Dev                      │ EXTERNAL_USER_ID                 │
+└────────────────────┴────────────────┴──────────────────┴──────────────────────────┴──────────────────────────────────┘
+```
+
 ## sap update
 
-If you need to update any parameter of sap system in database then you can use command 'sap update'
+If you need to update any parameter of sap system in the database then you can use command 'sap update'
 
 ```cmd
 sap update xxx
 ```
 
 List of available systems will be printed. Then you'll be prompted to enter parameters. In [] brackets values from
-database will be printed. If you don't need to change this parameter then press Enter. If you need to change parameters
+database will be printed. If you don't need to change this parameter just press Enter. If you need to change parameters
 then type new value.
 
 ```
@@ -687,12 +724,13 @@ Do you really want to delete the system? [y/n]: y
 
 ## sap debug
 
-You have to possibilities:
+You have two possibilities:
 
 1. Start debugging already opened system.
 
-If you have already opened system that you need to debug then use command 'sap debug'. Debug is always launched for the
-latest opened window. So *Open the window you need to debug* and run command.
+If you have already opened system which you need to debug then use command 'sap debug'. Debug is always launched for the
+latest opened sap system's window. 
+So **Open the window you need to debug** and run command.
 
 ```cmd
 sap debug yyy
@@ -757,7 +795,7 @@ Repeat for confirmation: 12345678
 
 ## sap pw
 
-If you need only password for specific sap system then you can use 'sap pw' command
+If you need only a password for specific sap system then you can use 'sap pw' command
 This can be useful when you are already logged in one system and password is requested for the other system.
 For example tr. STMS when you transport request into another system.
 

@@ -3,7 +3,6 @@
 #  ------------------------------------------
 
 import ctypes
-import getpass
 import os
 from contextlib import contextmanager
 from datetime import datetime
@@ -138,19 +137,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                                 utilities.message_type_warning)
         raise click.Abort
 
-    if external_user:
-
-        if not mandant:
-            mandant = input("Enter mandant: ")
-        user = input("Enter external user id: ")
-        password = getpass.getpass("Enter password for external user: ")
-
-        query_result = [Sap_system(system.upper(), str(mandant).zfill(3), user.upper(), password, "", "", "")]
-    else:
-
-        query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
-                                  description=description,
-                                  url=False, verbose=False, enum=True)
+    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                              description=description,
+                              url=False, verbose=False, enum=True)
     # --------------------------
     if query_result != []:
         selected_sap_systems = [
@@ -162,11 +151,10 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
-            argument = utilities.prepare_parameters_to_launch_system(selected_system, password,
-                                                                     language,
-                                                                     guiparm, snc_name, snc_qop,
-                                                                     user, "",
-                                                                     ctx.obj.config.command_line_path)
+            argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language,
+                                                                                      external_user,
+                                                                                      guiparm, snc_name, snc_qop, "",
+                                                                                      ctx.obj.config.command_line_path)
         except WrongPath as err:
             utilities.print_message(f"{err}", message_type=utilities.message_type_error)
             raise click.Abort
@@ -256,7 +244,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 command_type = None
 
             if external_user:
-                message = "Trying to LAUNCH the following system with EXTERNAL USERS"
+                message = "Trying to LAUNCH the following system with EXTERNAL USER"
             else:
                 message = "Trying to LAUNCH the following system "
 
@@ -355,11 +343,10 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
             #  values must be entered
             selected_system = utilities.choose_system(selected_sap_systems)
             try:
-                argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
-                                                                         language,
-                                                                         guiparm, snc_name, snc_qop,
-                                                                         user, "",
-                                                                         ctx.obj.config.command_line_path)
+                argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language,
+                                                                                          None, guiparm, snc_name,
+                                                                                          snc_qop, "",
+                                                                                          ctx.obj.config.command_line_path)
             except WrongPath as err:
                 click.echo(f"{err}")
                 raise click.Abort
@@ -409,11 +396,9 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
-            argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
-                                                                     language,
-                                                                     None, None, None,
-                                                                     user, "",
-                                                                     ctx.obj.config.command_line_path)
+            argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language, None,
+                                                                                      None, None, None, "",
+                                                                                      ctx.obj.config.command_line_path)
         except WrongPath as err:
             click.echo(f"{err}")
             raise click.Abort

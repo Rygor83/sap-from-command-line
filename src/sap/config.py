@@ -205,3 +205,4 @@ def open_folder(ctx, param, value):
     ctx.obj.config.open_config(locate=True)
 
     ctx.exit()
+

@@ -228,3 +228,4 @@ class SapDB():  # noqa : E801
 def start_sap_db(db_path, db_type):
     """Connect to db."""
     return SapDB(db_path, db_type)
+

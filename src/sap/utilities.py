@@ -10,6 +10,7 @@ import operator
 import re
 from prettytable import PrettyTable
 import time
+import getpass
 
 import sap.api
 from sap.api import Sap_system, Parameter
@@ -47,9 +48,9 @@ message_type_sensitive = "Sensitive"
 message_type_error = "Error"
 
 
-def prepare_parameters_to_launch_system(selected_system: Sap_system, password, language, guiparm, snc_name, snc_qop,
-                                        user, transaction="",
-                                        sapshcut_exe_path: str = "") -> str:  # list:
+def prepare_parameters_to_launch_system(selected_system: Sap_system, language, external_user, guiparm, snc_name,
+                                        snc_qop,
+                                        transaction="", sapshcut_exe_path: str = "") -> str:  # list:
     # Добавляем параметры для запуска SAP системы
     if not os.path.exists(sapshcut_exe_path):
         raise WrongPath("sapshcut.exe", sapshcut_exe_path)
@@ -59,12 +60,14 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, password, l
     argument = argument + f" -system={selected_system.system}"  # Id системы
     argument = argument + f" -client={str(selected_system.mandant).zfill(3)}"  # Номер манданта
 
-    if user:
+    if external_user:
+        user = input("\nEnter external user id: ")
         argument = argument + f" -user={user}"  # Пользователь
     else:
         argument = argument + f" -user={selected_system.user}"  # Пользователь
 
-    if password:
+    if external_user:
+        password = getpass.getpass("Enter password for external user: ")
         argument = argument + f" -pw={password}"  # Пароль
     else:
         argument = argument + f" -pw={selected_system.password}"  # Пароль
@@ -82,7 +85,14 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, password, l
 
     argument = argument + " -maxgui"  # Развернуть окно на весь экран
 
-    return argument
+    if external_user:
+        edited_system = Sap_system(selected_system.system, selected_system.mandant, str(user).upper(), password,
+                                   selected_system.customer, selected_system.description, selected_system.url,
+                                   selected_system.autotype)
+    else:
+        edited_system = selected_system
+
+    return argument, edited_system
 
 
 def launch_command_line_with_params(command_line_path, param):

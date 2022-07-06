@@ -22,3 +22,4 @@ To start work with SAP commands after preparatory work:
 - type 'SAP ADD' to add sap system into database
 - type 'SAP RUN <system id> <mandant num>' to launch sap system
 - type 'SAP --HELP' to learn more about program
+

@@ -134,3 +134,4 @@ COMMAND_LINE_PATH = 'sapshcut.exe'
 SAPLOGON_PATH = 'saplogon.exe'
 DEBUG_FILE_NAME = "DEBUG.TXT"
 TIMER_TO_CLEAR_SCREEN: int = 10
+

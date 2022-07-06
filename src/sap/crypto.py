@@ -97,3 +97,4 @@ class Crypto:
         """ Remove encryption keys """
         os.remove(self.private_key_path)
         os.remove(self.public_key_path)
+
