@@ -118,7 +118,7 @@ def logon(ctx):
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
 @click.option("-n", "--new", "reuse", help="Flag. Defines whether a new connection to an SAP is reused",
-              default=True, is_flag=True)
+              default=False, is_flag=True, show_default=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
@@ -174,7 +174,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         if web:
             if selected_system.url != " ":
                 utilities.print_message(
-                    f"Launching web site: {selected_system.description} of {selected_system.customer}",
+                    f"Launching web site: {selected_system.url} ({selected_system.description} of {selected_system.customer})",
                     message_type=utilities.message_type_message)
                 click.launch(url=f"{selected_system.url}")
 
@@ -261,9 +261,9 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 message = "Trying to LAUNCH the following system "
 
             if reuse:
-                argument = argument + f' -reuse=1'
-            else:
                 argument = argument + f' -reuse=0'
+            else:
+                argument = argument + f' -reuse=1'
 
             utilities.print_system_list(selected_system, title=message,
                                         command=command, command_type=command_type)
@@ -358,7 +358,6 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
                 argument = utilities.prepare_parameters_to_launch_system(selected_system, None,
                                                                          language,
                                                                          guiparm, snc_name, snc_qop,
-                                                                         None,
                                                                          user, "",
                                                                          ctx.obj.config.command_line_path)
             except WrongPath as err:
@@ -696,7 +695,7 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
 
 @sap_cli.command("config")
 @click.option('-create', is_flag=True, callback=create_config, expose_value=False, is_eager=True,
-              help='Create config file')
+              help='Create config file. For techincal purpuse. Use "sap start" to create config')
 @click.option('-open', is_flag=True, callback=open_config, expose_value=False, is_eager=True,
               help='Open config file')
 @click.option('-folder', is_flag=True, callback=open_folder, expose_value=False, is_eager=True,
@@ -708,7 +707,7 @@ def config(ctx):
     config_markdown = """
     Enter one of subcommands:
 
-    \t -create       Create config file
+    \t -create       Create config file. For techincal purpuse. Use "sap start" to create config
     \t -open         Open config file
     \t -folder       Open config folder
     """
@@ -839,7 +838,7 @@ def shortcut(ctx):
 def start(ctx):
     """
     \b
-    Starting point for working wiht SAP command line tool
+    Starting point for working with SAP command line tool
     1. Database creation.
     2. ini file with config parameters creation.
     3. Private and public encryption keys.
@@ -926,7 +925,7 @@ def backup(ctx, password, open_file=True):
         zf.comment = comment.encode()
 
     if os.path.exists(back_path):
-        utilities.print_message('Backup succesfully created', message_type=utilities.message_type_message)
+        utilities.print_message(f'Backup succesfully created: {back_path}', message_type=utilities.message_type_message)
         if open_file:
             click.launch(url=back_path, locate=True)
     else:

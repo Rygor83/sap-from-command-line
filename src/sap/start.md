@@ -1,15 +1,15 @@
 # Preparatory work
-## Files to work:
+## Created files:
 
-1. public_key.txt - used to encrypt passwords in database. Can be stored in any place. If you move it from default
+1. sap_config.ini - used to store information about all following files locations. Default location is "C:
+   \Users\<USERNAME>\AppData\Local\sap" folder. Also contains some additional parameters. All parameters have description.
+2. public_key.txt - used to encrypt passwords in database. Can be stored in any place. If you move it from default
    location then don't forget to put new place in sap_config.ini -> '[KEYS]' -> 'public_key_path'
-2. private_key.txt - used to decrypt passwords. Must be stored in a secure place. For example,
+3. private_key.txt - used to decrypt passwords. Must be stored in a secure place. For example,
    in [Bestcrypt](https://www.jetico.com/) container. Don't forget to put new place in sap_config.ini -> '[KEYS]' -> 'private_key_path'
-3. database.db - used to store all information about SAP systems. Must be stored in secure place. For example, in
+4. database.db - used to store all information about SAP systems. Must be stored in secure place. For example, in
    [Bestcrypt](https://www.jetico.com/) container. Don't forget to put new place in sap_config.ini -> '[DATABASE]' -> '
    db_path'
-4. sap_config.ini - used to store information about all previous files locations must be stored only in C:
-   \Users\<USERNAME>\AppData\Local\sap folder.
 
 ## Extra work:
 
