@@ -18,8 +18,9 @@ What this tool can do:
 
 1. Run SAP systems from the command line. This is possible with the built-in SAP tool - sapshcut.exe A detailed
    description of this tool can be found in note [103019](https://launchpad.support.sap.com/#/notes/103019) (local pdf
-   version is [here](../Note%20103019_SAP_Command_lines__v57.pdf)). I just took this tool and adapted the commands to my
-   tool.
+   version
+   is [here](https://github.com/Rygor83/sap-from-command-line/blob/master/Note%20103019_SAP_Command_lines__v57.pdf)). I
+   just took this tool and adapted the commands to my tool.
 2. All system data (System ID, client, user, password, system description, customer name) are stored in a database, the
    password is encrypted by PCA
 3. You can also store the URL - if the SAP system can be run in a browser, as well as an autotype sequence to

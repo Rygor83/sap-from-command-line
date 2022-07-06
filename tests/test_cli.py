@@ -4,6 +4,8 @@
 
 """ Test for Command Line """
 
+#TODO: сделать возможность работать без обращения к реальному config.ini файлу т.к. по умолчанию так и делается.
+
 import os
 
 import click
@@ -76,14 +78,13 @@ def runner():
 def test_list_added_system_outside_comman_line(runner, config_tmp_path, added_record, temp_db):
     """ Test LIST command with records in temporary database created from api"""
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "xxx", "100"])
-    assert result.output == ('\n' '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | XXX    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ XXX         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 @pytest.fixture
@@ -104,14 +105,13 @@ def add_system_to_temp_database(temp_db, config_tmp_path, runner):
 def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_database):
     """ Test LIST command with records in temporary database created with command line """
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
-    assert result.output == ('\n' '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 def test_delete_record_temp_db(runner, temp_db, config_tmp_path):
@@ -129,14 +129,13 @@ def test_delete_record_temp_db(runner, temp_db, config_tmp_path):
     result = runner.invoke(sap_cli,
                            args=["-path", config_tmp_path.config_path, "delete", "zzz", "100", "-confirm", "y"])
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
-    assert result.output == ('\n' '\n'
-                             '+------------------------------------------------------------+\n'
-                             '|         NOTHING FOUND according to search criteria         |\n'
-                             '+------------+----------+-----------+----------------+-------+\n'
-                             '| Customer   | System   | Mandant   | Description    | User  |\n'
-                             '+------------+----------+-----------+----------------+-------+\n'
-                             '|            | ZZZ      | 100       |                |       |\n'
-                             '+------------+----------+-----------+----------------+-------+\n')
+    assert result.output == ('\n\n'
+ '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│                │ ZZZ         │ 100           │                    │         │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 def test_pw_record_temp_db(runner, temp_db, config_tmp_path):
@@ -190,14 +189,13 @@ def test_update_record_temp_db(runner, temp_db, config_tmp_path):
                                  "-description", "QAS_SYSTEM",
                                  "-url", " "])
     result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
-    assert result.output == ('\n' '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 ########################################################################################################################
@@ -224,43 +222,37 @@ def add_system_to_existing_database(runner):
 def test_list_record_exising_db(runner, add_system_to_existing_database):
     """ Test LIST command with records in database created with command line """
     result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
-    assert result.output == ('\n'
-                             '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 def test_list_record_by_description_exising_db(runner, add_system_to_existing_database):
     """ Test LIST command with records in database created with command line """
     result = runner.invoke(sap_cli, args=["list", "-d", "sys"])
-    assert result.output == ('\n'
-                             '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 def test_list_record_by_customer_exising_db(runner, add_system_to_existing_database):
     """ Test LIST command with records in database created with command line """
     result = runner.invoke(sap_cli, args=["list", "-c", "cust"])
-    assert result.output == ('\n'
-                             '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 def test_pw_record_exising_db(runner, add_system_to_existing_database):
@@ -282,11 +274,13 @@ def test_update_record_exising_db(runner, add_system_to_existing_database):
                                  "-customer", "CUSTOMER",
                                  "-description", "QAS_SYSTEM"])
     result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
-    assert result.output == ('\n' '\n'
-                             '+--------------------------------------------------+\n'
-                             '|                Available systems                 |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| Customer | System | Mandant | Description | User |\n'
-                             '+----------+--------+---------+-------------+------+\n'
-                             '| CUSTOMER | ZZZ    | 100     | DEV_SYSTEM  | USER |\n'
-                             '+----------+--------+---------+-------------+------+\n')
+    assert result.output == ('\n\n'
+ '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+ '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+ '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+ '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+ '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+ '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
+
+
+#TODO: сделать проверку запуска команды 'sap list' без конфигурационного файла
