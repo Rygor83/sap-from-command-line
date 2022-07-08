@@ -40,8 +40,8 @@ What this tool can do:
 # Installation
 
 1. Install [Python](https://www.python.org/downloads/). Use version 3.9 and above.
-2. Download [source code](https://github.com/Rygor83/sap-from-command-line/archive/refs/heads/master.zip) and extract
-   it.
+2. Downloaded the latest version from [Releases page](https://github.com/Rygor83/sap-from-command-line/releases) and
+   extract it.
 3. Use the package manager [pip](https://pip.pypa.io/en/stable/) to install:
 
 ```cmd
@@ -171,6 +171,8 @@ sap start
 
  5 Find 'SAPSHCUT.EXE' file and put its location in sap_config.ini -> '[APPLICATION]' -> 'command_line_path'
  6 Find 'SAPLOGON.EXE' file and put its location in sap_config.ini -> '[APPLICATION]' -> 'saplogon_path'
+ 7 By default, this key: sap_config.ini -> '[LOCALE]' -> 'language' - have value of windows' default language. This key
+   is used as sap logon language. So if you have sap logon language other than windows language - change it.
 
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
 ║                                                    Start working                                                     ║
@@ -729,7 +731,7 @@ You have two possibilities:
 1. Start debugging already opened system.
 
 If you have already opened system which you need to debug then use command 'sap debug'. Debug is always launched for the
-latest opened sap system's window. 
+latest opened sap system's window.
 So **Open the window you need to debug** and run command.
 
 ```cmd
@@ -826,6 +828,185 @@ sap pw yyy
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
+## sap paradd
+
+Let's say you want to open tr. SE11 with the value of the table name already entered.
+You can use command 'sap run system mandant -t se11'. All you need right now is to add option '-p tablename'
+In order to you this possibility you need to add parameter for transaction.
+
+0. Open tr. SE11
+1. Give focus on 'Database table' field and press F1 key on keyboard.
+2. Press 'Technical information' button.
+3. Copy value from 'Screen Field' field.
+4. run 'sap paradd' command in terminal and follow the instruction. Transaction - SE11, Parameter - RSRD1-TBMA_VAL
+
+[![](resources\images\screen_field.png)]
+
+```cmd
+sap paradd
+```
+
+```
+Transaction: se11
+Parameter: RSRD1-TBMA_VAL
+
+                                    Available transactions and parameters
+┌─────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Transaction                                         │ Parameters                                                     │
+╞═════════════════════════════════════════════════════╪════════════════════════════════════════════════════════════════╡
+│ SE11                                                │ RSRD1-TBMA_VAL                                                 │
+└─────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────────┘
+```
+
+Now you can open sap system with tr. SE11 and table id T001:
+
+```cmd
+sap run xxx -t se11 -p t001
+```
+
+If you have several fields then you can enter them with ',' delimiter.
+For example, tr. FB03 "Display Fi document" have 3 fields: Document (Screen Field - RF05L-BELNR), Company code (Screen
+Field - RF05L-BUKRS) and Year (Screen Field - RF05L-GJAHR)
+
+```cmd
+sap paradd
+```
+
+```
+Transaction: fb03
+Parameter: RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR
+
+                                    Available transactions and parameters
+┌───────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────┐
+│ Transaction                   │ Parameters                                                                           │
+╞═══════════════════════════════╪══════════════════════════════════════════════════════════════════════════════════════╡
+│ FB03                          │ RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR                                                  │
+└───────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Now you can launch sap system with tr. FB03 and give all parameters delimited by ',' exactly as they were added into
+database earlier - document number, company code, year.
+
+```cmd
+sap run dhv 100 -tfb03 -p100000023,01,2019
+```
+
+```
+                                              Available systems
+┌────────┬─────────────────────────┬───────────────┬─────────────────┬────────────────────────┬────────────────────────┐
+│ Id     │ Customer                │ System        │ Mandant         │ Description            │ User                   │
+╞════════╪═════════════════════════╪═══════════════╪═════════════════╪════════════════════════╪════════════════════════╡
+│ 1      │ BESTCUSTOMER            │ XXX           │ 200             │ Dev                    │ XXX                    │
+└────────┴─────────────────────────┴───────────────┴─────────────────┴────────────────────────┴────────────────────────┘
+
+
+   Trying to LAUNCH the following system with transaction FB03 -> 100000023,01,2019
+┌────────────────────────────────┬───────────────────┬─────────────────────┬─────────────────────────────┬─────────────┐
+│ Customer                       │ System            │ Mandant             │ Description                 │ User        │
+╞════════════════════════════════╪═══════════════════╪═════════════════════╪═════════════════════════════╪═════════════╡
+│ BESTCUSTOMER                   │ XXX               │ 100                 │ Development                 │ XXX         │
+└────────────────────────────────┴───────────────────┴─────────────────────┴─────────────────────────────┴─────────────┘
+```
+
+## sap parlist
+
+To display all transactions and their parameters (Screen fields) run the following command
+
+```cmd
+sap parlist
+```
+
+```
+                                   Available transactions and parameters
+┌───────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────┐
+│ Transaction                   │ Parameters                                                                           │
+╞═══════════════════════════════╪══════════════════════════════════════════════════════════════════════════════════════╡
+│ SE11                          │ RSRD1-TBMA_VAL                                                                       │
+│ FB03                          │ RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR                                                  │
+└───────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Or you can display parameters of specific transaction - then run command 'sap parlist' with '-t transaction' option
+
+```cmd
+sap parlist -t fb03
+```
+
+```
+                                    Available transactions and parameters
+┌──────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────┐
+│ Transaction                      │ Parameters                                                                        │
+╞══════════════════════════════════╪═══════════════════════════════════════════════════════════════════════════════════╡
+│ FB03                             │ RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR                                               │
+└──────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────┘
+```
+
+## sap parupdate
+
+If you need to update parameters for specific transaction run
+
+```cmd
+sap parupdate
+```
+
+```
+  Available transactions and parameters
+┌─────────┬────────────────────────────┬───────────────────────────────────────────────────────────────────────────────┐
+│ Id      │ Transaction                │ Parameters                                                                    │
+╞═════════╪════════════════════════════╪═══════════════════════════════════════════════════════════════════════════════╡
+│ 1       │ SE11                       │ RSRD1-TBMA_VAL                                                                │
+│ 2       │ FB03                       │ RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR                                           │
+└─────────┴────────────────────────────┴───────────────────────────────────────────────────────────────────────────────┘
+
+Choose a transaction with parameter. Available values from 1 to 18:
+>>>: 1
+```
+
+Enter new value (for example RSRD1-VIMA_VAL - screen field for View) or press Enter to leave the old value
+
+```
+Enter new parameters for transaction SE11 [RSRD1-TBMA_VAL]: RSRD1-VIMA_VAL
+
+                                          The following system is UPDATED
+┌─────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────┐
+│ Transaction                                                 │ Parameters                                             │
+╞═════════════════════════════════════════════════════════════╪════════════════════════════════════════════════════════╡
+│ SE11                                                        │ RSRD1-VIMA_VAL                                         │
+└─────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────┘
+```
+
+## sap pardel
+
+To delete transaction and its parametes run
+
+```cmd
+sap pardel
+```
+
+```
+                                    Available transactions and parameters
+┌──────────┬───────────────────────────────┬───────────────────────────────────────────────────────────────────────────┐
+│ Id       │ Transaction                   │ Parameters                                                                │
+╞══════════╪═══════════════════════════════╪═══════════════════════════════════════════════════════════════════════════╡
+│ 1.       │ SE11                          │ RSRD1-TBMA_VAL                                                            │
+│ 2.       │ FB03                          │ RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR                                       │
+└──────────┴───────────────────────────────┴───────────────────────────────────────────────────────────────────────────┘
+
+
+Choose a transaction with parameter. Available values from 1 to 2:
+>>>: 2
+
+Do you really want to delete the system? [y/n]: y
+
+
+                                    The following parameter is DELETED from database
+┌─────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Transaction                                         │ Parameters                                                     │
+╞═════════════════════════════════════════════════════╪════════════════════════════════════════════════════════════════╡
+│ FB03                                                │ RF05L-BELNR,RF05L-BUKRS,RF05L-GJAHR                            │
+└─────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────────┘
+```
+
 ## sap config
 
 You can use the following commands for working with config
@@ -867,6 +1048,38 @@ sap config -folder
 ## sap logon
 
 If you need to open saplogon application only then use 'sap logon' command
+
+## sap --version
+
+In order to check version of sap command line tool run this command
+
+```cmd
+sap --version 
+```
+
+```
+sap, version 3.0
+```
+
+## sap about
+
+If you need to take a look at information about SAPLogon then use this command:
+
+```cmd
+sap about 
+```
+
+[![sap_about](resources\images\sap_about.png)]
+
+## sap shortcut
+
+To display information about shortcut.exe file use this command:
+
+```cmd
+sap shortcut 
+```
+
+[![sap_shortcut](resources\images\sap_shortcut.png)]
 
 ## other command
 

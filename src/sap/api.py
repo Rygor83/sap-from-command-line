@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
 from collections import namedtuple
@@ -134,4 +134,4 @@ COMMAND_LINE_PATH = 'sapshcut.exe'
 SAPLOGON_PATH = 'saplogon.exe'
 DEBUG_FILE_NAME = "DEBUG.TXT"
 TIMER_TO_CLEAR_SCREEN: int = 10
-
+SAPLOGON_INI= 'SAPUILandscape.xml'

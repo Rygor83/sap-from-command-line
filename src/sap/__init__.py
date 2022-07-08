@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
 from .api import (
@@ -23,4 +23,3 @@ from .api import (
 
 __version__ = '3.0'
 __author__ = "Rygor"
-

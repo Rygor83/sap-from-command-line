@@ -1,9 +1,8 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 import os
 import click
-from numpy.core._rational_tests import test_add_rationals
 
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine, asc
@@ -228,4 +227,3 @@ class SapDB():  # noqa : E801
 def start_sap_db(db_path, db_type):
     """Connect to db."""
     return SapDB(db_path, db_type)
-

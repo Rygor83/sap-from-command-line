@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
 """ Config file management """
@@ -140,7 +140,10 @@ class Config:
             ini_lang = 'RU'
         else:
             ini_lang = 'EN'
-        parser['LOCALE'] = {'language': ini_lang}
+        parser['LOCALE'] = {
+            "; language - default saplogon language": None,
+            'language': ini_lang
+        }
 
         with open(self.config_file_path, 'w', encoding='utf-8') as configfile:
             parser.write(configfile)
@@ -205,4 +208,3 @@ def open_folder(ctx, param, value):
     ctx.obj.config.open_config(locate=True)
 
     ctx.exit()
-

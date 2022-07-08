@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
 """Minimal setup file for tasks project."""
@@ -28,3 +28,4 @@ setup(
         ]
     },
 )
+

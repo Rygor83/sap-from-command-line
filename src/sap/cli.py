@@ -1,9 +1,10 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
 import ctypes
 import os
+import sys
 from contextlib import contextmanager
 from datetime import datetime
 from subprocess import Popen
@@ -28,9 +29,14 @@ from sap.config import create_config, open_config, open_folder
 from sap.crypto import Crypto
 from sap.database import SapDB
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, DEBUG_FILE_NAME, \
-    TIMER_TO_CLEAR_SCREEN
+    TIMER_TO_CLEAR_SCREEN, SAPLOGON_INI
 from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
     EncryptionKeysAlreadyExist, DatabaseExists
+from sap.backup import Backup
+
+if (sys.version_info[0] < 3) or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
+    utilities.print_message("Python must be using Python 3.9 or above", utilities.message_type_error)
+    sys.exit()
 
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
@@ -39,6 +45,10 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
                         show_default=True, token_normalize_func=lambda x: x.lower())
 
 log_level = ['--log_level', '-l']
+
+
+# TODO: если мы добавляем новые записи в sap_config.ini - как мы будем их обновлять в уже существуюущих скриптах ?
+#   тоже самое касается и базы данных - https://stackoverflow.com/questions/52392102/how-to-update-an-existing-section-in-python-config-file-python-3-6-6
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -207,11 +217,12 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                     param_data = sap.query_param(param)
 
                     if param_data:
+                        command = command + f" -> {parameter}"
                         param_list = param_data[0][1].split(',')
                         param_value = parameter.split(',')
 
-                        # TODO: сделать проверку, что кол-во параметров (param_list) совпадает с кол-вом значений (param_value)
-                        #  Как вариант можно сделать через zip(param_list, param_value, strict=True), но это будет python 3.10
+                        # TODO: сделать проверку, что кол-во параметров (param_list) совпадает с кол-вом
+                        #  значений (param_value)
 
                         param_list_value = zip(param_list, param_value)
 
@@ -290,11 +301,11 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
     System debug
     You can:
     1. Creat debug file - to debug modal dialog box: run 'sap debug -f'
-    2. Start debuggin of the opened system (the last used windows will be used): run 'sap debug <system> <mandant>'
+    2. Start debugging of the opened system (the last used windows will be used): run 'sap debug <system> <mandant>'
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system
-    2. MANDANT: Request a SAP system by mandant/clien
+    2. MANDANT: Request a SAP system by mandant/client
     """
 
     if file:
@@ -618,7 +629,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 @sap_cli.command("delete")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
-@click.option("-u", "--user", "user", help="Request a SAP system by usdf")
+@click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", default=None,
@@ -819,8 +830,10 @@ def shortcut(ctx):
 
 
 @sap_cli.command("start", short_help="Starting point for working wiht SAP command line tool")
+@click.option('-skip_message', '--skip_message', 'skip_message', is_flag=True, default=False,
+              help="Skip result message")
 @click.pass_context
-def start(ctx):
+def start(ctx, skip_message):
     """
     \b
     Starting point for working with SAP command line tool
@@ -850,30 +863,31 @@ def start(ctx):
         utilities.print_message(f"{err}", message_type=utilities.message_type_warning)
         raise click.Abort
 
-    folder = Path(__file__)
-    filename = 'start.md'
-    path = folder.parent / filename
-    START_MARKDOWN = ""
+    if not skip_message:
+        folder = Path(__file__)
+        filename = 'start.md'
+        path = folder.parent / filename
+        START_MARKDOWN = ""
 
-    with open(path, mode='rt') as file:
-        START_MARKDOWN = START_MARKDOWN + str(file.read())
+        with open(path, mode='rt') as file:
+            START_MARKDOWN = START_MARKDOWN + str(file.read())
 
-    console = Console()
-    md = Markdown(str(START_MARKDOWN))
-    console.print(md)
+        console = Console()
+        md = Markdown(str(START_MARKDOWN))
+        console.print(md)
 
-    click.pause('\nPress enter to open files folder and start working. Good luck.')
+        click.pause('\nPress enter to open files folder and start working. Good luck.')
 
-    click.launch(ctx.obj.config.config_file_path, locate=True)
+        click.launch(ctx.obj.config.config_file_path, locate=True)
 
 
 @sap_cli.command("backup", short_help="Create backup")
 @click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
               type=utilities.PASS_REQUIREMENT)
-@click.option('-o', "--open_file", "open_file", is_flag=True, default=True,
-              help='Do you need to open folder with backup file')
+@click.option('-skip_message', '--skip_message', 'skip_message', is_flag=True, default=False,
+              help="Skip result message")
 @click.pass_context
-def backup(ctx, password, open_file=True):
+def backup(ctx, password, skip_message) -> str:
     """
     \b
     Create backup for the following files:
@@ -883,36 +897,34 @@ def backup(ctx, password, open_file=True):
     4. sap_config.ini
     """
 
+    # -------------------------------------------
+    # Files to archive:
+    # -------------------------------------------
+
     #  Paths to SAPUILandscape.xml: https://launchpad.support.sap.com/#/notes/2075150
+    saplogon_ini_path = os.path.join(os.path.expandvars(r'%APPDATA%\SAP\Common'), SAPLOGON_INI)
 
-    pwd = str.encode(password)
+    file_list = [
+        ctx.obj.config.db_path,
+        ctx.obj.config.public_key_path,
+        ctx.obj.config.private_key_path,
+        ctx.obj.config.config_file_path,
+        saplogon_ini_path,
+    ]
+    # -------------------------------------------
 
-    config_ini_path = ctx.obj.config.config_file_path
-    saplogon_ini_path = os.path.join(os.path.expandvars(r'%APPDATA%\SAP\Common'), 'SAPUILandscape.xml')
+    cofig_file_folder = ctx.obj.config.config_path
 
-    back_file_name = f'backup_{datetime.now().strftime("%Y.%m.%d-%I.%M.%S")}.zip'
-    back_path = os.path.join(utilities.path(), back_file_name)
-    with pyzipper.AESZipFile(back_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
-        zf.setpassword(pwd)
-        zf.write(ctx.obj.config.db_path, os.path.basename(ctx.obj.config.db_path))
-        zf.write(ctx.obj.config.public_key_path, os.path.basename(ctx.obj.config.public_key_path))
-        zf.write(ctx.obj.config.private_key_path, os.path.basename(ctx.obj.config.private_key_path))
-        zf.write(config_ini_path, os.path.basename(config_ini_path))
-        zf.write(saplogon_ini_path, os.path.basename(saplogon_ini_path))
-
-        comment = r""" 
-            1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
-            2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
-            3. Other files - according to sap_config.ini paths
-            Or you can place whener you want, just enter new paths to sap_config.ini
-            !!! And remember that files 'database.db' and 'private_key.txt' must be stored in secure place"""
-
-        zf.comment = comment.encode()
+    backup_obj = Backup(password, cofig_file_folder, file_list)
+    back_path = backup_obj.create()
 
     if os.path.exists(back_path):
-        utilities.print_message(f'Backup succesfully created: {back_path}', message_type=utilities.message_type_message)
-        if open_file:
+        if not skip_message:
+            utilities.print_message(f'Backup succesfully created: {back_path}',
+                                    message_type=utilities.message_type_message)
             click.launch(url=back_path, locate=True)
+        else:
+            click.echo(backup_obj.backup_file_path)
     else:
         utilities.print_message('Backup creation failed', message_type=utilities.message_type_error)
         click.echo()
@@ -936,7 +948,7 @@ def parameter_list(ctx, transaction, enum):
 
         utilities.print_parameters_list(*parameters, title="Available transactions and parameters", enum=enum)
 
-        return result
+    return result
 
 
 @sap_cli.command("pardel")
@@ -949,6 +961,8 @@ def parameter_delete(ctx, transaction, confirm: bool):
     Delete transaction's parameter from databse 'Parameters'
     """
 
+    # TODO: перед запросом разрешение на удаление нужно вывести систему, которую мы удаляем. как в SAP DEL
+
     param = Parameter(str(transaction).upper() if transaction else None, None)
 
     query_result = ctx.invoke(parameter_list, transaction=param.transaction, enum=True)
@@ -958,8 +972,8 @@ def parameter_delete(ctx, transaction, confirm: bool):
 
         selected_params = utilities.choose_parameter(selected_parameters)
 
-        message = "Trying to DELETE the following transaction"
-        # utilities.print_system_list(selected_system, title=message)
+        message = "Trying to DELETE the following transaction and its parameters"
+        utilities.print_parameters_list(selected_params, title=message)
 
         click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
                       abort=True, default=confirm)
@@ -971,7 +985,7 @@ def parameter_delete(ctx, transaction, confirm: bool):
 
         result = sap.query_param(parameter_to_delete)
 
-        if result is None:
+        if result is not None:
 
             utilities.print_parameters_list(parameter_to_delete,
                                             title="The following parameter is DELETED from database")
@@ -1021,14 +1035,12 @@ def parameter_update(ctx, transaction: str):
 
         selected_params = utilities.choose_parameter(selected_parameters)
 
-        parameter_new = click.prompt(f"Enter new parameters for transaction {transaction.upper()}",
+        parameter_new = click.prompt(f"\nEnter new parameters for transaction {selected_params.transaction}",
                                      default=selected_params.parameter)
 
-        parameter_updated = Parameter(str(transaction).upper(), str(parameter_new).upper())
+        parameter_updated = Parameter(selected_params.transaction, str(parameter_new).upper())
 
         result = sap.update_param(parameter_updated)
-
-        print(result)
 
         if result is None:
 

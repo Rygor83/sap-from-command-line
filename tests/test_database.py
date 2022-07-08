@@ -2,6 +2,8 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
+""" Database Tests """
+
 import pytest
 import os
 from sap.database import SapDB

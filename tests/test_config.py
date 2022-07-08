@@ -2,7 +2,7 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-""" Test of config.ini file """
+""" Configuration file Tests """
 
 import os
 import pytest
