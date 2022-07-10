@@ -2,16 +2,12 @@
 #   Copyright (c) Rygor. 2021.
 #  ------------------------------------------
 
-""" Command Line Test """
+""" Command Line Tests for main commands: add, list, delete, update """
 
 import os
-
-import click
 import pytest
 import pyperclip
-import time
 
-from click.testing import CliRunner
 from sap.cli import sap_cli
 from sap.database import SapDB
 from sap.crypto import Crypto
@@ -24,6 +20,7 @@ from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, C
 ########################################################################################################################
 # Tests with temporary created config, encrypt keys and database
 ########################################################################################################################
+
 
 @pytest.fixture
 def crypto(tmp_path):
@@ -68,14 +65,9 @@ def config_tmp_path(tmp_path, crypto):
         os.remove(debug_file_path)
 
 
-@pytest.fixture
-def runner():
-    return CliRunner()
-
-
-def test_list_added_system_outside_command_line(runner, config_tmp_path, added_record, temp_db):
+def test_list_added_system_outside_command_line(runner, temp_start_cli):
     """ Test LIST command with records in temporary database created from api"""
-    result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "xxx", "100"])
+    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "xxx", "100"])
     assert result.output == ('\n\n'
                              '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
@@ -86,10 +78,10 @@ def test_list_added_system_outside_command_line(runner, config_tmp_path, added_r
 
 
 @pytest.fixture
-def add_system_to_temp_database(temp_db, config_tmp_path, runner):
+def add_system_to_temp_database(runner, temp_start_cli):
     """ Fixture to add and delete system from existing database """
     result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
+                           args=["-path", temp_start_cli,
                                  "add",
                                  "-system", "zzz",
                                  "-mandant", "100",
@@ -100,9 +92,9 @@ def add_system_to_temp_database(temp_db, config_tmp_path, runner):
                                  "-url", "", '-v'])
 
 
-def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_database):
+def test_list_record_temp_db(runner, temp_start_cli):
     """ Test LIST command with records in temporary database created with command line """
-    result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
+    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "zzz", "100"])
     assert result.output == ('\n\n'
                              '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
@@ -112,10 +104,10 @@ def test_list_record_temp_db(runner, config_tmp_path, add_system_to_temp_databas
                              '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
-def test_delete_record_temp_db(runner, temp_db, config_tmp_path):
+def test_delete_record_temp_db(runner, temp_start_cli):
     """ Test DELETE command in temporary database"""
     runner.invoke(sap_cli,
-                  args=["-path", config_tmp_path.config_path,
+                  args=["-path", temp_start_cli,
                         "add",
                         "-system", "zzz",
                         "-mandant", "100",
@@ -124,8 +116,8 @@ def test_delete_record_temp_db(runner, temp_db, config_tmp_path):
                         "-customer", "CUSTOMER",
                         "-description", "DEV_SYSTEM",
                         "-url", " ", '-v'])
-    runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "delete", "zzz", "100", "-confirm", "y"])
-    result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
+    runner.invoke(sap_cli, args=["-path", temp_start_cli, "delete", "zzz", "100", "-confirm"])
+    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "zzz", "100"])
     assert result.output == ('\n\n'
                              '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
@@ -135,12 +127,12 @@ def test_delete_record_temp_db(runner, temp_db, config_tmp_path):
                              '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
-def test_pw_record_temp_db(runner, temp_db, config_tmp_path):
+def test_pw_record_temp_db(runner, temp_start_cli):
     """ Test PW command in temporary database"""
     initial_password = '123456789'
 
     result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
+                           args=["-path", temp_start_cli,
                                  "add",
                                  "-system", "zzz",
                                  "-mandant", "100",
@@ -150,25 +142,25 @@ def test_pw_record_temp_db(runner, temp_db, config_tmp_path):
                                  "-description", "DEV_SYSTEM",
                                  "-url", "", '-v'])
     result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
+                           args=["-path", temp_start_cli,
                                  "pw", "zzz", "100", "-c"])
     password_from_database = pyperclip.paste()
 
     assert password_from_database == initial_password
 
 
-def test_debug_file(runner, config_tmp_path):
+def test_debug_file(runner, temp_start_cli):
     """ Test DEBUG command to create debug file """
-    result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, 'debug', '-f', '-o'])
+    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, 'debug', '-f', '-o'])
     with open(os.path.join(config_tmp_path.config_path, DEBUG_FILE_NAME), mode='r') as f:
         text = f.read()
     assert text == '[FUNCTION]\nCommand =/H\nTitle=Debugger\nType=SystemCommand'
 
 
-def test_update_record_temp_db(runner, temp_db, config_tmp_path):
+def test_update_record_temp_db(runner, temp_start_cli):
     """ Test UPDATE command in temporary database"""
     result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
+                           args=["-path", temp_start_cli,
                                  "add",
                                  "-system", "zzz",
                                  "-mandant", "100",
@@ -178,7 +170,7 @@ def test_update_record_temp_db(runner, temp_db, config_tmp_path):
                                  "-description", "DEV_SYSTEM",
                                  "-url", "", '-v'])
     result = runner.invoke(sap_cli,
-                           args=["-path", config_tmp_path.config_path,
+                           args=["-path", temp_start_cli,
                                  "update",
                                  "-system", "zzz",
                                  "-mandant", "100",
@@ -187,7 +179,7 @@ def test_update_record_temp_db(runner, temp_db, config_tmp_path):
                                  "-customer", "CUSTOMER",
                                  "-description", "QAS_SYSTEM",
                                  "-url", " "])
-    result = runner.invoke(sap_cli, args=["-path", config_tmp_path.config_path, "list", "zzz", "100"])
+    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "zzz", "100"])
     assert result.output == ('\n\n'
                              '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'

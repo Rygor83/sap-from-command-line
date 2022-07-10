@@ -72,9 +72,10 @@ class SapDB():  # noqa : E801
     def make_session(self):
         if database_exists(self.database_url):
             # Путь по умолчанию
-            engine = create_engine(self.database_url)
-            session = sessionmaker(bind=engine)
+            self.engine = create_engine(self.database_url)
+            session = sessionmaker(bind=self.engine)
             self.session = session()
+
         else:
             raise DatabaseDoesNotExists(self.database_path)
 
@@ -221,7 +222,7 @@ class SapDB():  # noqa : E801
 
     def stop_sap_db(self):
         """Disconnect from DB."""
-        self.session.close()
+        self.session.close_all()
 
 
 def start_sap_db(db_path, db_type):

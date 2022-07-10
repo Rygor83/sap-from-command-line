@@ -632,10 +632,10 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
-@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", default=None,
-              type=click.BOOL)
+@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", is_flag=True, default=False,
+              show_default=True)
 @click.pass_context
-def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm: bool):
+def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm):
     """
     \b
     Delete requested record about SAP system from database\n
@@ -658,8 +658,9 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
         message = "Trying to DELETE the following systtem"
         utilities.print_system_list(selected_system, title=message)
 
-        click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
-                      abort=True, default=confirm)
+        if not confirm:
+            click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
+                          abort=True, default=confirm)
 
         system_to_delete = Sap_system(selected_system.system,
                                       selected_system.mandant,
@@ -870,7 +871,7 @@ def start(ctx, skip_message):
         START_MARKDOWN = ""
 
         with open(path, mode='rt') as file:
-            START_MARKDOWN = START_MARKDOWN + str(file.read())
+            START_MARKDOWN += str(file.read())
 
         console = Console()
         md = Markdown(str(START_MARKDOWN))
@@ -944,19 +945,23 @@ def parameter_list(ctx, transaction, enum):
     with _sap_db(ctx.obj.config):
         result = sap.query_param(param)
 
-        parameters = [Parameter(item[0], item[1]) for item in result]
-
-        utilities.print_parameters_list(*parameters, title="Available transactions and parameters", enum=enum)
-
-    return result
+        if not result:
+            param = Parameter(str(transaction).upper() if transaction else None, None)
+            utilities.print_parameters_list(param, title="NOTHING FOUND according to search criteria",
+                                            color=utilities.color_warning)
+            return None
+        else:
+            parameters = [Parameter(item[0], item[1]) for item in result]
+            utilities.print_parameters_list(*parameters, title="Available transactions and parameters", enum=enum)
+            return result
 
 
 @sap_cli.command("pardel")
 @click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
-@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", default=None,
-              type=click.BOOL)
+@click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", is_flag=True, default=False,
+              show_default=True)
 @click.pass_context
-def parameter_delete(ctx, transaction, confirm: bool):
+def parameter_delete(ctx, transaction, confirm):
     """
     Delete transaction's parameter from databse 'Parameters'
     """
@@ -975,8 +980,9 @@ def parameter_delete(ctx, transaction, confirm: bool):
         message = "Trying to DELETE the following transaction and its parameters"
         utilities.print_parameters_list(selected_params, title=message)
 
-        click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
-                      abort=True, default=confirm)
+        if not confirm:
+            click.confirm(click.style('\nDo you really want to delete the system?', **utilities.color_sensitive),
+                          abort=True, default=confirm)
 
         parameter_to_delete = Parameter(selected_params.transaction,
                                         selected_params.parameter)
@@ -1019,8 +1025,9 @@ def parameter_add(ctx, transaction, parameter):
 
 @sap_cli.command("parupdate", short_help="Update record from database")
 @click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
+@click.option("-p", "--parameter", "parameter", prompt=True, help="Transaction's parameter", type=click.STRING)
 @click.pass_context
-def parameter_update(ctx, transaction: str):
+def parameter_update(ctx, transaction: str, parameter: str):
     """
     \b
     Update parameters for selected transaction
@@ -1035,8 +1042,9 @@ def parameter_update(ctx, transaction: str):
 
         selected_params = utilities.choose_parameter(selected_parameters)
 
-        parameter_new = click.prompt(f"\nEnter new parameters for transaction {selected_params.transaction}",
-                                     default=selected_params.parameter)
+        parameter_new = parameter if parameter else click.prompt(
+            f"\nEnter new parameters for transaction {selected_params.transaction}",
+            default=selected_params.parameter)
 
         parameter_updated = Parameter(selected_params.transaction, str(parameter_new).upper())
 
