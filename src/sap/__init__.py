@@ -21,5 +21,5 @@ from .api import (
     stop_sap_db,
 )
 
-__version__ = '3.0'
+__version__ = '3.1.2'
 __author__ = "Rygor"

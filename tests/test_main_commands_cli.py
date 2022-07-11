@@ -5,280 +5,643 @@
 """ Command Line Tests for main commands: add, list, delete, update """
 
 import os
-import pytest
 import pyperclip
+import pytest
 
+from api import DEBUG_FILE_NAME, CONFIG_NAME, PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME
 from sap.cli import sap_cli
-from sap.database import SapDB
-from sap.crypto import Crypto
-from sap.api import Sap_system
-from sap.config import Config
-from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, COMMAND_LINE_PATH, SAPLOGON_PATH, \
-    DEBUG_FILE_NAME
+
+PASSWORD = '12345678'
+UPDATED_PASSWORD = '1029384756'
 
 
-########################################################################################################################
-# Tests with temporary created config, encrypt keys and database
-########################################################################################################################
+def test_start_cli(temp_start_cli):
+    """
+    Test START command: 'start' command works in temp_start_cli fixture. All we need is to check if files are created
+    'sap start'
+    """
+    assert os.path.exists(os.path.join(temp_start_cli, CONFIG_NAME)) and os.path.exists(
+        os.path.join(temp_start_cli, PUBLIC_KEY_NAME)) and os.path.exists(
+        os.path.join(temp_start_cli, PRIVATE_KEY_NAME)) and os.path.exists(
+        os.path.join(temp_start_cli, DATABASE_NAME))
 
 
-@pytest.fixture
-def crypto(tmp_path):
-    """ Prepare temporary encryption keys """
-    crypt = Crypto(tmp_path.joinpath(PUBLIC_KEY_NAME), tmp_path.joinpath(PRIVATE_KEY_NAME))
-    crypt.generate_keys()
-    yield crypt
-    crypt.remove_keys()
-
-
-@pytest.fixture
-def temp_db(tmp_path):
-    """ Prepare temporary database """
-    database_path = tmp_path.joinpath(DATABASE_NAME)
-    database = SapDB(db_path=database_path)
-    database.create()
-    yield database
-    database.stop_sap_db()
-    database.drop()
-
-
-@pytest.fixture
-def added_record(temp_db, crypto):
-    """ Add temporary record for testing purpose """
-    system = Sap_system('XXX', '100', 'USER', crypto.encrypto(str.encode('123')), 'CUSTOMER', 'DEV_SYSTEM', '')
-    temp_db.add(system)
-
-
-@pytest.fixture
-def config_tmp_path(tmp_path, crypto):
-    """ Create specific config with tmp_dir """
-    cfg = Config(config_path=tmp_path,
-                 db_path=tmp_path.joinpath(DATABASE_NAME),
-                 db_type='sqlite',
-                 public_key_path=crypto.public_key_path,
-                 private_key_path=crypto.private_key_path)
-    cfg.create()
-    yield cfg
-    cfg.remove_config()
-    debug_file_path = os.path.join(tmp_path, DEBUG_FILE_NAME)
-    if os.path.exists(debug_file_path):
-        os.remove(debug_file_path)
-
-
-def test_list_added_system_outside_command_line(runner, temp_start_cli):
-    """ Test LIST command with records in temporary database created from api"""
-    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "xxx", "100"])
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ XXX         │ 100           │ DEV_SYSTEM         │ USER    │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
-
-
-@pytest.fixture
-def add_system_to_temp_database(runner, temp_start_cli):
-    """ Fixture to add and delete system from existing database """
+def test_add_system_1(runner, temp_start_cli):
+    """
+    Test ADD command: new system 1, basic fields
+    'sap add'
+    """
     result = runner.invoke(sap_cli,
-                           args=["-path", temp_start_cli,
+                           args=["--config_path", temp_start_cli,
                                  "add",
                                  "-system", "zzz",
+                                 "-mandant", "999",
+                                 "-user", "USER25",
+                                 "-password", PASSWORD,
+                                 "-customer", "Roga & copyta",
+                                 "-description", "Develop",
+                                 "-url", " ",
+                                 "-autotype", ""])
+    assert result.output == ('\n\n'
+                             '          \x1b[32m\x1b[40mThe following system is ADDED to the database: \x1b[0m           \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_add_system_2_with_url(runner, temp_start_cli):
+    """
+    Test ADD command: new system 2, basic fields + url, autotype
+    'sap add'
+    """
+    result = runner.invoke(sap_cli,
+                           args=["--config_path", temp_start_cli,
+                                 "add",
+                                 "-system", "yyy",
+                                 "-mandant", "998",
+                                 "-user", "USER21",
+                                 "-password", PASSWORD,
+                                 "-customer", "Vasya Pupkin",
+                                 "-description", "Production",
+                                 "-url", "www.vasyapupkin.by",
+                                 "-autotype", "{USERNAME}{TAB}{PASSWORD}{ENTER}"])
+    assert result.output == ('\n\n'
+                             '          \x1b[32m\x1b[40mThe following system is ADDED to the database: \x1b[0m           \n'
+                             '┌────────────────────┬────────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer           │ System     │ Mandant     │ Description      │ User     │\n'
+                             '╞════════════════════╪════════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ VASYA PUPKIN       │ YYY        │ 998         │ Production       │ USER21   │\n'
+                             '└────────────────────┴────────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_add_system_3_verbose(runner, temp_start_cli):
+    """
+    Test ADD command: new system 3, basic fields + url, autotype + show password
+    'sap add -v'
+    """
+    result = runner.invoke(sap_cli,
+                           args=["--config_path", temp_start_cli,
+                                 "add",
+                                 "-system", "xxx",
                                  "-mandant", "100",
-                                 "-user", "USER",
-                                 "-password", "12345",
-                                 "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM",
-                                 "-url", "", '-v'])
+                                 "-user", "USER15",
+                                 "-password", PASSWORD,
+                                 "-customer", "XYZ systems",
+                                 "-description", "Test",
+                                 "-url", "www.XYZsystems.by",
+                                 "-autotype", "{USERNAME}{TAB}{PASSWORD}{ENTER}",
+                                 "-v",
+                                 "-time", "1"])
+    assert result.output == ('\n\n'
+                             '          \x1b[32m\x1b[40mThe following system is ADDED to the database: \x1b[0m           \n'
+                             '┌────────────────┬──────────┬───────────┬───────────────┬─────────┬───────────┐\n'
+                             '│ Customer       │ System   │ Mandant   │ Description   │ User    │ Password  │\n'
+                             '╞════════════════╪══════════╪═══════════╪═══════════════╪═════════╪═══════════╡\n'
+                             '│ XYZ SYSTEMS    │ XXX      │ 100       │ Test          │ USER15  │ 12345678  │\n'
+                             '└────────────────┴──────────┴───────────┴───────────────┴─────────┴───────────┘\n'
+                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
+                             '│ Information about passwords will be deleted from screen in 1                │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
+                             '\r\x1b[K\r1\r\x1b[K\r0')
 
 
-def test_list_record_temp_db(runner, temp_start_cli):
-    """ Test LIST command with records in temporary database created with command line """
-    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "zzz", "100"])
+def test_list_existing_systems_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list all available systems
+    'sap list'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list"])
     assert result.output == ('\n\n'
                              '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '│ VASYA PUPKIN        │ YYY       │ 998         │ Production       │ USER21   │\n'
+                             '│ XYZ SYSTEMS         │ XXX       │ 100         │ Test             │ USER15   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
 
 
-def test_delete_record_temp_db(runner, temp_start_cli):
-    """ Test DELETE command in temporary database"""
-    runner.invoke(sap_cli,
-                  args=["-path", temp_start_cli,
-                        "add",
-                        "-system", "zzz",
-                        "-mandant", "100",
-                        "-user", "USER",
-                        "-password", "12345",
-                        "-customer", "CUSTOMER",
-                        "-description", "DEV_SYSTEM",
-                        "-url", " ", '-v'])
-    runner.invoke(sap_cli, args=["-path", temp_start_cli, "delete", "zzz", "100", "-confirm"])
-    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "zzz", "100"])
+def test_list_existing_systems_show_passwords_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list all available systems and show passwords
+    'sap list -v'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "-v", "-time", "1"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────────────────┬─────────┬───────────┬───────────────┬─────────┬──────────┐\n'
+                             '│ Customer         │ System  │ Mandant   │ Description   │ User    │ Password │\n'
+                             '╞══════════════════╪═════════╪═══════════╪═══════════════╪═════════╪══════════╡\n'
+                             '│ ROGA & COPYTA    │ ZZZ     │ 999       │ Develop       │ USER25  │ 12345678 │\n'
+                             '│ VASYA PUPKIN     │ YYY     │ 998       │ Production    │ USER21  │ 12345678 │\n'
+                             '│ XYZ SYSTEMS      │ XXX     │ 100       │ Test          │ USER15  │ 12345678 │\n'
+                             '└──────────────────┴─────────┴───────────┴───────────────┴─────────┴──────────┘\n'
+                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
+                             '│ Information about passwords will be deleted from screen in 1                │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
+                             '\r\x1b[K\r1\r\x1b[K\r0')
+
+
+def test_list_existing_system_with_system_mandant_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific system and mandant
+    'sap list system_id mandant'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "zzz", "999"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_system_only_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific system only
+    'sap list system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "zzz"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_mandant_only_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific mandant
+    'sap list % mandant'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "%", "999"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_only_partial_mandant_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific partial mandant
+    'sap list % mandant'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "%", "99"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '│ VASYA PUPKIN        │ YYY       │ 998         │ Production       │ USER21   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_customer_name_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific customer name
+    'sap list -c customer_name'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "-c", "roga"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_partial_customer_name_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific partial customer name
+    'sap list -c customer_name'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "-c", "ro%co"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_user_name_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific username
+    'sap list -u username'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "-u", "user21"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌────────────────────┬────────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer           │ System     │ Mandant     │ Description      │ User     │\n'
+                             '╞════════════════════╪════════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ VASYA PUPKIN       │ YYY        │ 998         │ Production       │ USER21   │\n'
+                             '└────────────────────┴────────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_partial_user_name_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific partial username
+    'sap list -u username'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "-u", "user2"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '│ VASYA PUPKIN        │ YYY       │ 998         │ Production       │ USER21   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_system_description_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific system description
+    'sap list -d system_description'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "-d", "dev"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Develop          │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_list_existing_system_with_url_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list system with specific system and show url, autotype information
+    'sap list system_id -url'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "yyy", "-url"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌───────────┬────────┬─────────┬────────────┬────────┬───────────┬────────────┐\n'
+                             '│           │        │         │            │        │           │ Autotype   │\n'
+                             '│ Customer  │ System │ Mandant │ Descripti… │ User   │ URL       │ sequence   │\n'
+                             '╞═══════════╪════════╪═════════╪════════════╪════════╪═══════════╪════════════╡\n'
+                             '│ VASYA     │ YYY    │ 998     │ Production │ USER21 │ www.vasy… │ {USERNAME… │\n'
+                             '│ PUPKIN    │        │         │            │        │           │            │\n'
+                             '└───────────┴────────┴─────────┴────────────┴────────┴───────────┴────────────┘\n')
+
+
+def test_list_existing_systems_enumerated_cli(runner, temp_start_cli):
+    """
+    Test LIST command: list enumerated all systems
+    'sap list --enum'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "--enum"])
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Develop        │ USER25  │\n'
+                             '│ 2    │ VASYA PUPKIN      │ YYY      │ 998        │ Production     │ USER21  │\n'
+                             '│ 3    │ XYZ SYSTEMS       │ XXX      │ 100        │ Test           │ USER15  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n')
+
+
+def test_list_no_existing_systems_cli(runner, temp_start_cli):
+    """
+    Test LIST command: Request for a non-existent system
+    'sap list non_existent_system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "bbb"])
     assert result.output == ('\n\n'
                              '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
                              '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
                              '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│                │ ZZZ         │ 100           │                    │         │\n'
+                             '│                │ BBB         │               │                    │         │\n'
                              '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
-def test_pw_record_temp_db(runner, temp_start_cli):
-    """ Test PW command in temporary database"""
-    initial_password = '123456789'
-
-    result = runner.invoke(sap_cli,
-                           args=["-path", temp_start_cli,
-                                 "add",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "-password", initial_password,
-                                 "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM",
-                                 "-url", "", '-v'])
-    result = runner.invoke(sap_cli,
-                           args=["-path", temp_start_cli,
-                                 "pw", "zzz", "100", "-c"])
+def test_pw_no_clipboard_clear_cli(runner, temp_start_cli):
+    """
+    Test PW command: copying password into clipboard. For this test we do not clear clipboard.
+    'sap pw system_id'
+    """
+    runner.invoke(sap_cli,
+                  args=["--config_path", temp_start_cli,
+                        "pw", "zzz", "--no_clear"])
     password_from_database = pyperclip.paste()
 
-    assert password_from_database == initial_password
+    assert password_from_database == PASSWORD
+
+
+def test_pw_clipboard_clear_cli(runner, temp_start_cli):
+    """
+    Test PW command: copying password into clipboard. And clear clipboard.
+    'sap pw system_id'
+    """
+    result = runner.invoke(sap_cli,
+                           args=["--config_path", temp_start_cli, "pw", "zzz", "--clear", "-time", "1"])
+
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Develop        │ USER25  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
+                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
+                             '│ Password is copied into clipboard.                                          │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
+                             '┌─ Sensitive ─────────────────────────────────────────────────────────────────┐\n'
+                             '│ If you use Clipboard managers, you should add PY.EXE, CMD.EXE applications  │\n'
+                             '│ to the exclusion list,                                                      │\n'
+                             '│ in order to keep sensitive information safe from copying to clipboard       │\n'
+                             '│ manager.                                                                    │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
+                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
+                             '│ Clipboard will be cleared in 1 seconds.                                     │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
+                             '\r\x1b[K\r1\r\x1b[K\r0\n\n'
+                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
+                             '│ Clipboard is cleared.                                                       │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n')
+
+
+def test_pw_no_existing_system_cli(runner, temp_start_cli):
+    """
+    Test PW command: Request for a non-existent system to get password
+    'sap pw non_existent_system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "pw", "bbb"])
+    assert result.output == ('\n\n'
+                             '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
+                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+                             '│                │ BBB         │               │                    │         │\n'
+                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
 def test_debug_file(runner, temp_start_cli):
-    """ Test DEBUG command to create debug file """
-    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, 'debug', '-f', '-o'])
-    with open(os.path.join(config_tmp_path.config_path, DEBUG_FILE_NAME), mode='r') as f:
-        text = f.read()
+    """
+    Test DEBUG command: create debug file
+    'sap debug -f'
+    """
+    runner.invoke(sap_cli, args=["-path", temp_start_cli, 'debug', '-f', '-o'])
+    with open(os.path.join(temp_start_cli, DEBUG_FILE_NAME), mode='r', encoding='utf-8') as file:
+        text = file.read()
     assert text == '[FUNCTION]\nCommand =/H\nTitle=Debugger\nType=SystemCommand'
 
 
-def test_update_record_temp_db(runner, temp_start_cli):
-    """ Test UPDATE command in temporary database"""
+@pytest.mark.skip
+def test_debug_existing_system_cli(runner, temp_start_cli):
+    """
+    Test DEBUG command
+    'sap debug system_id'
+    """
+    # TODO: возможно нужно просто проверять саму команду для запуска дебага системы. Вопрос как это сделать ?
+    pass
+
+
+def test_debug_no_existing_system_cli(runner, temp_start_cli):
+    """
+    Test DEBUG command: Request for a non-existent system to delete
+    'sap debug non_existent_system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "debug", "bbb"])
+    assert result.output == ('\n\n'
+                             '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
+                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
+                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
+                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
+                             '│                │ BBB         │               │                    │         │\n'
+                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
+
+
+def test_update_requesting_system_mandant_cli(runner, temp_start_cli):
+    """
+    Test UPDATE command: updating specific system
+    'sap update system_id mandant'
+    """
     result = runner.invoke(sap_cli,
                            args=["-path", temp_start_cli,
-                                 "add",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "-password", "12345",
-                                 "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM",
-                                 "-url", "", '-v'])
+                                 "update", "zzz", "999"],
+                           input="87654321\n\nDev\n\n\n")
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Develop        │ USER25  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
+                             '\n'
+                             'Enter new password [12345678]: 87654321\n'
+                             'Enter Customer [ROGA & COPYTA]: \n'
+                             'Enter system description [Develop]: Dev\n'
+                             'Enter URL [ ]: \n'
+                             'Enter Autotype sequence []: \n'
+                             '\n\n'
+                             '                  \x1b[32m\x1b[40mThe following system is UPDATED\x1b[0m                   \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Dev              │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_update_choosing_system_from_list_cli(runner, temp_start_cli):
+    """
+    Test UPDATE command: choosing system from list to update it
+    'sap update'
+    """
+    result = runner.invoke(sap_cli,
+                           args=["-path", temp_start_cli,
+                                 "update"],
+                           input="2\n\n\nProd\n\n\n")
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
+                             '│ 2    │ VASYA PUPKIN      │ YYY      │ 998        │ Production     │ USER21  │\n'
+                             '│ 3    │ XYZ SYSTEMS       │ XXX      │ 100        │ Test           │ USER15  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
+                             '\n\n'
+                             'Choose a system you want to login. Available values from 1 to 3: \n'
+                             '>>>: \n'
+                             'Enter new password [12345678]: \n'
+                             'Enter Customer [VASYA PUPKIN]: \n'
+                             'Enter system description [Production]: Prod\n'
+                             'Enter URL [www.vasyapupkin.by]: \n'
+                             'Enter Autotype sequence [{USERNAME}{TAB}{PASSWORD}{ENTER}]: \n'
+                             '\n\n'
+                             '                  \x1b[32m\x1b[40mThe following system is UPDATED\x1b[0m                   \n'
+                             '┌────────────────────┬────────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer           │ System     │ Mandant     │ Description      │ User     │\n'
+                             '╞════════════════════╪════════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ VASYA PUPKIN       │ YYY        │ 998         │ Prod             │ USER21   │\n'
+                             '└────────────────────┴────────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_update_requesting_customer_show_updated_password_cli(runner, temp_start_cli):
+    """
+    Test UPDATE command: updating specific system searched by customer name and showing updated password
+    'sap update -c customer_name -v'
+    """
     result = runner.invoke(sap_cli,
                            args=["-path", temp_start_cli,
                                  "update",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "-password", "12345",
-                                 "-customer", "CUSTOMER",
-                                 "-description", "QAS_SYSTEM",
-                                 "-url", " "])
-    result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "list", "zzz", "100"])
+                                 "-c", "roga",
+                                 "-v", "-time", "1"],
+                           input=f"{UPDATED_PASSWORD}\n\n\n\n\n")
     assert result.output == ('\n\n'
                              '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
+                             '\n'
+                             'Enter new password [87654321]: 1029384756\n'
+                             'Enter Customer [ROGA & COPYTA]: \n'
+                             'Enter system description [Dev]: \n'
+                             'Enter URL [ ]: \n'
+                             'Enter Autotype sequence []: \n'
+                             '\n\n'
+                             '                  \x1b[32m\x1b[40mThe following system is UPDATED\x1b[0m                   \n'
+                             '┌─────────────────┬─────────┬──────────┬───────────────┬─────────┬────────────┐\n'
+                             '│ Customer        │ System  │ Mandant  │ Description   │ User    │ Password   │\n'
+                             '╞═════════════════╪═════════╪══════════╪═══════════════╪═════════╪════════════╡\n'
+                             f'│ ROGA & COPYTA   │ ZZZ     │ 999      │ Dev           │ USER25  │ {UPDATED_PASSWORD} │\n'
+                             '└─────────────────┴─────────┴──────────┴───────────────┴─────────┴────────────┘\n'
+                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
+                             '│ Information about passwords will be deleted from screen in 1                │\n'
+                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
+                             '\r\x1b[K\r1\r\x1b[K\r0')
+
+
+def test_update_no_existing_system_cli(runner, temp_start_cli):
+    """
+    Test UPDATE command: Request for a non-existent system to update
+    'sap update non_existent_system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "update", "bbb"])
+    assert result.output == ('\n\n'
+                             '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
                              '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
                              '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+                             '│                │ BBB         │               │                    │         │\n'
                              '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
-########################################################################################################################
-# Tests with already created config, encrypt keys and database
-########################################################################################################################
-
-@pytest.fixture
-def add_system_to_existing_database(runner):
-    """ Fixture to add and delete system from existing database """
-    result = runner.invoke(sap_cli,
-                           args=["add",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "-password", "12345",
-                                 "-customer", "CUSTOMER",
-                                 "-description", "DEV_SYSTEM",
-                                 "-url", "", '-v'])
-    yield result
-    result = runner.invoke(sap_cli,
-                           args=["delete", "zzz", "100", "-confirm", "y"])
-
-
-def test_list_record_exising_db(runner, add_system_to_existing_database):
-    """ Test LIST command with records in database created with command line """
-    result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
+def test_delete_existing_system_choosing_from_list_cli(runner, temp_start_cli):
+    """
+    Test DELETE command: choosing system from list to delete it
+    'sap delete'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete"], input="3\ny\n")
     assert result.output == ('\n\n'
                              '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
+                             '│ 2    │ VASYA PUPKIN      │ YYY      │ 998        │ Prod           │ USER21  │\n'
+                             '│ 3    │ XYZ SYSTEMS       │ XXX      │ 100        │ Test           │ USER15  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
+                             '\n\n'
+                             'Choose a system you want to login. Available values from 1 to 3: \n'
+                             '>>>: \n\n'
+                             '               \x1b[32m\x1b[40mTrying to DELETE the following system\x1b[0m                \n'
+                             '┌───────────────────┬────────────┬─────────────┬──────────────────┬───────────┐\n'
+                             '│ Customer          │ System     │ Mandant     │ Description      │ User      │\n'
+                             '╞═══════════════════╪════════════╪═════════════╪══════════════════╪═══════════╡\n'
+                             '│ XYZ SYSTEMS       │ XXX        │ 100         │ Test             │ USER15    │\n'
+                             '└───────────────────┴────────────┴─────────────┴──────────────────┴───────────┘\n'
+                             '\n'
+                             'Do you really want to delete the system? [y/N]: y\n'
+                             '\n\n'
+                             '           \x1b[32m\x1b[40mThe following system is DELETED from database\x1b[0m            \n'
+                             '┌───────────────────┬────────────┬─────────────┬──────────────────┬───────────┐\n'
+                             '│ Customer          │ System     │ Mandant     │ Description      │ User      │\n'
+                             '╞═══════════════════╪════════════╪═════════════╪══════════════════╪═══════════╡\n'
+                             '│ XYZ SYSTEMS       │ XXX        │ 100         │ Test             │ USER15    │\n'
+                             '└───────────────────┴────────────┴─────────────┴──────────────────┴───────────┘\n')
+
+
+def test_delete_existing_system_by_system_id_cli(runner, temp_start_cli):
+    """
+    Test DELETE command: choosing system by system id to delete it
+    'sap delete system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete", "zzz"], input="y\n")
+    assert result.output == ('\n\n'
+                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
+                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
+                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
+                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
+                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
+                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
+                             '\n\n'
+                             '               \x1b[32m\x1b[40mTrying to DELETE the following system\x1b[0m                \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Dev              │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n'
+                             '\n'
+                             'Do you really want to delete the system? [y/N]: y\n'
+                             '\n\n'
+                             '           \x1b[32m\x1b[40mThe following system is DELETED from database\x1b[0m            \n'
+                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
+                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
+                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
+                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Dev              │ USER25   │\n'
+                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+
+def test_delete_no_existing_system_cli(runner, temp_start_cli):
+    """
+    Test DELETE command: Request for a non-existent system to delete
+    'sap delete non_existent_system_id'
+    """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete", "bbb"])
+    assert result.output == ('\n\n'
+                             '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
                              '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
                              '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
                              '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
+                             '│                │ BBB         │               │                    │         │\n'
                              '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
 
 
-def test_list_record_by_description_exising_db(runner, add_system_to_existing_database):
-    """ Test LIST command with records in database created with command line """
-    result = runner.invoke(sap_cli, args=["list", "-d", "sys"])
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
+@pytest.mark.skip
+def test_run_existing_system_cli(runner, temp_start_cli):
+    """
+    Test RUN command: run specific system
+    'sap run system_id'
+    """
+    # TODO: возможно нужно просто проверять саму команду для запуска системы. Вопрос как это сделать ?
+    pass
 
 
-def test_list_record_by_customer_exising_db(runner, add_system_to_existing_database):
-    """ Test LIST command with records in database created with command line """
-    result = runner.invoke(sap_cli, args=["list", "-c", "cust"])
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
-
-
-def test_pw_record_exising_db(runner, add_system_to_existing_database):
-    """ Test PW command in existing database"""
-    result = runner.invoke(sap_cli,
-                           args=["pw", "zzz", "100", "-c"])
-    password = pyperclip.paste()
-    assert password == '12345'
-
-
-def test_update_record_exising_db(runner, add_system_to_existing_database):
-    """ Test UPDATE command in existing database"""
-    result = runner.invoke(sap_cli,
-                           args=["update",
-                                 "-system", "zzz",
-                                 "-mandant", "100",
-                                 "-user", "USER",
-                                 "-password", "12345",
-                                 "-customer", "CUSTOMER",
-                                 "-description", "QAS_SYSTEM"])
-    result = runner.invoke(sap_cli, args=["list", "zzz", "100"])
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│ CUSTOMER       │ ZZZ         │ 100           │ DEV_SYSTEM         │ USER    │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
-
-
-def test_list_without_config(runner, tmp_path):
-    """ Test LIST command without config file"""
-    result = runner.invoke(sap_cli, args=["--config_path", tmp_path, "list"])
-    assert result.output == ('\n'
-                             'SAP_CONFIG.INI does not exist.. \n'
-                             f'Check path: {tmp_path}\sap_config.ini \n'
-                             "Either run 'sap start' or 'sap config -create' to create and edit config\n"
-                             'Aborted.\n')
+@pytest.mark.skip
+def test_logon_cli(runner, temp_start_cli):
+    """
+    Test LOGON command: run saplogon application
+    'sap logon'
+    """
+    # TODO: возможно нужно пробовать запускать окно и проверять, что оно вызвано. Вопрос как это сделать ?
+    pass

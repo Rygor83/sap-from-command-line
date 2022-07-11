@@ -160,7 +160,7 @@ def choose_parameter(parameters: list, verbose=False):
     return selected_params
 
 
-def print_system_list(*sap_systems: Sap_system, title, color=color_success, verbose=False,
+def print_system_list(*sap_systems: Sap_system, title, color=color_success, verbose=False, timeout=0,
                       enum=False, command: str = '', command_type: str = '', url=False):
     """ Print information in table style """
 
@@ -236,6 +236,15 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
     click.echo('\n')
     console = Console()
     console.print(table)
+
+    if verbose:
+        print_message(
+            f"Information about passwords will be deleted from screen in {timeout}", message_type_message)
+        try:
+            countdown(timeout)
+        except KeyboardInterrupt:
+            print_message("Aborted!", message_type_error)
+        click.clear()
 
 
 def print_parameters_list(*parameters: Parameter, title, color=color_success, enum=False):

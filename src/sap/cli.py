@@ -2,36 +2,34 @@
 #   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
+""" Command line interface for sap-from-command-line tool """
+
 import ctypes
 import os
 import sys
 from contextlib import contextmanager
-from datetime import datetime
 from subprocess import Popen
-import click_log
 import logging
-import click
+import re
 import time
+from pathlib import Path
+import click_log
+import click
 import pyautogui
 import pyperclip
-import pyzipper
-import re
-import rich_click as click
-from rich import print
+
+import rich_click as click  # rich help output. Do not delete it as it works in background
 from rich.console import Console
 from rich.markdown import Markdown
 
-from pathlib import Path
 import sap.config
 from sap import utilities
 from sap.api import Sap_system, Obj_structure, Parameter
 from sap.config import create_config, open_config, open_folder
 from sap.crypto import Crypto
 from sap.database import SapDB
-from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, DEBUG_FILE_NAME, \
-    TIMER_TO_CLEAR_SCREEN, SAPLOGON_INI
-from sap.exceptions import DatabaseDoesNotExists, ConfigDoesNotExists, WrongPath, ConfigExists, \
-    EncryptionKeysAlreadyExist, DatabaseExists
+from sap.api import DEBUG_FILE_NAME, SAPLOGON_INI
+from sap.exceptions import ConfigDoesNotExists, WrongPath, ConfigExists, EncryptionKeysAlreadyExist, DatabaseExists
 from sap.backup import Backup
 
 if (sys.version_info[0] < 3) or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
@@ -47,8 +45,8 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
 log_level = ['--log_level', '-l']
 
 
-# TODO: если мы добавляем новые записи в sap_config.ini - как мы будем их обновлять в уже существуюущих скриптах ?
-#   тоже самое касается и базы данных - https://stackoverflow.com/questions/52392102/how-to-update-an-existing-section-in-python-config-file-python-3-6-6
+# TODO: if i add new parameters into config file - how make an update for users
+#  https://stackoverflow.com/questions/52392102/how-to-update-an-existing-section-in-python-config-file-python-3-6-6
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -56,7 +54,7 @@ log_level = ['--log_level', '-l']
 @click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
 @click.version_option(version=sap.__version__)
 @click_log.simple_verbosity_option(logger, *log_level, default='ERROR')
-def sap_cli(ctx, config_path: str, verbosity=''):
+def sap_cli(ctx, config_path: str):
     """
     \b
     Command line tool for launching SAP systems from SAPLogon\n
@@ -69,7 +67,7 @@ def sap_cli(ctx, config_path: str, verbosity=''):
     # ========= CONFIG =========
     ctx.obj.config = sap.config.Config(config_path)
 
-    if ctx.invoked_subcommand != "start" and ctx.invoked_subcommand != "config":
+    if ctx.invoked_subcommand not in ("start", "config"):
         try:
             _config = ctx.obj.config.read()
         except ConfigDoesNotExists as err:
@@ -137,13 +135,12 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
     Launch SAP system \n
     \b
     Optional arguments:
-    1. SYSTEM: Request a SAP system by systedm id
+    1. SYSTEM: Request a SAP system by system id
     2. MANDANT: Request a SAP system by mandant/client
     """
-    password = ""
 
     if snc_name is not None and snc_qop is None or snc_name is None and snc_qop is not None:
-        utilities.print_message(f"\nBoth parameters must be used: -sname/--snc_name and -sqop/--snc_qop",
+        utilities.print_message("\nBoth parameters must be used: -sname/--snc_name and -sqop/--snc_qop",
                                 utilities.message_type_warning)
         raise click.Abort
 
@@ -151,7 +148,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                               description=description,
                               url=False, verbose=False, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_sap_systems = [
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
@@ -210,46 +207,43 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 command = transaction
                 command_type = 'transaction'
 
-                argument = argument + " -type=transaction"
+                argument += " -type=transaction"
 
                 if parameter:
-                    param = Parameter(str(transaction).upper())
+                    param = Parameter(str(transaction).upper(), None)
                     param_data = sap.query_param(param)
 
                     if param_data:
-                        command = command + f" -> {parameter}"
+                        command += f" -> {parameter}"
                         param_list = param_data[0][1].split(',')
                         param_value = parameter.split(',')
 
-                        # TODO: сделать проверку, что кол-во параметров (param_list) совпадает с кол-вом
-                        #  значений (param_value)
-
                         param_list_value = zip(param_list, param_value)
 
-                        argument = argument + f' -command="*{transaction.upper()}'
+                        argument += f' -command="*{transaction.upper()}'
                         for item in param_list_value:
-                            argument = argument + f' {item[0]}={item[1]};'
-                        argument = argument + '"'
+                            argument += f' {item[0]}={item[1]};'
+                        argument += '"'
                     else:
                         utilities.print_message(f"\nThere is no parameter info for {transaction.upper()} transaction",
                                                 message_type=utilities.message_type_warning)
 
-                        argument = argument + f' -command="{transaction.upper()}"'
+                        argument += f' -command="{transaction.upper()}"'
                 else:
                     argument = argument + " -command=" + transaction
             elif system_command:
                 command = system_command
                 command_type = 'system command'
 
-                argument = argument + " -type=SystemCommand"
-                argument = argument + " -command=" + system_command
+                argument += " -type=SystemCommand"
+                argument += " -command=" + system_command
 
             elif report:
                 command = report
                 command_type = 'report'
 
-                argument = argument + " -type=report"
-                argument = argument + " -command=" + report
+                argument += " -type=report"
+                argument += " -command=" + report
             else:
                 command = None
                 command_type = None
@@ -260,16 +254,16 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 message = "Trying to LAUNCH the following system "
 
             if reuse:
-                argument = argument + f' -reuse=0'
+                argument += ' -reuse=0'
             else:
-                argument = argument + f' -reuse=1'
+                argument += ' -reuse=1'
 
             utilities.print_system_list(selected_system, title=message,
                                         command=command, command_type=command_type)
 
             logger.info(f"{argument}")
 
-            # Запускаем SAP
+            # SAP Launching
             pop = Popen(argument)
             pop.wait()
 
@@ -277,7 +271,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 click.echo(pop.returncode, pop.communicate()[0])
 
 
-@sap_cli.command("debug", short_help="System debug: either create debug file or start system debuggin")
+@sap_cli.command("debug", short_help="System debug: either create debug file or start system debugging")
 @click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
@@ -322,11 +316,6 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
 
         utilities.print_markdown(debug_markdown)
 
-        # click.echo(f"\n{debug_file_path} file will be created.")
-        # click.echo(f"After creation, a folder with {DEBUG_FILE_NAME} file will be opened \n")
-        # click.echo("Drag the file to the SAP system to start debug mode \n")
-        # click.pause("Press Enter to continue")
-
         with open(debug_file_path, "w", encoding='utf-8') as writer:
             writer.write("[FUNCTION]\n")
             writer.write("Command =/H\n")
@@ -341,17 +330,17 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
                                   description=description,
                                   url=False, verbose=False, enum=True)
         # --------------------------
-        if query_result != []:
+        if query_result:
             selected_sap_systems = [
-                Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+                Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
                 for item in query_result]
 
             if language is None:
                 language = ctx.obj.config.language
 
-            # As soon as dubugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
+            # As soon as debugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
             #  as it influence whether to open new windows, or to debug the latest opened. All arguments
-            #  values must be entered
+            #  value must be entered
             selected_system = utilities.choose_system(selected_sap_systems)
             try:
                 argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language,
@@ -397,9 +386,9 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
                               description=description,
                               url=False, verbose=False, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
 
         if language is None:
@@ -433,13 +422,13 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
-@click.option('-c', "--clear_clipboard", "clear_clipboard", is_flag=True, default=True,
-              help='Flag. Clear clipboard.')
-@click.option('-t', "--time_to_clear", "time_to_clear", default=utilities.default_time_to_clear(), show_default=True,
+@click.option('--clear/--no_clear', "clear_clipboard", is_flag=True, default=True,
+              help='Clear clipboard', show_default=True)
+@click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_clear(), show_default=True,
               type=click.INT, help='Timer in seconds to clear clipboard')
 @click.pass_context
-def pw(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool,
-       time_to_clear: int):
+def copy_password(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool,
+                  timeout: int):
     """
     \b
     Copy password for the requested system into clipboard.
@@ -454,9 +443,9 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
                               description=description,
                               url=False, verbose=False, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
 
         selected_system = utilities.choose_system(selected_sap_systems)
@@ -470,21 +459,21 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
                 "If you use Clipboard managers, you should add PY.EXE, CMD.EXE applications to the exclusion list,\nin order to keep sensitive information safe from copying to clipboard manager.",
                 message_type=utilities.message_type_sensitive)
 
-            utilities.print_message(f"Clipboard will be cleared in {time_to_clear} seconds.",
+            utilities.print_message(f"Clipboard will be cleared in {timeout} seconds.",
                                     message_type=utilities.message_type_message)
 
             try:
-                utilities.countdown(time_to_clear)
+                utilities.countdown(timeout)
             except KeyboardInterrupt:
                 click.echo("\n")
-                utilities.print_message(f"Aborted",
+                utilities.print_message("Aborted",
                                         message_type=utilities.message_type_error)
             if ctypes.windll.user32.OpenClipboard(None):
                 ctypes.windll.user32.EmptyClipboard()
             ctypes.windll.user32.CloseClipboard()
 
             click.echo("\n")
-            utilities.print_message(f"Clipboard is cleared.", message_type=utilities.message_type_message)
+            utilities.print_message("Clipboard is cleared.", message_type=utilities.message_type_message)
 
 
 @sap_cli.command("add")
@@ -496,13 +485,16 @@ def pw(ctx, system: str, mandant: int, user: str, customer: str, description: st
 @click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
-@click.option("-a", "--autotype", prompt=True, help="Autotype sequence for logining to web site", type=click.STRING,
+@click.option("-autotype", prompt=True, help="Autotype sequence for logining to web site", type=click.STRING,
               default=utilities.default_sequence(), show_default=True)
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
+@click.option("-v", "--verbose", "verbose", help="Flag. Show passwords for selected systems", is_flag=True,
+              default=False)
+@click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
+              type=click.INT, default=0)
 def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
-        autotype: str, verbose: bool):
+        autotype: str, verbose: bool, timeout: int):
     """
-    Add sap system with it's parameters to db. Just run 'sap add' and follow instructions.
+    Add sap system with its parameters to db. Just run 'sap add' and follow instructions.
     """
 
     with _sap_db(ctx.obj.config):
@@ -535,14 +527,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             added_system = [Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4],
                                        item[5], item[6], item[7]) for item in result]
             utilities.print_system_list(*added_system, title="The following system is ADDED to the database: ",
-                                        verbose=verbose)
-            if verbose:
-                click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
-                try:
-                    utilities.countdown(TIMER_TO_CLEAR_SCREEN)
-                except KeyboardInterrupt:
-                    click.echo("Aborted!")
-                click.clear()
+                                        verbose=verbose, timeout=timeout if timeout else ctx.obj.config.time_to_clear)
 
 
 @sap_cli.command("update", short_help="Update record from database")
@@ -551,9 +536,11 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
-@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=True)
+@click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=False)
+@click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
+              type=click.INT, default=0)
 @click.pass_context
-def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, verbose: bool):
+def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, verbose: bool, timeout: int):
     """
     \b
     Update password, customer, system description or url of the requested record from database\n
@@ -567,19 +554,18 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
                               description=description,
                               url=False, verbose=False, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_sap_systems = [
             Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
 
         selected_system = utilities.choose_system(selected_sap_systems)
 
-        password_new = click.prompt("\nEnter new password", default=selected_system.password)
-
         # TODO: попробовать переделать на
         #  password = getpass.getpass("Enter password for external user: ")
-        #  если пользователь нажимает ENTER, а поле пустое, то запращивать хочет ли он оставить старый пароль
+        #  если пользователь нажимает ENTER, а поле пустое, то запрашивать хочет ли он оставить старый пароль
 
+        password_new = click.prompt("\nEnter new password", default=selected_system.password)
         customer_new = click.prompt("Enter Customer", default=selected_system.customer)
         description_new = click.prompt("Enter system description", default=selected_system.description)
         url_new = click.prompt("Enter URL", default=selected_system.url)
@@ -596,34 +582,29 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
             str(autotype_new),
         )
 
-        result = sap.update(sap_encrypted_system)
+        with _sap_db(ctx.obj.config):
+            result = sap.update(sap_encrypted_system)
 
-        if result is None:
-            result = sap.query_system(sap_encrypted_system)
+            if result is None:
+                result = sap.query_system(sap_encrypted_system)
 
-            updated_system = [
-                Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
-                           item[7]) for item in result]
+                updated_system = [
+                    Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
+                               item[7]) for item in result]
 
-            utilities.print_system_list(*updated_system, title="The following system is UPDATED", verbose=verbose)
+                utilities.print_system_list(*updated_system, title="The following system is UPDATED", verbose=verbose,
+                                            timeout=timeout if timeout else ctx.obj.config.time_to_clear)
+            else:
+                no_system_found = Sap_system(system.upper() if system else None,
+                                             str(mandant).zfill(3) if mandant else None,
+                                             user.upper() if user else None,
+                                             None,
+                                             customer.upper() if customer else None,
+                                             description.upper() if description else None,
+                                             None, None)
 
-            click.echo(f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}: \n")
-            try:
-                utilities.countdown(TIMER_TO_CLEAR_SCREEN)
-            except KeyboardInterrupt:
-                click.echo("Aborted!")
-            click.clear()
-        else:
-            no_system_found = Sap_system(system.upper() if system else None,
-                                         str(mandant).zfill(3) if mandant else None,
-                                         user.upper() if user else None,
-                                         None,
-                                         customer.upper() if customer else None,
-                                         description.upper() if description else None,
-                                         None, None)
-
-            utilities.print_system_list(no_system_found, title="FAILED TO UPDATE the following system",
-                                        color=utilities.color_warning)
+                utilities.print_system_list(no_system_found, title="FAILED TO UPDATE the following system",
+                                            color=utilities.color_warning)
 
 
 @sap_cli.command("delete")
@@ -648,14 +629,14 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
                               description=description, url=False, verbose=False, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6])
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
             for item in query_result]
 
         selected_system = utilities.choose_system(selected_sap_systems)
 
-        message = "Trying to DELETE the following systtem"
+        message = "Trying to DELETE the following system"
         utilities.print_system_list(selected_system, title=message)
 
         if not confirm:
@@ -670,29 +651,30 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
                                       selected_system.description,
                                       selected_system.url)
 
-        result = sap.delete(system_to_delete)
+        with _sap_db(ctx.obj.config):
+            sap.delete(system_to_delete)
 
-        result = sap.query_system(system_to_delete)
+            result = sap.query_system(system_to_delete)
 
-        if result == []:
+            if not result:
 
-            utilities.print_system_list(system_to_delete, title="The following system is DELETED from database")
-        else:
-            no_system_found = Sap_system(system.upper() if system else None,
-                                         str(mandant).zfill(3) if mandant else None,
-                                         user.upper() if user else None,
-                                         None,
-                                         customer.upper() if customer else None,
-                                         description.upper() if description else None,
-                                         None)
+                utilities.print_system_list(system_to_delete, title="The following system is DELETED from database")
+            else:
+                no_system_found = Sap_system(system.upper() if system else None,
+                                             str(mandant).zfill(3) if mandant else None,
+                                             user.upper() if user else None,
+                                             None,
+                                             customer.upper() if customer else None,
+                                             description.upper() if description else None,
+                                             None)
 
-            utilities.print_system_list(no_system_found, title="FAILED TO UPDATE the following system",
-                                        color=utilities.color_warning)
+                utilities.print_system_list(no_system_found, title="FAILED TO UPDATE the following system",
+                                            color=utilities.color_warning)
 
 
 @sap_cli.command("config")
 @click.option('-create', is_flag=True, callback=create_config, expose_value=False, is_eager=True,
-              help='Create config file. For techincal purpuse. Use "sap start" to create config')
+              help='Create config file. For technical purpose. Use "sap start" to create config')
 @click.option('-open', is_flag=True, callback=open_config, expose_value=False, is_eager=True,
               help='Open config file')
 @click.option('-folder', is_flag=True, callback=open_folder, expose_value=False, is_eager=True,
@@ -704,7 +686,7 @@ def config(ctx):
     config_markdown = """
     Enter one of subcommands:
 
-    \t -create       Create config file. For techincal purpuse. Use "sap start" to create config
+    \t -create       Create config file. For technical purpose. Use "sap start" to create config
     \t -open         Open config file
     \t -folder       Open config folder
     """
@@ -719,15 +701,16 @@ def config(ctx):
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING, default=None)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING,
               default=None)
-@click.option("-url", "--show_url", "url", help="Flag. Display url of the requested SAP sytem", is_flag=True,
-              type=click.BOOL,
-              default=False)
-@click.option("-v", "--verbose", "verbose", help="Flag. Display passwords of the requested SAP sytem", is_flag=True,
-              type=click.BOOL, default=False)
-@click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, type=click.BOOL, default=False)
+@click.option("-url", "--show_url", "url", help="Flag. Display url of the requested SAP system", is_flag=True,
+              default=False, show_default=True)
+@click.option("-v", "--verbose", "verbose", help="Flag. Display passwords of the requested SAP system", is_flag=True,
+              default=False, show_default=True)
+@click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
+              type=click.INT, default=0)
+@click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, default=False, show_default=True)
 @click.pass_context
 def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool,
-                 verbose: bool, enum: bool) -> list:
+                 verbose: bool, timeout: int, enum: bool) -> list:
     """
     \b
     Print information about SAP systems \b
@@ -738,8 +721,6 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
     \b
     If no arguments - print information about all SAP systems from database
     """
-
-    result = ""
 
     with _sap_db(ctx.obj.config):
         sap_system_sql = Sap_system(str(system).upper() if system else None,
@@ -761,27 +742,18 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                                          "",
                                          "")
             utilities.print_system_list(no_system_found, title="NOTHING FOUND according to search criteria",
-                                        color=utilities.color_warning, )
-            return list()
+                                        color=utilities.color_warning)
         else:
             sap_system = [
                 Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
                            item[7])
                 for item in result]
 
-            utilities.print_system_list(*sap_system, title="Available systems", verbose=verbose, url=url,
+            utilities.print_system_list(*sap_system, title="Available systems", verbose=verbose,
+                                        timeout=timeout if timeout else ctx.obj.config.time_to_clear, url=url,
                                         enum=enum)
-            if verbose:
-                utilities.print_message(
-                    f"Information about passwords will be deleted from screen in {TIMER_TO_CLEAR_SCREEN}",
-                    utilities.message_type_message)
-                try:
-                    utilities.countdown(TIMER_TO_CLEAR_SCREEN)
-                except KeyboardInterrupt:
-                    utilities.print_message("Aborted!", utilities.message_type_error)
-                click.clear()
 
-            return sap_system
+        return sap_system if sap_system else []
 
 
 @sap_cli.command("db")
@@ -830,7 +802,7 @@ def shortcut(ctx):
         utilities.print_message(f"{err}", utilities.message_type_error)
 
 
-@sap_cli.command("start", short_help="Starting point for working wiht SAP command line tool")
+@sap_cli.command("start", short_help="Starting point for working with SAP command line tool")
 @click.option('-skip_message', '--skip_message', 'skip_message', is_flag=True, default=False,
               help="Skip result message")
 @click.pass_context
@@ -841,7 +813,7 @@ def start(ctx, skip_message):
     1. Database creation.
     2. ini file with config parameters creation.
     3. Private and public encryption keys.
-    4. Usefull messages.
+    4. Useful messages.
     """
 
     click.clear()
@@ -868,14 +840,14 @@ def start(ctx, skip_message):
         folder = Path(__file__)
         filename = 'start.md'
         path = folder.parent / filename
-        START_MARKDOWN = ""
+        start_markdown_text = ""
 
         with open(path, mode='rt') as file:
-            START_MARKDOWN += str(file.read())
+            start_markdown_text += str(file.read())
 
         console = Console()
-        md = Markdown(str(START_MARKDOWN))
-        console.print(md)
+        markdown_text = Markdown(str(start_markdown_text))
+        console.print(markdown_text)
 
         click.pause('\nPress enter to open files folder and start working. Good luck.')
 
@@ -888,7 +860,7 @@ def start(ctx, skip_message):
 @click.option('-skip_message', '--skip_message', 'skip_message', is_flag=True, default=False,
               help="Skip result message")
 @click.pass_context
-def backup(ctx, password, skip_message) -> str:
+def backup(ctx, password, skip_message):
     """
     \b
     Create backup for the following files:
@@ -921,7 +893,7 @@ def backup(ctx, password, skip_message) -> str:
 
     if os.path.exists(back_path):
         if not skip_message:
-            utilities.print_message(f'Backup succesfully created: {back_path}',
+            utilities.print_message(f'Backup successfully created: {back_path}',
                                     message_type=utilities.message_type_message)
             click.launch(url=back_path, locate=True)
         else:
@@ -937,7 +909,7 @@ def backup(ctx, password, skip_message) -> str:
 @click.pass_context
 def parameter_list(ctx, transaction, enum):
     """
-    List transaction's parameter from databse 'Parameters'
+    List transaction's parameter from database 'Parameters'
     """
 
     param = Parameter(str(transaction).upper() if transaction else None, None)
@@ -949,11 +921,11 @@ def parameter_list(ctx, transaction, enum):
             param = Parameter(str(transaction).upper() if transaction else None, None)
             utilities.print_parameters_list(param, title="NOTHING FOUND according to search criteria",
                                             color=utilities.color_warning)
-            return None
         else:
             parameters = [Parameter(item[0], item[1]) for item in result]
             utilities.print_parameters_list(*parameters, title="Available transactions and parameters", enum=enum)
-            return result
+
+        return result if result else None
 
 
 @sap_cli.command("pardel")
@@ -963,7 +935,7 @@ def parameter_list(ctx, transaction, enum):
 @click.pass_context
 def parameter_delete(ctx, transaction, confirm):
     """
-    Delete transaction's parameter from databse 'Parameters'
+    Delete transaction's parameter from database 'Parameters'
     """
 
     # TODO: перед запросом разрешение на удаление нужно вывести систему, которую мы удаляем. как в SAP DEL
@@ -972,7 +944,7 @@ def parameter_delete(ctx, transaction, confirm):
 
     query_result = ctx.invoke(parameter_list, transaction=param.transaction, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_parameters = [Parameter(item[0], item[1]) for item in query_result]
 
         selected_params = utilities.choose_parameter(selected_parameters)
@@ -987,19 +959,20 @@ def parameter_delete(ctx, transaction, confirm):
         parameter_to_delete = Parameter(selected_params.transaction,
                                         selected_params.parameter)
 
-        result = sap.delete_param(parameter_to_delete)
+        with _sap_db(ctx.obj.config):
+            sap.delete_param(parameter_to_delete)
 
-        result = sap.query_param(parameter_to_delete)
+            result = sap.query_param(parameter_to_delete)
 
-        if result is not None:
+            if result is not None:
 
-            utilities.print_parameters_list(parameter_to_delete,
-                                            title="The following parameter is DELETED from database")
-        else:
-            no_parameter_found = Parameter(parameter_to_delete.transaction, parameter_to_delete.parameter)
+                utilities.print_parameters_list(parameter_to_delete,
+                                                title="The following parameter is DELETED from database")
+            else:
+                no_parameter_found = Parameter(parameter_to_delete.transaction, parameter_to_delete.parameter)
 
-            utilities.print_parameters_list(no_parameter_found, title="FAILED TO UPDATE the following system",
-                                            color=utilities.color_warning)
+                utilities.print_parameters_list(no_parameter_found, title="FAILED TO UPDATE the following system",
+                                                color=utilities.color_warning)
 
 
 @sap_cli.command("paradd")
@@ -1008,7 +981,7 @@ def parameter_delete(ctx, transaction, confirm):
 @click.pass_context
 def parameter_add(ctx, transaction, parameter):
     """
-    Add transaction's parameter to databse 'Parameters'
+    Add transaction's parameter to database 'Parameters'
     """
 
     param = Parameter(str(transaction).upper(), str(parameter).upper())
@@ -1020,7 +993,7 @@ def parameter_add(ctx, transaction, parameter):
             utilities.print_message("Failed to add system to database ... \n", utilities.message_type_error)
             click.echo(result)
         else:
-            result = ctx.invoke(parameter_list, transaction=param.transaction)
+            ctx.invoke(parameter_list, transaction=param.transaction)
 
 
 @sap_cli.command("parupdate", short_help="Update record from database")
@@ -1037,7 +1010,7 @@ def parameter_update(ctx, transaction: str, parameter: str):
 
     query_result = ctx.invoke(parameter_list, transaction=param.transaction, enum=True)
     # --------------------------
-    if query_result != []:
+    if query_result:
         selected_parameters = [Parameter(item[0], item[1]) for item in query_result]
 
         selected_params = utilities.choose_parameter(selected_parameters)
@@ -1048,17 +1021,18 @@ def parameter_update(ctx, transaction: str, parameter: str):
 
         parameter_updated = Parameter(selected_params.transaction, str(parameter_new).upper())
 
-        result = sap.update_param(parameter_updated)
+        with _sap_db(ctx.obj.config):
+            result = sap.update_param(parameter_updated)
 
-        if result is None:
+            if result is None:
 
-            utilities.print_parameters_list(parameter_updated,
-                                            title="The following system is UPDATED")
-        else:
-            no_parameter_found = Parameter(parameter_updated.transaction, parameter_updated.parameter)
+                utilities.print_parameters_list(parameter_updated,
+                                                title="The following system is UPDATED")
+            else:
+                no_parameter_found = Parameter(parameter_updated.transaction, parameter_updated.parameter)
 
-            utilities.print_parameters_list(no_parameter_found, title="FAILED TO UPDATE the following system",
-                                            color=utilities.color_warning)
+                utilities.print_parameters_list(no_parameter_found, title="FAILED TO UPDATE the following system",
+                                                color=utilities.color_warning)
 
 
 @contextmanager

@@ -8,7 +8,7 @@ import os
 import pytest
 from click.testing import CliRunner
 
-from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
+from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, DEBUG_FILE_NAME
 from sap.cli import sap_cli
 
 
@@ -35,4 +35,7 @@ def temp_start_cli(tmpdir_factory, runner):
     os.remove(os.path.join(test_path, CONFIG_NAME))
     os.remove(os.path.join(test_path, PUBLIC_KEY_NAME))
     os.remove(os.path.join(test_path, PRIVATE_KEY_NAME))
+    debug_file = os.path.join(test_path, DEBUG_FILE_NAME)
+    if os.path.exists(debug_file):
+        os.remove(debug_file)
     os.remove(os.path.join(test_path, DATABASE_NAME))
