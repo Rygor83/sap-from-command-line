@@ -7,18 +7,12 @@
 import os.path
 from zipfile import ZipFile
 import pytest
-from click.testing import CliRunner
 
 from sap.backup import Backup
 from sap.cli import sap_cli
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME, SAPLOGON_INI
 
-text_file_name = 'text_file.txt'
-
-
-@pytest.fixture
-def runner():
-    return CliRunner()
+TEXT_FILE_NAME = 'text_file.txt'
 
 
 @pytest.fixture
@@ -26,7 +20,7 @@ def temp_backup_api(tmp_path):
     """
     Temporary backup creation with api
     """
-    text_file_path = os.path.join(tmp_path, text_file_name)
+    text_file_path = os.path.join(tmp_path, TEXT_FILE_NAME)
     with open(text_file_path, "w", encoding="UTF-8") as file:
         file.write("For backup")
 
@@ -63,7 +57,7 @@ def test_created_backup_file_api(temp_backup_api):
 def test_check_archived_files_api(temp_backup_api):
     """ Check files: only one file in archive and specific filename"""
     archive = ZipFile(temp_backup_api)
-    assert len(archive.filelist) == 1 and archive.filelist[0].filename == text_file_name
+    assert len(archive.filelist) == 1 and archive.filelist[0].filename == TEXT_FILE_NAME
 
 
 def test_archive_comment_api(temp_backup_api):

@@ -8,14 +8,11 @@ import ctypes
 import os
 import sys
 from contextlib import contextmanager
-from subprocess import Popen
 import logging
-import re
 import time
 from pathlib import Path
 import click_log
 import click
-import pyautogui
 import pyperclip
 
 import rich_click as click  # rich help output. Do not delete it as it works in background
@@ -45,8 +42,10 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
 log_level = ['--log_level', '-l']
 
 
-# TODO: if i add new parameters into config file - how make an update for users
+# TODO: Если я обновил настройку конфигурационного файл, то как мне ее передать пользователю ?
 #  https://stackoverflow.com/questions/52392102/how-to-update-an-existing-section-in-python-config-file-python-3-6-6
+#  По такому же принципу работать с базой данных - посмотреть в сторону alembic
+#  https://alembic.sqlalchemy.org/en/latest/
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -92,15 +91,12 @@ def sap_cli(ctx, config_path: str):
 
 
 @sap_cli.command("logon")
+@click.option("-s", "--saplogon", "saplogon", help="Path to saplogon.exe file")
 @click.pass_context
-def logon(ctx):
+def logon(ctx, saplogon):
     """Launch SAPLogon application"""
 
-    try:
-        utilities.launch_saplogon_with_params(ctx.obj.config.saplogon_path)
-    except WrongPath as err:
-        utilities.print_message(f"{err}", utilities.message_type_error)
-        raise click.Abort
+    utilities.launch_saplogon_with_params(saplogon if saplogon else ctx.obj.config.saplogon_path)
 
 
 @sap_cli.command("run")
@@ -124,12 +120,14 @@ def logon(ctx):
 @click.option("-r", "--report", "report", help="Run report (report name for SE38 transaction)", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
+@click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_wait_for_web(), show_default=True,
+              type=click.INT, help='Timer in seconds to wait web site to load')
 @click.option("-n", "--new", "reuse", help="Flag. Defines whether a new connection to an SAP is reused",
               default=False, is_flag=True, show_default=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
-        parameter: str, web: bool, reuse: bool):
+        parameter: str, web: bool, timeout: int, reuse: bool):
     """
     \b
     Launch SAP system \n
@@ -146,129 +144,69 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
                               description=description,
-                              url=False, verbose=False, enum=True)
+                              url=web, verbose=False, enum=True)
+    if not query_result:
+        return
     # --------------------------
-    if query_result:
-        selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
-            for item in query_result]
+    selected_sap_systems = [
+        Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
+        for item in query_result]
 
-        if language is None:
-            language = ctx.obj.config.language
+    if language is None:
+        language = ctx.obj.config.language
 
-        selected_system = utilities.choose_system(selected_sap_systems)
-        try:
-            argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language,
-                                                                                      external_user,
-                                                                                      guiparm, snc_name, snc_qop, "",
-                                                                                      ctx.obj.config.command_line_path)
-        except WrongPath as err:
-            utilities.print_message(f"{err}", message_type=utilities.message_type_error)
-            raise click.Abort
+    selected_system = utilities.choose_system(selected_sap_systems)
 
-        if web:
-            if selected_system.url != " ":
-                utilities.print_message(
-                    f"Launching web site: {selected_system.url} ({selected_system.description} of {selected_system.customer})",
-                    message_type=utilities.message_type_message)
-                click.launch(url=f"{selected_system.url}")
+    if web:
+        if selected_system.url != "":
+            utilities.print_message(
+                f"Launching web site: {selected_system.url} ({selected_system.description} of {selected_system.customer})",
+                message_type=utilities.message_type_message)
 
-                utilities.print_message(f"Waiting web site to load: {ctx.obj.config.wait_site_to_load} seconds",
-                                        utilities.message_type_message)
-                time.sleep(ctx.obj.config.wait_site_to_load)
+            utilities.open_url(f"{selected_system.url}")
 
-                key_strokes = re.findall(r'{(.+?)}', selected_system.autotype)
-                logger.info(f"Autotype sequence: {selected_system.autotype}")
 
-                for item in key_strokes:
-                    if item == 'USER':
-                        pyautogui.write(str(selected_system.user))
-                    elif item == 'PASS':
-                        pyautogui.write(str(selected_system.password))
-                    else:
-                        pyautogui.press(item)
+            utilities.print_message(
+                f"Waiting web site to load: {timeout if timeout else ctx.obj.config.wait_site_to_load} seconds",
+                utilities.message_type_message)
 
-            else:
-                no_system_found = Sap_system(system.upper() if system else None,
-                                             str(mandant).zfill(3) if mandant else None,
-                                             user.upper() if user else None,
-                                             None,
-                                             customer.upper() if customer else None,
-                                             description.upper() if description else None,
-                                             None,
-                                             None)
+            time.sleep(timeout if timeout else ctx.obj.config.wait_site_to_load)
 
-                utilities.print_system_list(no_system_found,
-                                            title="NO URL FOUND according to search criteria",
-                                            color=utilities.color_warning)
-                raise click.Abort
+            logger.info(f"Autotype sequence: {selected_system.autotype}")
+            utilities.launch_autotype_sequence(selected_system.autotype, selected_system.user, selected_system.password)
+
         else:
-            if transaction:
-                command = transaction
-                command_type = 'transaction'
+            no_system_found = Sap_system(system.upper() if system else None,
+                                         str(mandant).zfill(3) if mandant else None,
+                                         user.upper() if user else None, None,
+                                         customer.upper() if customer else None,
+                                         description.upper() if description else None,
+                                         None, None)
 
-                argument += " -type=transaction"
+            utilities.print_system_list(no_system_found, title="NO URL FOUND according to search criteria",
+                                        color=utilities.color_warning, url=True)
+            raise click.Abort
+    else:
 
-                if parameter:
-                    param = Parameter(str(transaction).upper(), None)
-                    param_data = sap.query_param(param)
+        argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
+            selected_system, language,
+            external_user,
+            guiparm, snc_name, snc_qop,
+            transaction, parameter, report, system_command, reuse,
+            ctx.obj.config.command_line_path)
 
-                    if param_data:
-                        command += f" -> {parameter}"
-                        param_list = param_data[0][1].split(',')
-                        param_value = parameter.split(',')
+        if external_user:
+            message = "Trying to LAUNCH the following system with EXTERNAL USER"
+        else:
+            message = "Trying to LAUNCH the following system "
 
-                        param_list_value = zip(param_list, param_value)
+        utilities.print_system_list(selected_system, title=message,
+                                    command=command, command_type=command_type)
 
-                        argument += f' -command="*{transaction.upper()}'
-                        for item in param_list_value:
-                            argument += f' {item[0]}={item[1]};'
-                        argument += '"'
-                    else:
-                        utilities.print_message(f"\nThere is no parameter info for {transaction.upper()} transaction",
-                                                message_type=utilities.message_type_warning)
+        logger.info(f"{argument}")
 
-                        argument += f' -command="{transaction.upper()}"'
-                else:
-                    argument = argument + " -command=" + transaction
-            elif system_command:
-                command = system_command
-                command_type = 'system command'
-
-                argument += " -type=SystemCommand"
-                argument += " -command=" + system_command
-
-            elif report:
-                command = report
-                command_type = 'report'
-
-                argument += " -type=report"
-                argument += " -command=" + report
-            else:
-                command = None
-                command_type = None
-
-            if external_user:
-                message = "Trying to LAUNCH the following system with EXTERNAL USER"
-            else:
-                message = "Trying to LAUNCH the following system "
-
-            if reuse:
-                argument += ' -reuse=0'
-            else:
-                argument += ' -reuse=1'
-
-            utilities.print_system_list(selected_system, title=message,
-                                        command=command, command_type=command_type)
-
-            logger.info(f"{argument}")
-
-            # SAP Launching
-            pop = Popen(argument)
-            pop.wait()
-
-            if pop.returncode:
-                click.echo(pop.returncode, pop.communicate()[0])
+        # SAP Launching
+        utilities.open_sap(argument)
 
 
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debugging")
@@ -329,39 +267,38 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
         query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
                                   description=description,
                                   url=False, verbose=False, enum=True)
+        if not query_result:
+            return
+
         # --------------------------
-        if query_result:
-            selected_sap_systems = [
-                Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
-                for item in query_result]
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
+            for item in query_result]
 
-            if language is None:
-                language = ctx.obj.config.language
+        if language is None:
+            language = ctx.obj.config.language
 
-            # As soon as debugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
-            #  as it influence whether to open new windows, or to debug the latest opened. All arguments
-            #  value must be entered
-            selected_system = utilities.choose_system(selected_sap_systems)
-            try:
-                argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language,
-                                                                                          None, guiparm, snc_name,
-                                                                                          snc_qop, "",
-                                                                                          ctx.obj.config.command_line_path)
-            except WrongPath as err:
-                click.echo(f"{err}")
-                raise click.Abort
+        # As soon as debugger stops working - revert all the changes to "prepare_parameters_to_launch_system"
+        #  as it influence whether to open new windows, or to debug the latest opened. All arguments
+        #  value must be entered
+        selected_system = utilities.choose_system(selected_sap_systems)
+        try:
+            argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
+                selected_system, language,
+                None, guiparm, snc_name,
+                snc_qop, None, None, None, None, None,
+                ctx.obj.config.command_line_path)
+        except WrongPath as err:
+            click.echo(f"{err}")
+            raise click.Abort
 
-            argument = argument + " -command=/H" + " -type=SystemCommand"
+        argument = argument + " -command=/H" + " -type=SystemCommand"
 
-            utilities.print_system_list(selected_system, title="Trying to DEBUG the following system")
+        utilities.print_system_list(selected_system, title="Trying to DEBUG the following system")
 
-            logger.info(f"{argument}")
+        logger.info(f"{argument}")
 
-            pop = Popen(argument)
-            pop.wait()
-
-            if pop.returncode:
-                click.echo(pop.returncode, pop.communicate()[0])
+        utilities.open_sap(argument)
 
 
 @sap_cli.command("stat")
@@ -396,9 +333,11 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
-            argument, selected_system = utilities.prepare_parameters_to_launch_system(selected_system, language, None,
-                                                                                      None, None, None, "",
-                                                                                      ctx.obj.config.command_line_path)
+            argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
+                selected_system, language, None,
+                None, None, None, None, None, None, None, None,
+                ctx.obj.config.command_line_path)
+
         except WrongPath as err:
             click.echo(f"{err}")
             raise click.Abort
@@ -409,11 +348,7 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 
         logger.info(f"{argument}")
 
-        pop = Popen(argument)
-        pop.wait()
-
-        if pop.returncode:
-            click.echo(pop.returncode, pop.communicate()[0])
+        utilities.open_sap(argument)
 
 
 @sap_cli.command("pw")
@@ -722,6 +657,8 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
     If no arguments - print information about all SAP systems from database
     """
 
+    sap_system = []
+
     with _sap_db(ctx.obj.config):
         sap_system_sql = Sap_system(str(system).upper() if system else None,
                                     str(mandant) if mandant else None,
@@ -842,7 +779,7 @@ def start(ctx, skip_message):
         path = folder.parent / filename
         start_markdown_text = ""
 
-        with open(path, mode='rt') as file:
+        with open(path, mode='rt', encoding='utf-8') as file:
             start_markdown_text += str(file.read())
 
         console = Console()

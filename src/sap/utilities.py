@@ -11,6 +11,7 @@ import re
 from prettytable import PrettyTable
 import time
 import getpass
+import pyautogui
 
 import sap.api
 from sap.api import Sap_system, Parameter
@@ -50,10 +51,32 @@ message_type_error = "Error"
 
 def prepare_parameters_to_launch_system(selected_system: Sap_system, language, external_user, guiparm, snc_name,
                                         snc_qop,
-                                        transaction="", sapshcut_exe_path: str = "") -> str:  # list:
-    # Добавляем параметры для запуска SAP системы
-    if not os.path.exists(sapshcut_exe_path):
-        raise WrongPath("sapshcut.exe", sapshcut_exe_path)
+                                        transaction='', parameter='', report='', system_command='', reuse='',
+                                        sapshcut_exe_path: str = ""):
+    """
+    Constructing a string to start the system
+    :param selected_system:
+    :param language:
+    :param external_user:
+    :param guiparm:
+    :param snc_name:
+    :param snc_qop:
+    :param transaction:
+    :param parameter:
+    :param report:
+    :param system_command:
+    :param sapshcut_exe_path:
+    :return:
+    """
+
+    # TODO: переделать, чтобы у нужных параметров были дефолтные значения, а это будет означать, что можно
+    # не передавать параметры при вызове - а занчит нужно будет убрать множество None
+
+    try:
+        check_if_path_exists(sapshcut_exe_path)
+    except WrongPath as err:
+        print_message(f"{err}", message_type=message_type_error)
+        raise click.Abort
 
     argument: str = ""
     argument = argument + f'"{sapshcut_exe_path}"'  # Путь до sapshcut.exe
@@ -92,7 +115,62 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
     else:
         edited_system = selected_system
 
-    return argument, edited_system
+    if transaction:
+        command = transaction
+        command_type = 'transaction'
+
+        argument += " -type=transaction"
+
+        if parameter:
+            param = Parameter(str(transaction).upper(), None)
+            param_data = sap.query_param(param)
+
+            if param_data:
+                command += f" -> {parameter}"
+                param_list = param_data[0][1].split(',')
+                param_value = parameter.split(',')
+
+                param_list_value = zip(param_list, param_value)
+
+                argument += f' -command="*{transaction.upper()}'
+                for item in param_list_value:
+                    argument += f' {item[0]}={item[1]};'
+                argument += '"'
+            else:
+                print_message(f"\nThere is no parameter info for {transaction.upper()} transaction",
+                              message_type=message_type_warning)
+
+                argument += f' -command="{transaction.upper()}"'
+        else:
+            argument = argument + " -command=" + transaction
+    elif system_command:
+        command = system_command
+        command_type = 'system command'
+
+        argument += " -type=SystemCommand"
+        argument += " -command=" + system_command
+
+    elif report:
+        command = report
+        command_type = 'report'
+
+        argument += " -type=report"
+        argument += " -command=" + report
+    else:
+        command = None
+        command_type = None
+
+    if reuse:
+        argument += ' -reuse=0'
+    else:
+        argument += ' -reuse=1'
+
+    if external_user:
+        message = "Trying to LAUNCH the following system with EXTERNAL USER"
+    else:
+        message = "Trying to LAUNCH the following system "
+
+    return argument, edited_system, command, command_type
 
 
 def launch_command_line_with_params(command_line_path, param):
@@ -114,8 +192,13 @@ def launch_command_line_with_params(command_line_path, param):
 def launch_saplogon_with_params(saplogon):
     ''' Запуск sapshcut.exe с разными параметрами'''
 
-    if not os.path.exists(saplogon):
-        raise WrongPath('saplogon.exe', saplogon)
+    try:
+        check_if_path_exists(saplogon)
+    except WrongPath as err:
+        print_message(f"{err}", message_type_error)
+        raise click.Abort
+    else:
+        click.echo(f'Trying to launch: {saplogon}')
 
     click.launch(url=saplogon)
 
@@ -399,3 +482,56 @@ def default_time_to_clear():
         return ""
 
     return _config.time_to_clear
+
+
+def default_time_to_wait_for_web():
+    """
+    Default values from configuration file for CLICK.OPTION for [AUTO-TYPE]->wait
+    """
+    config = ""
+    config = sap.config.Config()
+    try:
+        _config = config.read()
+    except:
+        return ""
+
+    return _config.wait_site_to_load
+
+
+def open_sap(argument):
+    pop = Popen(argument)
+    pop.wait()
+
+    if pop.returncode:
+        click.echo(pop.returncode, pop.communicate()[0])
+
+
+def check_if_path_exists(path):
+    if not os.path.exists(path):
+        raise WrongPath(os.path.basename(path), path)
+    return True
+
+
+def launch_autotype_sequence(autotype, user, password):
+    """
+    Enteting data according autotype sequence at web site
+
+    :param autotype: autotype sequence
+    :param user: user id
+    :param password: user's password
+    :return: None
+    """
+    key_strokes = re.findall(r'{(.+?)}', autotype)
+
+    for item in key_strokes:
+        if item == 'USER':
+            pyautogui.write(str(user))
+        elif item == 'PASS':
+            pyautogui.write(str(password))
+        else:
+            pyautogui.press(item)
+
+
+def open_url(url):
+    """ Open url in web browser"""
+    click.launch(url=url)

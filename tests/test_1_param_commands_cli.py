@@ -7,7 +7,7 @@
 from sap.cli import sap_cli
 
 
-def test_paradd_cli(runner, temp_start_cli):
+def test_paradd_1_cli(runner, temp_start_cli):
     """  Testing paradd: adding new transaction """
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "paradd",
@@ -20,6 +20,21 @@ def test_paradd_cli(runner, temp_start_cli):
                              '╞═══════════════════════════════════╪═════════════════════════════════════════╡\n'
                              '│ SE11                              │ RSRD1-VIMA_VAL                          │\n'
                              '└───────────────────────────────────┴─────────────────────────────────────────┘\n')
+
+
+def test_paradd_2_cli(runner, temp_start_cli):
+    """  Testing paradd: adding new transaction """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
+                                          "paradd",
+                                          "-t", "SM30",
+                                          "-p", "VIEWNAME"])
+    assert result.output == ('\n\n'
+                             '               \x1b[32m\x1b[40mAvailable transactions and parameters\x1b[0m                \n'
+                             '┌────────────────────────────────────────┬────────────────────────────────────┐\n'
+                             '│ Transaction                            │ Parameters                         │\n'
+                             '╞════════════════════════════════════════╪════════════════════════════════════╡\n'
+                             '│ SM30                                   │ VIEWNAME                           │\n'
+                             '└────────────────────────────────────────┴────────────────────────────────────┘\n')
 
 
 def test_parupdate_existing_transaction_cli(runner, temp_start_cli):
@@ -69,6 +84,7 @@ def test_parlist_existing_transaction_cli(runner, temp_start_cli):
                              '│ Transaction                       │ Parameters                              │\n'
                              '╞═══════════════════════════════════╪═════════════════════════════════════════╡\n'
                              '│ SE11                              │ RSRD1-TBMA_VAL                          │\n'
+                             '│ SM30                              │ VIEWNAME                                │\n'
                              '└───────────────────────────────────┴─────────────────────────────────────────┘\n')
 
 
@@ -82,6 +98,7 @@ def test_parlist_enumerated_existing_transaction_cli(runner, temp_start_cli):
                              '│ Id       │ Transaction                  │ Parameters                        │\n'
                              '╞══════════╪══════════════════════════════╪═══════════════════════════════════╡\n'
                              '│ 1        │ SE11                         │ RSRD1-TBMA_VAL                    │\n'
+                             '│ 2        │ SM30                         │ VIEWNAME                          │\n'
                              '└──────────┴──────────────────────────────┴───────────────────────────────────┘\n')
 
 
@@ -158,4 +175,17 @@ def test_pardelete_no_transaction_exists_cli(runner, temp_start_cli):
                              '│ Transaction                            │ Parameters                         │\n'
                              '╞════════════════════════════════════════╪════════════════════════════════════╡\n'
                              '│ SE11                                   │                                    │\n'
+                             '└────────────────────────────────────────┴────────────────────────────────────┘\n')
+
+
+def test_parlist_existing_transaction_2_cli(runner, temp_start_cli):
+    """ Testing parlist: listing existing transaction """
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
+                                          "parlist"])
+    assert result.output == ('\n\n'
+                             '               \x1b[32m\x1b[40mAvailable transactions and parameters\x1b[0m                \n'
+                             '┌────────────────────────────────────────┬────────────────────────────────────┐\n'
+                             '│ Transaction                            │ Parameters                         │\n'
+                             '╞════════════════════════════════════════╪════════════════════════════════════╡\n'
+                             '│ SM30                                   │ VIEWNAME                           │\n'
                              '└────────────────────────────────────────┴────────────────────────────────────┘\n')

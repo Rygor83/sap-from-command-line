@@ -82,7 +82,7 @@ class Config:
 
             self.time_to_clear = int(parser.get('PASSWORD', 'time_to_clear'))
 
-            # TODO: Сделать проверку и уведомление, если приватный ключ и базаданных лежат в одной папке
+            # TODO: Сделать проверку и уведомление, если приватный ключ и база данных лежат в одной папке
 
             # db_path = pathlib.Path(self.db_path)
             # private_key_path = pathlib.Path(self.private_key_path)

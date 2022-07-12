@@ -9,4 +9,6 @@ rich
 click_log
 
 pytest
+pytest-cov
+pytest-mock
 setuptools
