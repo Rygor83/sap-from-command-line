@@ -46,8 +46,8 @@ class Config:
 
         self.db_path = db_path if db_path else os.path.join(self.config_path, DATABASE_NAME)
         self.db_type = db_type
-        self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file'
-        self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file'
+        self.command_line_path = command_line_path if command_line_path else 'path to sapshcut.exe file.'
+        self.saplogon_path = saplogon_path if saplogon_path else 'path to saplogon.exe file.'
         self.public_key_path = public_key_path if public_key_path else os.path.join(self.config_path,
                                                                                     PUBLIC_KEY_NAME)
         self.private_key_path = private_key_path if private_key_path else os.path.join(self.config_path,

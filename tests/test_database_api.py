@@ -9,7 +9,7 @@ import os
 from sap.database import SapDB
 from sap.api import Sap_system
 from sap.crypto import Crypto
-from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME
 
 
 @pytest.fixture

@@ -165,7 +165,6 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
             utilities.open_url(f"{selected_system.url}")
 
-
             utilities.print_message(
                 f"Waiting web site to load: {timeout if timeout else ctx.obj.config.wait_site_to_load} seconds",
                 utilities.message_type_message)
@@ -439,7 +438,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             str(mandant).zfill(3),
             str(user).upper(),
             encrypted_password,
-            str(customer).upper(),
+            str(customer),
             str(description),
             str(url),
             str(autotype)
@@ -447,12 +446,8 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
         result = sap.add(sap_system)
 
         if result is not None:
-            click.echo(
-                click.style(
-                    "Failed to add system to database ... \n",
-                    **utilities.color_sensitive,
-                )
-            )
+            utilities.print_message("Failed to add system to database ... \n",
+                                    message_type=utilities.message_type_sensitive)
             click.echo(result)
         else:
             sap_system = Sap_system(str(system).upper() if system else None, str(mandant) if mandant else None,
@@ -462,7 +457,8 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             added_system = [Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4],
                                        item[5], item[6], item[7]) for item in result]
             utilities.print_system_list(*added_system, title="The following system is ADDED to the database: ",
-                                        verbose=verbose, timeout=timeout if timeout else ctx.obj.config.time_to_clear)
+                                        verbose=verbose,
+                                        timeout=timeout if timeout else ctx.obj.config.time_to_clear)
 
 
 @sap_cli.command("update", short_help="Update record from database")
@@ -490,9 +486,8 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
                               url=False, verbose=False, enum=True)
     # --------------------------
     if query_result:
-        selected_sap_systems = [
-            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
-            for item in query_result]
+        selected_sap_systems = [Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
+                                for item in query_result]
 
         selected_system = utilities.choose_system(selected_sap_systems)
 

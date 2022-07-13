@@ -206,7 +206,6 @@ def launch_saplogon_with_params(saplogon):
 def choose_system(sap_systems: list, verbose=False) -> Sap_system:
     ans = 0
     if len(sap_systems) >= 2:
-        # print_system_list(parameters, 'Available systems', verbose=verbose, enum=True)
 
         while int(ans) > len(sap_systems) or int(ans) < 1:
             if 1 <= int(ans) <= len(sap_systems):
@@ -227,7 +226,6 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
 def choose_parameter(parameters: list, verbose=False):
     ans = 0
     if len(parameters) >= 2:
-        # print_system_list(parameters, 'Available systems', verbose=verbose, enum=True)
 
         while int(ans) > len(parameters) or int(ans) < 1:
             if 1 <= int(ans) <= len(parameters):
@@ -446,7 +444,8 @@ def print_message(message, message_type):
         Text.from_markup(message),
         border_style=border_style,
         title=message_type,
-        title_align=title_align, )
+        title_align=title_align,
+        expand=True)
     )
 
 

@@ -8,7 +8,7 @@ import pytest
 from sap.crypto import Crypto
 import os
 
-from api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME
 
 
 @pytest.fixture
