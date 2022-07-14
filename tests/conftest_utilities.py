@@ -5,11 +5,17 @@
 """ Helpers for testing """
 
 from sap.api import Parameter, Sap_system
+from pathlib import Path
 
 
-def flat_actual(system):
+def flat_actual(*systems):
     """ Removing unwanted elements from actual output as it was printed on screen """
-    return str(system).replace("\n", '').replace(' ', '')
+    ret_sys = ''
+    for system in systems:
+        ret_sys += str(system).replace("\n", '').replace(' ', '')
+        if len(systems) > 1:
+            ret_sys += ','
+    return ret_sys
 
 
 def flat_expected(*systems):
@@ -50,13 +56,6 @@ def stub_open_sap(arguments):
     Stab function to replace utilities.open_sap
     """
     print(arguments)
-
-
-def stub_launch(url=''):
-    """
-    Stab function to replace 'click.launch' for launching websites
-    """
-    return 0 if url else 1
 
 
 def stub_launch(command_line_path, param):

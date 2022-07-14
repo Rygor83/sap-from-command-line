@@ -102,8 +102,8 @@ _sapdb = None
 
 def start_sap_db(db_path, db_type):
     """Connect API functions to a db."""
-    if not isinstance(db_path, string_types):
-        raise TypeError('db_path must be a string')
+    # if not isinstance(db_path, string_types):
+    #     raise TypeError('db_path must be a string')
     global _sapdb
     import sap.database
     try:
@@ -130,7 +130,8 @@ PUBLIC_KEY_NAME = 'public_key.txt'
 PRIVATE_KEY_NAME = 'private_key.txt'
 CONFIG_NAME = 'sap_config.ini'
 DATABASE_NAME = 'database.db'
-COMMAND_LINE_PATH = 'sapshcut.exe'
-SAPLOGON_PATH = 'saplogon.exe'
+COMMAND_LINE_NAME = 'sapshcut.exe'
+SAPLOGON_NAME = 'saplogon.exe'
 DEBUG_FILE_NAME = "DEBUG.TXT"
 SAPLOGON_INI = 'SAPUILandscape.xml'
+TEXT_FILE_NAME = 'text_file.txt'

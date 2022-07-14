@@ -4,7 +4,7 @@
 import typing
 import click
 import traceback
-import os
+from pathlib import Path
 from subprocess import Popen
 import operator
 import re
@@ -175,7 +175,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
 
 def launch_command_line_with_params(command_line_path, param):
     ''' Запуск sapshcut.exe с разными параметрами'''
-    if not os.path.exists(command_line_path):
+    if not command_line_path.exists():
         raise WrongPath('sapshcut.exe', command_line_path)
 
     # Добавляем путь к командному файлу
@@ -200,7 +200,7 @@ def launch_saplogon_with_params(saplogon):
     else:
         click.echo(f'Trying to launch: {saplogon}')
 
-    click.launch(url=saplogon)
+    click.launch(url=str(saplogon))
 
 
 def choose_system(sap_systems: list, verbose=False) -> Sap_system:
@@ -373,7 +373,7 @@ def print_parameters_list(*parameters: Parameter, title, color=color_success, en
 
 
 def path():
-    return click.get_app_dir('sap', roaming=False)
+    return Path(click.get_app_dir('sap', roaming=False))
 
 
 class String_3(click.ParamType):
@@ -506,8 +506,8 @@ def open_sap(argument):
 
 
 def check_if_path_exists(path):
-    if not os.path.exists(path):
-        raise WrongPath(os.path.basename(path), path)
+    if not path.exists():
+        raise WrongPath(path.name, path)
     return True
 
 
@@ -531,6 +531,6 @@ def launch_autotype_sequence(autotype, user, password):
             pyautogui.press(item)
 
 
-def open_url(url):
+def open_url(url, locate):
     """ Open url in web browser"""
-    click.launch(url=url)
+    click.launch(url=url, locate=locate)

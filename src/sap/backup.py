@@ -4,7 +4,7 @@
 
 """ Backup api """
 
-import os
+from pathlib import Path
 from datetime import datetime
 import pyzipper
 
@@ -23,9 +23,9 @@ class Backup:
 
     def __init__(self, password, backup_path, files):
         self.password = password
-        self.backup_path = backup_path
+        self.backup_path = Path(backup_path)
         self.files = files
-        self.backup_file_path = ""
+        self.backup_file_path = Path()
 
     def create(self):
         """
@@ -34,14 +34,14 @@ class Backup:
         pwd = str.encode(self.password)
 
         back_file_name = f'backup_{datetime.now().strftime("%Y.%m.%d-%I.%M.%S")}.zip'
-        self.backup_file_path = os.path.join(self.backup_path, back_file_name)
+        self.backup_file_path = Path(self.backup_path / back_file_name)
         with pyzipper.AESZipFile(self.backup_file_path, 'w', compression=pyzipper.ZIP_LZMA,
                                  encryption=pyzipper.WZ_AES) as zip_file:
             zip_file.setpassword(pwd)
 
             # Adding files into backup archive:
             for file in self.files:
-                zip_file.write(file, os.path.basename(file))
+                zip_file.write(file, Path(file).name)
 
             zip_file.comment = self.comment.encode()
 
@@ -51,4 +51,4 @@ class Backup:
         """
         Delete backup file
         """
-        os.remove(self.backup_file_path)
+        self.backup_file_path.unlink()

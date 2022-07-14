@@ -4,7 +4,7 @@
 
 """ Passwords encryption with RSA for sap systems """
 
-import os
+from pathlib import Path
 import click
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -22,15 +22,15 @@ class Crypto:
     def __init__(self, public_key_path: str = '', private_key_path: str = ''):
         self.public_key_file_name = PUBLIC_KEY_NAME
         self.private_key_file_name = PRIVATE_KEY_NAME
-        self.public_key_path = public_key_path if public_key_path else os.path.join(
-            utilities.path(), self.public_key_file_name)
-        self.private_key_path = private_key_path if private_key_path else os.path.join(
-            utilities.path(), self.private_key_file_name)
+        self.public_key_path = Path(public_key_path) if public_key_path else Path(
+            utilities.path() / self.public_key_file_name)
+        self.private_key_path = Path(private_key_path) if private_key_path else Path(
+            utilities.path() / self.private_key_file_name)
 
     def generate_keys(self):
         """ Generate RSA encryption keys: public, private """
 
-        if not os.path.isfile(self.public_key_path) and not os.path.isfile(self.private_key_path):
+        if not self.public_key_path.is_file() and not self.private_key_path.is_file():
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
             private_pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -49,7 +49,6 @@ class Crypto:
         """ Save RSA keys """
         with open(file_name, "w", encoding='utf-8') as file:
             for item in pem.splitlines():
-                # click.echo(item)
                 file.write(item.decode() + '\n')
 
     def encrypto(self, password):
@@ -95,5 +94,5 @@ class Crypto:
 
     def remove_keys(self):
         """ Remove encryption keys """
-        os.remove(self.private_key_path)
-        os.remove(self.public_key_path)
+        self.private_key_path.unlink()
+        self.public_key_path.unlink()

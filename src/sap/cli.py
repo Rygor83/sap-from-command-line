@@ -6,11 +6,11 @@
 
 import ctypes
 import os
+from pathlib import Path
 import sys
 from contextlib import contextmanager
 import logging
 import time
-from pathlib import Path
 import click_log
 import click
 import pyperclip
@@ -91,12 +91,12 @@ def sap_cli(ctx, config_path: str):
 
 
 @sap_cli.command("logon")
-@click.option("-s", "--saplogon", "saplogon", help="Path to saplogon.exe file")
+@click.option("-s", "--saplogon", "saplogon_path", help="Path to saplogon.exe file")
 @click.pass_context
-def logon(ctx, saplogon):
+def logon(ctx, saplogon_path):
     """Launch SAPLogon application"""
 
-    utilities.launch_saplogon_with_params(saplogon if saplogon else ctx.obj.config.saplogon_path)
+    utilities.launch_saplogon_with_params(Path(saplogon_path) if saplogon_path else ctx.obj.config.saplogon_path)
 
 
 @sap_cli.command("run")
@@ -222,8 +222,8 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 @click.option("-sqop", "--snc_qop", "snc_qop", help="Activation of the logon via Secure Network Communication (SNC)",
               type=click.STRING)
 @click.option("-f", "--file", "file", help="Flag. Create debug file", is_flag=True, type=click.BOOL)
-@click.option('-o', "--open_debug_file", "open_file", help="Flag. Open file with debug file", is_flag=True,
-              default=True)
+@click.option('-open/-not_open', "open_file", help="Open/Not Open: file with debug file", is_flag=True,
+              default=True, show_default=True)
 @click.pass_context
 def debug(ctx, system: str, mandant: str, user: str, customer: str, description: str, language: str, guiparm: str,
           snc_name: str, snc_qop: str, file: bool, open_file: bool):
@@ -241,7 +241,7 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
 
     if file:
         debug_folder = ctx.obj.config.config_path if ctx.obj.config.config_path else utilities.path()
-        debug_file_path = os.path.join(debug_folder, DEBUG_FILE_NAME)
+        debug_file_path = Path(debug_folder / DEBUG_FILE_NAME)
 
         debug_markdown = f"""
         # DEBUG
@@ -260,7 +260,7 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
             writer.write("Type=SystemCommand")
 
         if open_file:
-            click.launch(url=debug_file_path, locate=True)
+            utilities.open_url(url=str(debug_file_path), locate=True)
 
     else:
         query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
@@ -579,7 +579,8 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
                                       selected_system.password,
                                       selected_system.customer,
                                       selected_system.description,
-                                      selected_system.url)
+                                      selected_system.url,
+                                      selected_system.autotype)
 
         with _sap_db(ctx.obj.config):
             sap.delete(system_to_delete)
@@ -784,6 +785,8 @@ def start(ctx, skip_message):
         click.pause('\nPress enter to open files folder and start working. Good luck.')
 
         click.launch(ctx.obj.config.config_file_path, locate=True)
+    else:
+        click.echo(ctx.obj.config.config_file_path)
 
 
 @sap_cli.command("backup", short_help="Create backup")
@@ -807,7 +810,8 @@ def backup(ctx, password, skip_message):
     # -------------------------------------------
 
     #  Paths to SAPUILandscape.xml: https://launchpad.support.sap.com/#/notes/2075150
-    saplogon_ini_path = os.path.join(os.path.expandvars(r'%APPDATA%\SAP\Common'), SAPLOGON_INI)
+    common_folder = Path(os.path.expandvars(r'%APPDATA%\SAP\Common'))
+    saplogon_ini_path = common_folder / SAPLOGON_INI
 
     file_list = [
         ctx.obj.config.db_path,
@@ -823,7 +827,7 @@ def backup(ctx, password, skip_message):
     backup_obj = Backup(password, cofig_file_folder, file_list)
     back_path = backup_obj.create()
 
-    if os.path.exists(back_path):
+    if back_path.exists():
         if not skip_message:
             utilities.print_message(f'Backup successfully created: {back_path}',
                                     message_type=utilities.message_type_message)

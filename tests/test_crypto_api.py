@@ -1,32 +1,14 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2021.
+#   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
 """ Encryption system Tests """
-
-import pytest
-from sap.crypto import Crypto
-import os
-
-from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME
-
-
-@pytest.fixture
-def temp_crypto(tmpdir):
-    """
-    Create public and private encryption keys
-    """
-    public = os.path.join(tmpdir, PUBLIC_KEY_NAME)
-    private = os.path.join(tmpdir, PRIVATE_KEY_NAME)
-    cr = Crypto(public, private)
-    yield cr
-    cr.remove_keys()
 
 
 def test_create_crypto_files(temp_crypto):
     """ Test if encryption keys are created"""
     temp_crypto.generate_keys()
-    assert os.path.isfile(temp_crypto.public_key_path) is True and os.path.isfile(temp_crypto.private_key_path) is True
+    assert temp_crypto.public_key_path.is_file() and temp_crypto.private_key_path.is_file()
 
 
 def test_encrypt(temp_crypto):

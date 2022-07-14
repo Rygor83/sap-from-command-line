@@ -4,34 +4,62 @@
 
 """ Command Line Tests for main commands: add, list, delete, update """
 
+from pathlib import Path
 import click
-import os
-import sys
 import pyperclip
 import pytest
 from pytest_mock import mocker  # do not delete it
-from rich import print
 
+from conftest_utilities import flat_actual, flat_expected, stub_print_system_list, stub_print_message, stub_open_sap
+from conftest_utilities import stub_launch
 from sap.api import DEBUG_FILE_NAME, CONFIG_NAME, PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME
 from sap.cli import sap_cli
 from sap import Sap_system
 import sap.utilities
-from conftest_utilities import flat_actual, flat_expected, stub_print_system_list, stub_print_message, stub_open_sap
-from conftest_utilities import stub_launch, stub_launch
 
 PASSWORD = '12345678'
 UPDATED_PASSWORD = '1029384756'
 
-# TODO: нужно попробовать сделать тест без базы данных - чтобы попасть на сообщение об ошибке
-
-sap_system_1 = sap.Sap_system(system='ZZZ', mandant='999', user='USER25', password=PASSWORD, customer='Roga & copyta',
-                              description='Develop', url='', autotype='')
-sap_system_2 = sap.Sap_system(system='YYY', mandant='998', user='USER21', password=PASSWORD, customer='Vasya Pupkin',
-                              description='Production', url='www.vasyapupkin.by',
+sap_system_1 = sap.Sap_system(system='ZZZ',
+                              mandant='999',
+                              user='USER25',
+                              password=PASSWORD,
+                              customer='Roga & copyta',
+                              description='Develop',
+                              url='',
+                              autotype='')
+sap_system_2 = sap.Sap_system(system='YYY',
+                              mandant='998',
+                              user='USER21',
+                              password=PASSWORD,
+                              customer='Vasya Pupkin',
+                              description='Production',
+                              url='www.vasyapupkin.by',
                               autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}')
-sap_system_3 = sap.Sap_system(system='XXX', mandant='100', user='USER15', password=PASSWORD, customer='XYZ systems',
-                              description='Test', url='www.XYZsystems.by',
+sap_system_3 = sap.Sap_system(system='XXX',
+                              mandant='100',
+                              user='USER15',
+                              password=PASSWORD,
+                              customer='XYZ systems',
+                              description='Test',
+                              url='www.XYZsystems.by',
                               autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}')
+sap_system_1_updated = sap.Sap_system(system='ZZZ',
+                                      mandant='999',
+                                      user='USER25',
+                                      password=UPDATED_PASSWORD,
+                                      customer='Roga & copyta',
+                                      description='Dev',
+                                      url='',
+                                      autotype='')
+sap_system_2_updated = sap.Sap_system(system='YYY',
+                                      mandant='998',
+                                      user='USER21',
+                                      password=PASSWORD,
+                                      customer='Vasya Pupkin',
+                                      description='Production',
+                                      url='www.vasyapupkin.by',
+                                      autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}')
 
 
 def test_start_cli(temp_start_cli):
@@ -39,10 +67,8 @@ def test_start_cli(temp_start_cli):
     Test START command: 'start' command works in temp_start_cli fixture. All we need is to check if files are created
     'sap start'
     """
-    assert os.path.exists(os.path.join(temp_start_cli, CONFIG_NAME)) and os.path.exists(
-        os.path.join(temp_start_cli, PUBLIC_KEY_NAME)) and os.path.exists(
-        os.path.join(temp_start_cli, PRIVATE_KEY_NAME)) and os.path.exists(
-        os.path.join(temp_start_cli, DATABASE_NAME))
+    assert Path(temp_start_cli / CONFIG_NAME).exists() and Path(temp_start_cli / PUBLIC_KEY_NAME).exists() and Path(
+        temp_start_cli / PRIVATE_KEY_NAME).exists() and Path(temp_start_cli / DATABASE_NAME).exists()
 
 
 def test_add_system_1(runner, temp_start_cli, mocker):
@@ -81,8 +107,8 @@ def test_add_system_2_with_url(runner, temp_start_cli, mocker):
                                  "-password", sap_system_2.password,
                                  "-customer", sap_system_2.customer,
                                  "-description", sap_system_2.description,
-                                 "-url", sap_system_2.url,
-                                 "-autotype", sap_system_2.autotype])
+                                 "-url", sap_system_2.url if sap_system_2.url else "",
+                                 "-autotype", sap_system_2.autotype if sap_system_2.autotype else ""])
 
     assert flat_actual(result.output) == flat_expected(sap_system_2)
 
@@ -102,12 +128,62 @@ def test_add_system_3_verbose(runner, temp_start_cli, mocker):
                                  "-password", sap_system_3.password,
                                  "-customer", sap_system_3.customer,
                                  "-description", sap_system_3.description,
-                                 "-url", sap_system_3.url,
-                                 "-autotype", sap_system_3.autotype,
+                                 "-url", sap_system_3.url if sap_system_3.url else "",
+                                 "-autotype", sap_system_3.autotype if sap_system_3.autotype else "",
                                  "-v",
                                  "-time", "1"])
 
     assert flat_actual(result.output) == flat_expected(sap_system_3)
+
+
+def test_add_system_1_no_config_exists(runner, tmp_path, mocker):  # , temp_start_cli, mocker):
+    """
+    Test ADD command: new system 1, basic fields
+    'sap add'
+    """
+
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
+    result = runner.invoke(sap_cli,
+                           args=["--config_path", tmp_path,
+                                 "add",
+                                 "-system", sap_system_1.system,
+                                 "-mandant", sap_system_1.mandant,
+                                 "-user", sap_system_1.user,
+                                 "-password", sap_system_1.password,
+                                 "-customer", sap_system_1.customer,
+                                 "-description", sap_system_1.description,
+                                 "-url", sap_system_1.url if sap_system_1.url else "",
+                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else ""])
+
+    assert result.output.replace('\n', '') == ('SAP_CONFIG.INI does not exist.. Check path: '
+                                               f'{tmp_path / CONFIG_NAME} '
+                                               "Either run 'sap start' or 'sap config -create' to create and edit "
+                                               'configAborted.')
+
+
+def test_add_system_1_no_database_exists(runner, tmp_path, mocker, config_tmp_path):  # , temp_start_cli, mocker):
+    """
+    Test ADD command: new system 1, basic fields
+    'sap add'
+    """
+
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
+    result = runner.invoke(sap_cli,
+                           args=["--config_path", tmp_path,
+                                 "add",
+                                 "-system", sap_system_1.system,
+                                 "-mandant", sap_system_1.mandant,
+                                 "-user", sap_system_1.user,
+                                 "-password", sap_system_1.password,
+                                 "-customer", sap_system_1.customer,
+                                 "-description", sap_system_1.description,
+                                 "-url", sap_system_1.url if sap_system_1.url else "",
+                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else ""])
+
+    assert result.output.replace('\n', '') == (
+        'Database does not exist or there is no possibility for connection.. Check '
+        'the following path: '
+        f'{tmp_path / DATABASE_NAME}Aborted.')
 
 
 def test_list_existing_systems_cli(runner, temp_start_cli, mocker):
@@ -426,9 +502,9 @@ def test_run_existing_system_with_transaction_and_parameter_show_log_cli(runner,
 
     mocker.patch.object(sap.utilities, 'check_if_path_exists', return_value=True)
     mocker.patch.object(sap.utilities, 'print_system_list', return_value=True)
-    mocker.patch.object(sap.utilities, 'open_sap', return_value=True)
+    mocker.patch.object(sap.utilities, 'open_sap', new=stub_open_sap)
     result = runner.invoke(sap_cli,
-                           args=["--config_path", temp_start_cli, "--log_level", "DEBUG", "run", sap_system_2.system,
+                           args=["--config_path", temp_start_cli, "run", sap_system_2.system,
                                  "-t", transaction_code, "-p", view_name])
     assert str(result.output).replace("\n", "") == (
         f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command="*{transaction_code} VIEWNAME={view_name};" -reuse=1')
@@ -542,13 +618,14 @@ def test_debug_no_existing_system_cli(runner, temp_start_cli, mocker):
     assert flat_actual(result.output) == flat_expected(non_existing_sap_system)
 
 
-def test_debug_file(runner, temp_start_cli):
+def test_debug_file_not_open(runner, temp_start_cli):
     """
     Test DEBUG command: create debug file
-    'sap debug -f'
+    'sap debug -f -not_open'
     """
-    runner.invoke(sap_cli, args=["-path", temp_start_cli, 'debug', '-f', '-o'])
-    with open(os.path.join(temp_start_cli, DEBUG_FILE_NAME), mode='r', encoding='utf-8') as file:
+    runner.invoke(sap_cli, args=["-path", temp_start_cli, 'debug', '-f', '-not_open'])
+    debug_file = temp_start_cli / DEBUG_FILE_NAME
+    with debug_file.open(encoding='utf-8') as file:
         text = file.read()
     assert text == '[FUNCTION]\nCommand =/H\nTitle=Debugger\nType=SystemCommand'
 
@@ -560,11 +637,11 @@ def test_logon_cli(runner, temp_start_cli, mocker):
     'sap logon'
     """
 
-    path_to_test_file = os.path.join(temp_start_cli, CONFIG_NAME)
+    path_to_config_file = Path(temp_start_cli) / CONFIG_NAME
     mocker.patch.object(click, 'launch', return_value=True)
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "logon", "-s", path_to_test_file])
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "logon", "-s", path_to_config_file])
 
-    assert result.output == f"Trying to launch: {path_to_test_file}\n"
+    assert result.output == f"Trying to launch: {path_to_config_file}\n"
 
 
 def test_logon_wrong_saplogon_path_cli(runner, temp_start_cli, mocker):
@@ -580,105 +657,50 @@ def test_logon_wrong_saplogon_path_cli(runner, temp_start_cli, mocker):
         'following path: path to saplogon.exe file.Aborted.')
 
 
-def test_update_requesting_system_mandant_cli(runner, temp_start_cli):
+def test_update_requesting_system_mandant_cli(runner, temp_start_cli, mocker):
     """
     Test UPDATE command: updating specific system
     'sap update system_id mandant'
     """
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "update", "zzz", "999"],
-                           input="87654321\n\nDev\n\n\n")
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
-                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
-                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
-                             '│ 1    │ Roga & copyta     │ ZZZ      │ 999        │ Develop        │ USER25  │\n'
-                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
-                             '\n'
-                             'Enter new password [12345678]: 87654321\n'
-                             'Enter Customer [Roga & copyta]: \n'
-                             'Enter system description [Develop]: Dev\n'
-                             'Enter URL []: \n'
-                             'Enter Autotype sequence []: \n'
-                             '\n\n'
-                             '                  \x1b[32m\x1b[40mThe following system is UPDATED\x1b[0m                   \n'
-                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
-                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
-                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
-                             '│ Roga & copyta       │ ZZZ       │ 999         │ Dev              │ USER25   │\n'
-                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+                           input=f"{sap_system_1_updated.password}\n\n{sap_system_1_updated.description}\n\n\n")
+
+    expected_results = flat_expected(sap_system_1)
+    expected_results += flat_actual(f''' 
+            Enter new password [12345678]: {sap_system_1_updated.password}\n
+            Enter Customer [Roga & copyta]: \n
+            Enter system description [Develop]: {sap_system_1_updated.description}\n
+            Enter URL []: \n
+            Enter Autotype sequence []: \n''')
+    expected_results += flat_expected(sap_system_1_updated)
+
+    assert flat_actual(result.output) == expected_results
 
 
-def test_update_choosing_system_from_list_cli(runner, temp_start_cli):
+def test_update_choosing_system_from_list_cli(runner, temp_start_cli, mocker):
     """
     Test UPDATE command: choosing system from list to update it
     'sap update'
     """
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli,
                            args=["-path", temp_start_cli,
                                  "update"],
-                           input="2\n\n\nProd\n\n\n")
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
-                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
-                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
-                             '│ 1    │ Roga & copyta     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
-                             '│ 2    │ Vasya Pupkin      │ YYY      │ 998        │ Production     │ USER21  │\n'
-                             '│ 3    │ XYZ systems       │ XXX      │ 100        │ Test           │ USER15  │\n'
-                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
-                             '\n\n'
-                             'Choose a system you want to login. Available values from 1 to 3: \n'
-                             '>>>: \n'
-                             'Enter new password [12345678]: \n'
-                             'Enter Customer [Vasya Pupkin]: \n'
-                             'Enter system description [Production]: Prod\n'
-                             'Enter URL [www.vasyapupkin.by]: \n'
-                             'Enter Autotype sequence [{USERNAME}{TAB}{PASSWORD}{ENTER}]: \n'
-                             '\n\n'
-                             '                  \x1b[32m\x1b[40mThe following system is UPDATED\x1b[0m                   \n'
-                             '┌────────────────────┬────────────┬─────────────┬──────────────────┬──────────┐\n'
-                             '│ Customer           │ System     │ Mandant     │ Description      │ User     │\n'
-                             '╞════════════════════╪════════════╪═════════════╪══════════════════╪══════════╡\n'
-                             '│ Vasya Pupkin       │ YYY        │ 998         │ Prod             │ USER21   │\n'
-                             '└────────────────────┴────────────┴─────────────┴──────────────────┴──────────┘\n')
+                           input=f"2\n\n\n{sap_system_2_updated.description}\n\n\n")
 
+    expected_results = flat_expected(*[sap_system_1_updated, sap_system_2, sap_system_3])
+    expected_results += flat_actual(f""" 
+            Choose a system you want to login. Available values from 1 to 3: \n
+            >>>: \n
+            Enter new password [12345678]: \n
+            Enter Customer [Vasya Pupkin]: \n
+            Enter system description [Production]: {sap_system_2_updated.description}\n
+            Enter URL [www.vasyapupkin.by]: \n
+            Enter Autotype sequence""" + "[{USERNAME}{TAB}{PASSWORD}{ENTER}]: \n")
+    expected_results += flat_expected(sap_system_2_updated)
 
-def test_update_requesting_customer_show_updated_password_cli(runner, temp_start_cli):
-    """
-    Test UPDATE command: updating specific system searched by customer name and showing updated password
-    'sap update -c customer_name -v'
-    """
-    result = runner.invoke(sap_cli,
-                           args=["-path", temp_start_cli,
-                                 "update",
-                                 "-c", "roga",
-                                 "-v", "-time", "1"],
-                           input=f"{UPDATED_PASSWORD}\n\n\n\n\n")
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
-                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
-                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
-                             '│ 1    │ Roga & copyta     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
-                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
-                             '\n'
-                             'Enter new password [87654321]: 1029384756\n'
-                             'Enter Customer [Roga & copyta]: \n'
-                             'Enter system description [Dev]: \n'
-                             'Enter URL []: \n'
-                             'Enter Autotype sequence []: \n'
-                             '\n\n'
-                             '                  \x1b[32m\x1b[40mThe following system is UPDATED\x1b[0m                   \n'
-                             '┌─────────────────┬─────────┬──────────┬───────────────┬─────────┬────────────┐\n'
-                             '│ Customer        │ System  │ Mandant  │ Description   │ User    │ Password   │\n'
-                             '╞═════════════════╪═════════╪══════════╪═══════════════╪═════════╪════════════╡\n'
-                             f'│ Roga & copyta   │ ZZZ     │ 999      │ Dev           │ USER25  │ {UPDATED_PASSWORD} │\n'
-                             '└─────────────────┴─────────┴──────────┴───────────────┴─────────┴────────────┘\n'
-                             '┌─ Message ───────────────────────────────────────────────────────────────────┐\n'
-                             '│ Information about passwords will be deleted from screen in 1                │\n'
-                             '└─────────────────────────────────────────────────────────────────────────────┘\n'
-                             '\r\x1b[K\r1\r\x1b[K\r0')
+    assert flat_actual(result.output) == expected_results
 
 
 def test_update_no_existing_system_cli(runner, temp_start_cli, mocker):
@@ -687,14 +709,12 @@ def test_update_no_existing_system_cli(runner, temp_start_cli, mocker):
     'sap update non_existent_system_id'
     """
 
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "update", "bbb"])
-    assert result.output == ('\n\n'
-                             '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│                │ BBB         │               │                    │         │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
+    non_existing_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
+                                     url='', autotype='')
+
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "update", non_existing_system.system])
+    assert flat_actual(result.output) == flat_expected(non_existing_system)
 
 
 def test_delete_existing_system_choosing_from_list_cli(runner, temp_start_cli, mocker):
@@ -702,81 +722,48 @@ def test_delete_existing_system_choosing_from_list_cli(runner, temp_start_cli, m
     Test DELETE command: choosing system from list to delete it
     'sap delete'
     """
-
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete"], input="3\ny\n")
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
-                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
-                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
-                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
-                             '│ 2    │ VASYA PUPKIN      │ YYY      │ 998        │ Prod           │ USER21  │\n'
-                             '│ 3    │ XYZ SYSTEMS       │ XXX      │ 100        │ Test           │ USER15  │\n'
-                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
-                             '\n\n'
-                             'Choose a system you want to login. Available values from 1 to 3: \n'
-                             '>>>: \n\n'
-                             '               \x1b[32m\x1b[40mTrying to DELETE the following system\x1b[0m                \n'
-                             '┌───────────────────┬────────────┬─────────────┬──────────────────┬───────────┐\n'
-                             '│ Customer          │ System     │ Mandant     │ Description      │ User      │\n'
-                             '╞═══════════════════╪════════════╪═════════════╪══════════════════╪═══════════╡\n'
-                             '│ XYZ SYSTEMS       │ XXX        │ 100         │ Test             │ USER15    │\n'
-                             '└───────────────────┴────────────┴─────────────┴──────────────────┴───────────┘\n'
-                             '\n'
-                             'Do you really want to delete the system? [y/N]: y\n'
-                             '\n\n'
-                             '           \x1b[32m\x1b[40mThe following system is DELETED from database\x1b[0m            \n'
-                             '┌───────────────────┬────────────┬─────────────┬──────────────────┬───────────┐\n'
-                             '│ Customer          │ System     │ Mandant     │ Description      │ User      │\n'
-                             '╞═══════════════════╪════════════╪═════════════╪══════════════════╪═══════════╡\n'
-                             '│ XYZ SYSTEMS       │ XXX        │ 100         │ Test             │ USER15    │\n'
-                             '└───────────────────┴────────────┴─────────────┴──────────────────┴───────────┘\n')
+
+    expected_results = flat_actual(*[sap_system_1_updated, sap_system_2_updated, sap_system_3])
+    expected_results = expected_results[:-1] + ')'
+    expected_results += flat_actual(f""" 
+                Choose a system you want to login. Available values from 1 to 3: \n
+                >>>: \n\n""")
+    expected_results += flat_expected(sap_system_3)
+    expected_results += flat_actual(f"Do you really want to delete the system? [y/N]: y\n")
+    expected_results += flat_expected(sap_system_3)[:-2]
+
+    assert flat_actual(result.output) == flat_expected(expected_results)
 
 
-def test_delete_existing_system_by_system_id_cli(runner, temp_start_cli):
+def test_delete_existing_system_by_system_id_cli(runner, temp_start_cli, mocker):
     """
     Test DELETE command: choosing system by system id to delete it
     'sap delete system_id'
     """
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete", "zzz"], input="y\n")
-    assert result.output == ('\n\n'
-                             '                         \x1b[32m\x1b[40mAvailable systems\x1b[0m                          \n'
-                             '┌──────┬───────────────────┬──────────┬────────────┬────────────────┬─────────┐\n'
-                             '│ Id   │ Customer          │ System   │ Mandant    │ Description    │ User    │\n'
-                             '╞══════╪═══════════════════╪══════════╪════════════╪════════════════╪═════════╡\n'
-                             '│ 1    │ ROGA & COPYTA     │ ZZZ      │ 999        │ Dev            │ USER25  │\n'
-                             '└──────┴───────────────────┴──────────┴────────────┴────────────────┴─────────┘\n'
-                             '\n\n'
-                             '               \x1b[32m\x1b[40mTrying to DELETE the following system\x1b[0m                \n'
-                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
-                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
-                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
-                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Dev              │ USER25   │\n'
-                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n'
-                             '\n'
-                             'Do you really want to delete the system? [y/N]: y\n'
-                             '\n\n'
-                             '           \x1b[32m\x1b[40mThe following system is DELETED from database\x1b[0m            \n'
-                             '┌─────────────────────┬───────────┬─────────────┬──────────────────┬──────────┐\n'
-                             '│ Customer            │ System    │ Mandant     │ Description      │ User     │\n'
-                             '╞═════════════════════╪═══════════╪═════════════╪══════════════════╪══════════╡\n'
-                             '│ ROGA & COPYTA       │ ZZZ       │ 999         │ Dev              │ USER25   │\n'
-                             '└─────────────────────┴───────────┴─────────────┴──────────────────┴──────────┘\n')
+
+    expected_results = flat_actual(sap_system_1_updated) + ',)('
+    expected_results += flat_actual(sap_system_1_updated) + ',)'
+    expected_results += flat_actual(f"Do you really want to delete the system? [y/N]: y\n")
+    expected_results += flat_expected(sap_system_1_updated)[:-2]
+
+    assert flat_actual(result.output) == flat_expected(expected_results)
 
 
-def test_delete_no_existing_system_cli(runner, temp_start_cli):
+def test_delete_no_existing_system_cli(runner, temp_start_cli, mocker):
     """
     Test DELETE command: Request for a non-existent system to delete
     'sap delete non_existent_system_id'
     """
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete", "bbb"])
-    assert result.output == ('\n\n'
-                             '             \x1b[33m\x1b[40mNOTHING FOUND according to search criteria\x1b[0m             \n'
-                             '┌────────────────┬─────────────┬───────────────┬────────────────────┬─────────┐\n'
-                             '│ Customer       │ System      │ Mandant       │ Description        │ User    │\n'
-                             '╞════════════════╪═════════════╪═══════════════╪════════════════════╪═════════╡\n'
-                             '│                │ BBB         │               │                    │         │\n'
-                             '└────────────────┴─────────────┴───────────────┴────────────────────┴─────────┘\n')
+    non_existing_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
+                                     url='', autotype='')
+
+    mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete", non_existing_system.system])
+    assert flat_actual(result.output) == flat_expected(non_existing_system)
 
 
 def test_shortcut(runner, temp_start_cli, mocker):
@@ -789,7 +776,6 @@ def test_shortcut(runner, temp_start_cli, mocker):
     assert str(result.output).strip() == "path to sapshcut.exe file. -help"
 
 
-@pytest.mark.skip
 def test_about(runner, temp_start_cli, mocker):
     """
     Test ABOUT command: testing parameters to launch
@@ -800,12 +786,11 @@ def test_about(runner, temp_start_cli, mocker):
     assert str(result.output).strip() == "path to sapshcut.exe file. -version"
 
 
-@pytest.mark.skip
 def test_keys_already_created(runner, temp_start_cli, mocker):
     """ Test KEYS command """
 
     # TODO: https://rich.readthedocs.io/en/stable/console.html
 
-    # mocker.patch.object(sap.utilities, 'print_message', stub_print_messages)
+    mocker.patch.object(sap.utilities, 'print_message', stub_print_message)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "keys"])
-    assert result.return_value == ''
+    assert result.output == f"""\nEncryption keys already exist: \nPrivate: {temp_start_cli / PRIVATE_KEY_NAME}\nPublic: {temp_start_cli / PUBLIC_KEY_NAME}\nAborted.\n"""

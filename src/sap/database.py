@@ -1,7 +1,10 @@
 #  ------------------------------------------
 #   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
-import os
+
+""" Database API """
+
+from pathlib import Path
 import click
 
 from sqlalchemy import Column, String, BLOB
@@ -22,6 +25,7 @@ Base = declarative_base()
 
 
 class Sap(Base):
+    """ Table to store imformation about sap systems """
     __tablename__ = 'sap'
     system_id = Column(String(3), primary_key=True)
     mandant_num = Column(String(3), primary_key=True)
@@ -34,12 +38,13 @@ class Sap(Base):
 
 
 class Param(Base):
+    """ Table to store transactions and screen-field for them """
     __tablename__ = 'parameters'
     transaction = Column(String(20), primary_key=True)
     parameter = Column(String(100))
 
 
-class SapDB():  # noqa : E801
+class SapDB():
     """ Database processing class  """
     session = ''
 
@@ -52,7 +57,7 @@ class SapDB():  # noqa : E801
         """
         self.database_name = DATABASE_NAME
         self.database_type = db_type if db_type else 'sqlite'
-        self.database_path = db_path if db_path else os.path.join(utilities.path(), self.database_name)
+        self.database_path = Path(db_path) if db_path else Path(utilities.path() / self.database_name)
 
         db_credentials = {'username': None,
                           'password': None,
@@ -70,6 +75,7 @@ class SapDB():  # noqa : E801
         )
 
     def make_session(self):
+        """ create sessioin """
         if database_exists(self.database_url):
             # Путь по умолчанию
             self.engine = create_engine(self.database_url)
@@ -80,10 +86,7 @@ class SapDB():  # noqa : E801
             raise DatabaseDoesNotExists(self.database_path)
 
     def create(self):
-        """
-        Database creation
-        :return:
-        """
+        """ Database creation """
 
         if database_exists(self.database_url):
             raise DatabaseExists(self.database_path)
@@ -95,7 +98,7 @@ class SapDB():  # noqa : E801
             self.session = session()
 
     def add(self, sap_system):  # type (namedtuple) -> list
-        """Add a task dict to db."""
+        """Add a system to database """
         record = Sap(system_id=sap_system.system,
                      mandant_num=str(sap_system.mandant).zfill(3),
                      user_id=sap_system.user,
@@ -113,6 +116,7 @@ class SapDB():  # noqa : E801
         return result
 
     def query_system(self, sap_system):
+        """ Query system from database """
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
                                    Sap.description, Sap.url, Sap.autotype).order_by(asc(Sap.customer),
@@ -132,7 +136,7 @@ class SapDB():  # noqa : E801
         return query.all()
 
     def update(self, sap_system):  # type (namedtuple) -> list
-        """Modify task in db with given task_id."""
+        """ Update system in database """
         result = ''
 
         query = self.session.query(Sap)
@@ -151,7 +155,7 @@ class SapDB():  # noqa : E801
             self.session.commit()
 
     def delete(self, sap_system):  # type (namedtuple) -> bool
-        """Remove a task from db with given task_id."""
+        """ Remove system from database """
         result = ''
 
         query = self.session.query(Sap)
@@ -189,7 +193,7 @@ class SapDB():  # noqa : E801
         return result
 
     def add_param(self, parameter):  # type (namedtuple) -> list
-        """Add a task dict to db."""
+        """Add transaction and its parameters to database """
         record = Param(transaction=parameter.transaction,
                        parameter=parameter.parameter)
 
@@ -202,7 +206,7 @@ class SapDB():  # noqa : E801
         return result
 
     def update_param(self, parameter):  # type (namedtuple) -> list
-        """Modify task in db with given task_id."""
+        """ Update transaction and its parameters """
         result = ''
 
         query = self.session.query(Param)

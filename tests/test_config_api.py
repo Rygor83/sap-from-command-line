@@ -4,32 +4,16 @@
 
 """ Configuration file Tests """
 
-import os
+from pathlib import Path
 import pytest
 
-from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME, COMMAND_LINE_PATH, SAPLOGON_PATH
+from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, DATABASE_NAME
 from sap.config import Config
-
-
-@pytest.fixture
-def config_tmp_path(tmp_path):
-    """ Create specific config with tmp_dir """
-    cfg = Config(config_path=tmp_path)
-    cfg.db_path = os.path.join(tmp_path, DATABASE_NAME)
-    cfg.db_type = "sqlite"
-    cfg.command_line_path = os.path.join(tmp_path, COMMAND_LINE_PATH)
-    cfg.saplogon_path = os.path.join(tmp_path, SAPLOGON_PATH)
-    cfg.public_key_path = os.path.join(tmp_path, PUBLIC_KEY_NAME)
-    cfg.private_key_path = os.path.join(tmp_path, PRIVATE_KEY_NAME)
-    cfg.language = 'RU'
-    cfg.create()
-    yield cfg
-    cfg.remove_config()
 
 
 def test_config_create(config_tmp_path):
     """ Check if config file is created """
-    assert os.path.exists(config_tmp_path.config_file_path) is True
+    assert config_tmp_path.config_file_path.exists()
 
 
 def test_read_tmp_path_config(config_tmp_path):
@@ -58,9 +42,9 @@ def test_read_default_config(config_default_path, tmp_path):
     """ Check values of config file with default values """
     info = config_default_path.read()
     assert (info.db_type == 'sqlite') and (
-            info.db_path == os.path.join(tmp_path, DATABASE_NAME)) and (
-                   info.private_key_path == os.path.join(tmp_path, PRIVATE_KEY_NAME)) and (
-                   info.public_key_path == os.path.join(tmp_path, PUBLIC_KEY_NAME)) and (
-                   info.command_line_path == 'path to sapshcut.exe file') and (
-                   info.saplogon_path == 'path to saplogon.exe file') and (
+            info.db_path == tmp_path / DATABASE_NAME) and (
+                   info.private_key_path == tmp_path / PRIVATE_KEY_NAME) and (
+                   info.public_key_path == tmp_path / PUBLIC_KEY_NAME) and (
+                   info.command_line_path == Path('path to sapshcut.exe file.')) and (
+                   info.saplogon_path == Path('path to saplogon.exe file.')) and (
                    info.language == 'RU')
