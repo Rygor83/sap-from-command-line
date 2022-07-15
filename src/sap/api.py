@@ -2,9 +2,9 @@
 #   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
+""" sap's module API """
+
 from collections import namedtuple
-from six import string_types
-import sqlalchemy
 import click
 from sap.exceptions import DatabaseDoesNotExists
 
@@ -33,6 +33,7 @@ def query_system(sap_system: Sap_system):
     # if _sapdb is None:
     #     raise UninitializedDatabase()
 
+    # noinspection PyUnresolvedReferences
     return _sapdb.query_system(sap_system)
 
 
@@ -52,9 +53,11 @@ def add(sap_system: Sap_system):
     # if _sapdb is None:
     #     raise UninitializedDatabase()
 
+    # noinspection PyUnresolvedReferences
     return _sapdb.add(sap_system)
 
 
+# noinspection PyUnresolvedReferences
 def update(sap_system: Sap_system):
     # if not isinstance(sap_system, Sap_system):
     #     raise TypeError('sap must be Sap object')
@@ -68,6 +71,7 @@ def update(sap_system: Sap_system):
     return _sapdb.update(sap_system)
 
 
+# noinspection PyUnresolvedReferences
 def delete(sap_system: Sap_system):
     # if not isinstance(sap_system, Sap_system):
     #     raise TypeError('sap must be Sap object')
@@ -81,18 +85,22 @@ def delete(sap_system: Sap_system):
     return _sapdb.delete(sap_system)
 
 
+# noinspection PyUnresolvedReferences
 def query_param(parameter: Parameter):
     return _sapdb.query_param(parameter)
 
 
+# noinspection PyUnresolvedReferences
 def add_param(parameter: Parameter):
     return _sapdb.add_param(parameter)
 
 
+# noinspection PyUnresolvedReferences
 def delete_param(parameter: Parameter):
     return _sapdb.delete_param(parameter)
 
 
+# noinspection PyUnresolvedReferences
 def update_param(parameter: Parameter):
     return _sapdb.update_param(parameter)
 
@@ -114,6 +122,7 @@ def start_sap_db(db_path, db_type):
         raise click.Abort
 
 
+# noinspection PyUnresolvedReferences
 def stop_sap_db():
     _sapdb.stop_sap_db()
 

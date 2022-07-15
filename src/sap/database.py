@@ -5,27 +5,24 @@
 """ Database API """
 
 from pathlib import Path
-import click
 
 from sqlalchemy import Column, String, BLOB
 from sqlalchemy import create_engine, asc
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.engine.url import URL
 from sqlalchemy_utils import drop_database, database_exists
 
 import sap.utilities as utilities
 from sap.api import DATABASE_NAME
-from sap.exceptions import DatabaseDoesNotExists
 from sap.exceptions import DatabaseExists, DatabaseDoesNotExists
 
 Base = declarative_base()
 
 
 class Sap(Base):
-    """ Table to store imformation about sap systems """
+    """ Table to store information about sap systems """
     __tablename__ = 'sap'
     system_id = Column(String(3), primary_key=True)
     mandant_num = Column(String(3), primary_key=True)
@@ -44,6 +41,7 @@ class Param(Base):
     parameter = Column(String(100))
 
 
+# noinspection PyUnresolvedReferences
 class SapDB():
     """ Database processing class  """
     session = ''
@@ -75,7 +73,7 @@ class SapDB():
         )
 
     def make_session(self):
-        """ create sessioin """
+        """ create session """
         if database_exists(self.database_url):
             # Путь по умолчанию
             self.engine = create_engine(self.database_url)
@@ -124,6 +122,7 @@ class SapDB():
                                                                                     asc(Sap.mandant_num),
                                                                                     asc(Sap.user_id))
         if sap_system.system:
+            # noinspection PyUnresolvedReferences
             query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
         if sap_system.mandant:
             query = query.filter(Sap.mandant_num.ilike(f"%{sap_system.mandant}%"))
@@ -141,6 +140,7 @@ class SapDB():
 
         query = self.session.query(Sap)
         try:
+            # noinspection PyUnresolvedReferences
             result = query.filter(Sap.system_id == sap_system.system, Sap.mandant_num == sap_system.mandant,
                                   Sap.user_id == sap_system.user).one()
         except NoResultFound:
@@ -160,6 +160,7 @@ class SapDB():
 
         query = self.session.query(Sap)
         try:
+            # noinspection PyUnresolvedReferences
             result = query.filter(Sap.system_id == sap_system.system, Sap.mandant_num == sap_system.mandant,
                                   Sap.user_id == sap_system.user).one()
         except NoResultFound:
@@ -183,6 +184,7 @@ class SapDB():
 
         query = self.session.query(Param)
         try:
+            # noinspection PyUnresolvedReferences
             result = query.filter(Param.transaction == parameter.transaction).one()
         except NoResultFound:
             return result
@@ -211,6 +213,7 @@ class SapDB():
 
         query = self.session.query(Param)
         try:
+            # noinspection PyUnresolvedReferences
             result = query.filter(Param.transaction == parameter.transaction).one()
         except NoResultFound:
             return None
@@ -221,7 +224,7 @@ class SapDB():
             self.session.commit()
 
     def drop(self):
-        """ Dropping datase"""
+        """ Dropping database"""
         drop_database(self.database_url)
 
     def stop_sap_db(self):

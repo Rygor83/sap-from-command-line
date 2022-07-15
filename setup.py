@@ -5,11 +5,10 @@
 """Minimal setup file for tasks project."""
 
 from setuptools import setup, find_packages
-from sap import __version__
 
 setup(
     name='sap',
-    version='__version__',
+    version='3.1.5',
     license='MIT',
     description='Command line tool for launching SAP systems from SAPLogon',
 

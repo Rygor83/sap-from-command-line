@@ -2,6 +2,8 @@
 #   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
 
+""" module sap """
+
 from .api import (
     Sap_system,
     Parameter,
@@ -21,5 +23,5 @@ from .api import (
     stop_sap_db,
 )
 
-__version__ = '3.1.5'
+__version__ = '3.1.5'  # UPDATE setup.py
 __author__ = "Rygor"

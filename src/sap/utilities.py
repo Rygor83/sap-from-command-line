@@ -1,19 +1,19 @@
 #  ------------------------------------------
 #   Copyright (c) Rygor. 2022.
 #  ------------------------------------------
-import typing
+
+""" helpful functions """
+
 import click
-import traceback
 from pathlib import Path
 from subprocess import Popen
-import operator
 import re
-from prettytable import PrettyTable
 import time
 import getpass
 import pyautogui
 
 import sap.api
+import sap.config
 from sap.api import Sap_system, Parameter
 from sap.exceptions import WrongPath
 
@@ -27,14 +27,9 @@ from rich.prompt import IntPrompt
 
 from rich_click.rich_click import (
     ALIGN_ERRORS_PANEL,
-    ERRORS_PANEL_TITLE,
     STYLE_ERRORS_PANEL_BORDER,
-    STYLE_HELPTEXT,
-    STYLE_HELPTEXT_FIRST_LINE,
     STYLE_USAGE,
-    STYLE_USAGE_COMMAND,
     STYLE_SWITCH,
-    STYLE_REQUIRED_LONG,
 )
 
 # Цвета сообщений
@@ -50,8 +45,7 @@ message_type_error = "Error"
 
 
 def prepare_parameters_to_launch_system(selected_system: Sap_system, language, external_user, guiparm, snc_name,
-                                        snc_qop,
-                                        transaction='', parameter='', report='', system_command='', reuse='',
+                                        snc_qop, transaction='', parameter='', report='', system_command='', reuse='',
                                         sapshcut_exe_path: str = ""):
     """
     Constructing a string to start the system
@@ -70,7 +64,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
     """
 
     # TODO: переделать, чтобы у нужных параметров были дефолтные значения, а это будет означать, что можно
-    # не передавать параметры при вызове - а занчит нужно будет убрать множество None
+    # не передавать параметры при вызове - а значит нужно будет убрать множество None
 
     try:
         check_if_path_exists(sapshcut_exe_path)
@@ -165,16 +159,11 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
     else:
         argument += ' -reuse=1'
 
-    if external_user:
-        message = "Trying to LAUNCH the following system with EXTERNAL USER"
-    else:
-        message = "Trying to LAUNCH the following system "
-
     return argument, edited_system, command, command_type
 
 
 def launch_command_line_with_params(command_line_path, param):
-    ''' Запуск sapshcut.exe с разными параметрами'''
+    """ Запуск sapshcut.exe с разными параметрами"""
     if not command_line_path.exists():
         raise WrongPath('sapshcut.exe', command_line_path)
 
@@ -190,7 +179,7 @@ def launch_command_line_with_params(command_line_path, param):
 
 
 def launch_saplogon_with_params(saplogon):
-    ''' Запуск sapshcut.exe с разными параметрами'''
+    """ Запуск sapshcut.exe с разными параметрами"""
 
     try:
         check_if_path_exists(saplogon)
@@ -203,7 +192,7 @@ def launch_saplogon_with_params(saplogon):
     click.launch(url=str(saplogon))
 
 
-def choose_system(sap_systems: list, verbose=False) -> Sap_system:
+def choose_system(sap_systems: list) -> Sap_system:
     ans = 0
     if len(sap_systems) >= 2:
 
@@ -223,7 +212,7 @@ def choose_system(sap_systems: list, verbose=False) -> Sap_system:
     return selected_system
 
 
-def choose_parameter(parameters: list, verbose=False):
+def choose_parameter(parameters: list):
     ans = 0
     if len(parameters) >= 2:
 
@@ -398,7 +387,7 @@ LETTERS_NUMBERS_3 = String_3()
 class Pass_requirement(click.ParamType):
     """Click check class for parameters type"""
 
-    # TODO: долать требования к паролю, чтобы он был не простым
+    # TODO: доделать требования к паролю, чтобы он был не простым
 
     name = "Password"
 
@@ -444,8 +433,7 @@ def print_message(message, message_type):
         Text.from_markup(message),
         border_style=border_style,
         title=message_type,
-        title_align=title_align,
-        expand=True)
+        title_align=title_align)
     )
 
 
@@ -459,7 +447,6 @@ def default_sequence():
     """
     Default values from configuration file for CLICK.OPTION for [AUTO-TYPE]->sequence
     """
-    config = ""
     config = sap.config.Config()
     try:
         _config = config.read()
@@ -473,7 +460,6 @@ def default_time_to_clear():
     """
     Default values from configuration file for CLICK.OPTION for [PASSWORD]->time_to_clear
     """
-    config = ""
     config = sap.config.Config()
     try:
         _config = config.read()
@@ -513,7 +499,7 @@ def check_if_path_exists(path):
 
 def launch_autotype_sequence(autotype, user, password):
     """
-    Enteting data according autotype sequence at web site
+    Entering data according autotype sequence at website
 
     :param autotype: autotype sequence
     :param user: user id

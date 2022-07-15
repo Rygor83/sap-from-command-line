@@ -1,12 +1,15 @@
 click
+click_log
 cryptography
 prettytable
+pyautogui
 pyperclip
-sqlalchemy
-sqlalchemy_utils
 pyzipper
 rich
-click_log
+rich_click
+six
+sqlalchemy
+sqlalchemy_utils
 
 pytest
 pytest-cov
