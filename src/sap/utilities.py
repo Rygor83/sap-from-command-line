@@ -531,6 +531,6 @@ def launch_autotype_sequence(autotype, user, password):
             pyautogui.press(item)
 
 
-def open_url(url, locate):
+def open_url(url, locate=False):
     """ Open url in web browser"""
     click.launch(url=url, locate=locate)

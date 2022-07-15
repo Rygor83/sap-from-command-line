@@ -51,7 +51,11 @@ class Config:
         self.public_key_path = Path(public_key_path) if public_key_path else Path(self.config_path / PUBLIC_KEY_NAME)
         self.private_key_path = Path(private_key_path) if private_key_path else Path(
             self.config_path / PRIVATE_KEY_NAME)
-        self.language = 'RU'  # TODO: сделать мультиязычность
+        self.language = 'RU'
+
+        # TODO: сделать мультиязычность
+        #   1. https://docs.python.org/3.10/library/i18n.html
+        #   2. https://github.com/alexa-samples/skill-sample-python-howto/blob/master/instructions/localization.md
 
         self.sequence = sequence
         self.wait_site_to_load = wait_site_to_load
