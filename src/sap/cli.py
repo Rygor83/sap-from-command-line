@@ -36,17 +36,18 @@ if (sys.version_info[0] < 3) or (sys.version_info[0] == 3 and sys.version_info[1
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help', '/?'],
                         show_default=True, token_normalize_func=lambda x: x.lower())
 
 log_level = ['--log_level', '-l']
 
 
 # TODO: Если я обновил настройку конфигурационного файл, то как мне ее передать пользователю ?
-#  https://stackoverflow.com/questions/52392102/how-to-update-an-existing-section-in-python-config-file-python-3-6-6
+#   смотреть в сторону Windows Terminal с 2мя json файлами
 #  По такому же принципу работать с базой данных - посмотреть в сторону alembic
 #  https://alembic.sqlalchemy.org/en/latest/
 
+# TODO: Как сделать, чтобы по TAB раскрывались команды - https://python-prompt-toolkit.readthedocs.io/en/stable/
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.pass_context
@@ -99,6 +100,24 @@ def logon(ctx, saplogon_path):
     utilities.launch_saplogon_with_params(Path(saplogon_path) if saplogon_path else ctx.obj.config.saplogon_path)
 
 
+@sap_cli.command("shut")
+@click.argument("system", required=False, type=click.STRING)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.pass_context
+def shut(ctx, system: str, mandant: str):
+    """
+    \b
+    Shut down the selected system\n
+    \b
+    Optional arguments:
+    1. SYSTEM: Request a SAP system by system id
+    2. MANDANT: Request a SAP system by mandant/client
+    """
+    # SAP RUN SYS_ID -s /nex
+
+    ctx.invoke(run, system=system, mandant=mandant, system_command='/nex')
+
+
 @sap_cli.command("run")
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
@@ -124,10 +143,12 @@ def logon(ctx, saplogon_path):
               type=click.INT, help='Timer in seconds to wait web site to load')
 @click.option("-n", "--new", "reuse", help="Flag. Defines whether a new connection to an SAP is reused",
               default=False, is_flag=True, show_default=True)
+@click.option("-np", "--no_pass", "no_password", help="Do not enter password for web system",
+              default=True, is_flag=True, show_default=True)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
-        parameter: str, web: bool, timeout: int, reuse: bool):
+        parameter: str, web: bool, timeout: int, reuse: bool, no_password: bool):
     """
     \b
     Launch SAP system \n
@@ -149,7 +170,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         return
     # --------------------------
     selected_sap_systems = [
-        Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
+        Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7], item[8])
         for item in query_result]
 
     if language is None:
@@ -157,22 +178,24 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
     selected_system = utilities.choose_system(selected_sap_systems)
 
-    if web:
-        if selected_system.url != "":
+    if web or selected_system.only_web == 'yes':
+        if selected_system.url != " ":
             utilities.print_message(
                 f"Launching web site: {selected_system.url} ({selected_system.description} of {selected_system.customer})",
                 message_type=utilities.message_type_message)
 
             utilities.open_url(f"{selected_system.url}")
 
-            utilities.print_message(
-                f"Waiting web site to load: {timeout if timeout else ctx.obj.config.wait_site_to_load} seconds",
-                utilities.message_type_message)
+            if no_password:
+                utilities.print_message(
+                    f"Waiting web site to load: {timeout if timeout else ctx.obj.config.wait_site_to_load} seconds",
+                    utilities.message_type_message)
 
-            time.sleep(timeout if timeout else ctx.obj.config.wait_site_to_load)
+                time.sleep(timeout if timeout else ctx.obj.config.wait_site_to_load)
 
-            logger.info(f"Autotype sequence: {selected_system.autotype}")
-            utilities.launch_autotype_sequence(selected_system.autotype, selected_system.user, selected_system.password)
+                logger.info(f"Autotype sequence: {selected_system.autotype}")
+                utilities.launch_autotype_sequence(selected_system.autotype, selected_system.user,
+                                                   selected_system.password)
 
         else:
             no_system_found = Sap_system(system.upper() if system else None,
@@ -206,6 +229,35 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
         # SAP Launching
         utilities.open_sap(argument)
+
+
+@sap_cli.command("login")
+@click.argument("system", required=False, type=click.STRING)
+@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.option("-u", "--user", "user", help="Request a SAP system by user")
+@click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
+@click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
+@click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_wait_for_web(), show_default=True,
+              type=click.INT, help='Timer in seconds to wait web site to load')
+@click.pass_context
+def login(ctx, system: str, mandant: int, user: str, customer: str, description: str, timeout: int):
+    """
+    Login to web system: enter user and password. The website has to be opened.
+    """
+    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+                              description=description,
+                              url="", verbose=False, enum=True)
+    if not query_result:
+        return
+    # --------------------------
+    selected_sap_systems = [
+        Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7], item[8])
+        for item in query_result]
+
+    selected_system = utilities.choose_system(selected_sap_systems)
+    time.sleep(timeout if timeout else ctx.obj.config.wait_site_to_load)
+    utilities.launch_autotype_sequence(selected_system.autotype, selected_system.user,
+                                       selected_system.password)
 
 
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debugging")
@@ -245,7 +297,7 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
 
         debug_markdown = f"""
         # DEBUG
-        
+
         {debug_file_path} file will be created.
         After creation, a folder with {DEBUG_FILE_NAME} file will be opened
         Drag the file to the SAP system to start debug mode
@@ -350,7 +402,8 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
         utilities.open_sap(argument)
 
 
-@sap_cli.command("pw")
+@sap_cli.command("copy")
+@click.argument("command", required=True, type=click.STRING)
 @click.argument("system", required=False, type=click.STRING)
 @click.argument("mandant", required=False, type=click.IntRange(1, 999))
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
@@ -361,13 +414,15 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 @click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_clear(), show_default=True,
               type=click.INT, help='Timer in seconds to clear clipboard')
 @click.pass_context
-def copy_password(ctx, system: str, mandant: int, user: str, customer: str, description: str, clear_clipboard: bool,
-                  timeout: int):
+def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str, description: str,
+         clear_clipboard: bool,
+         timeout: int):
     """
     \b
-    Copy password for the requested system into clipboard.
-    Script waits 10 seconds and clears clipboard.\n
+    Copy a value for the requested system into clipboard. For password script waits 10 seconds and clears clipboard.\n
     \b
+    Required argument:
+    1. COMMAND: What value to copy: user, password, URL
     Optional argument:
     1. SYSTEM: Request a SAP system by system id
     2. MANDANT: Request a SAP system by mandant/client
@@ -384,11 +439,23 @@ def copy_password(ctx, system: str, mandant: int, user: str, customer: str, desc
 
         selected_system = utilities.choose_system(selected_sap_systems)
 
-        pyperclip.copy(selected_system.password)
+        if command == 'user':
+            pyperclip.copy(selected_system.user)
+        elif command == 'pw' or command == 'password':
+            pyperclip.copy(selected_system.password)
+        elif command == 'url':
+            pyperclip.copy(selected_system.url)
+        elif command == 'desc' or command == 'description':
+            pyperclip.copy(selected_system.description)
+        elif command == 'customer':
+            pyperclip.copy(selected_system.customer)
+        else:
+            utilities.print_message(f"'{command}' is not a valid command", message_type=utilities.message_type_error)
+            sys.exit()
 
-        utilities.print_message("Password is copied into clipboard.", message_type=utilities.message_type_message)
+        utilities.print_message(f"{command} is copied into clipboard.", message_type=utilities.message_type_message)
 
-        if clear_clipboard:
+        if (command == 'pw' or command == 'password') and clear_clipboard:
             utilities.print_message(
                 "If you use Clipboard managers, you should add PY.EXE, CMD.EXE applications to the exclusion list,\nin order to keep sensitive information safe from copying to clipboard manager.",
                 message_type=utilities.message_type_sensitive)
@@ -421,15 +488,19 @@ def copy_password(ctx, system: str, mandant: int, user: str, customer: str, desc
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
 @click.option("-autotype", prompt=True, help="Autotype sequence for logining to web site", type=click.STRING,
               default=utilities.default_sequence(), show_default=True)
+@click.option("-only_web", prompt=True, help="Is SAP system used only as web", type=click.Choice(['yes', 'no']),
+              default='no', show_default=True)
 @click.option("-v", "--verbose", "verbose", help="Flag. Show passwords for selected systems", is_flag=True,
               default=False)
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
 def add(ctx, system: str, mandant: str, user: str, password: str, description: str, customer: str, url: str,
-        autotype: str, verbose: bool, timeout: int):
+        autotype: str, only_web: str, verbose: bool, timeout: int):
     """
     Add sap system with its parameters to db. Just run 'sap add' and follow instructions.
     """
+
+    # TODO: сделать проверку доступности базы данных перед тем, как вводить данные. Иначе вводишь данные, а тебе - БД не доступна!
 
     with _sap_db(ctx.obj.config):
         encrypted_password = ctx.obj.crypto.encrypto(str.encode(password))
@@ -441,7 +512,8 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             str(customer),
             str(description),
             str(url),
-            str(autotype)
+            str(autotype),
+            str(only_web),
         )
         result = sap.add(sap_system)
 
@@ -455,7 +527,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
             result = sap.query_system(sap_system)
 
             added_system = [Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4],
-                                       item[5], item[6], item[7]) for item in result]
+                                       item[5], item[6], item[7], item[8]) for item in result]
             utilities.print_system_list(*added_system, title="The following system is ADDED to the database: ",
                                         verbose=verbose,
                                         timeout=timeout if timeout else ctx.obj.config.time_to_clear)
@@ -467,11 +539,14 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
+@click.option("-ow", "--only_web", "only_web", help="Is SAP system used as only web", type=click.Choice(['yes', 'no']),
+              default=None, show_default=True)
 @click.option("-v", "--verbose", "verbose", help="Show passwords for selected systems", is_flag=True, default=False)
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
 @click.pass_context
-def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, verbose: bool, timeout: int):
+def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, only_web: str, verbose: bool,
+           timeout: int):
     """
     \b
     Update password, customer, system description or url of the requested record from database\n
@@ -482,12 +557,13 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
     """
 
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
-                              description=description,
+                              description=description, only_web=only_web,
                               url=False, verbose=False, enum=True)
     # --------------------------
     if query_result:
-        selected_sap_systems = [Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7])
-                                for item in query_result]
+        selected_sap_systems = [
+            Sap_system(item[0], item[1], item[2], item[3], item[4], item[5], item[6], item[7], item[8])
+            for item in query_result]
 
         selected_system = utilities.choose_system(selected_sap_systems)
 
@@ -499,7 +575,17 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
         customer_new = click.prompt("Enter Customer", default=selected_system.customer)
         description_new = click.prompt("Enter system description", default=selected_system.description)
         url_new = click.prompt("Enter URL", default=selected_system.url)
+
+        # TODO: система запрашивает Autotype даже когда его не нужно запрашивать
+        #   Посмотреть: 1. https://stackoverflow.com/questions/55584012/python-click-dependent-options-on-another-option
+        #               2. https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is
+
         autotype_new = click.prompt("Enter Autotype sequence", default=selected_system.autotype)
+
+        only_web_value = click.prompt("Is only web available", type=click.Choice(['yes', 'no']),
+                                      default=selected_system.only_web)
+
+        print(only_web_value)
 
         sap_encrypted_system = Sap_system(
             str(selected_system.system).upper(),
@@ -510,6 +596,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
             str(description_new),
             str(url_new),
             str(autotype_new),
+            str(only_web_value),
         )
 
         with _sap_db(ctx.obj.config):
@@ -520,7 +607,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 
                 updated_system = [
                     Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
-                               item[7]) for item in result]
+                               item[7], item[8]) for item in result]
 
                 utilities.print_system_list(*updated_system, title="The following system is UPDATED", verbose=verbose,
                                             timeout=timeout if timeout else ctx.obj.config.time_to_clear)
@@ -632,15 +719,17 @@ def config(ctx):
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING, default=None)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING,
               default=None)
-@click.option("-url", "--show_url", "url", help="Flag. Display url of the requested SAP system", is_flag=True,
+@click.option("-u", "--url", "url", help="Flag. Display url of the requested SAP system", is_flag=True,
               default=False, show_default=True)
+@click.option("-ow", "--only_web", "only_web", help="Is SAP system used as only web", type=click.Choice(['yes', 'no']),
+              default=None, show_default=True)
 @click.option("-v", "--verbose", "verbose", help="Flag. Display passwords of the requested SAP system", is_flag=True,
               default=False, show_default=True)
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
 @click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, default=False, show_default=True)
 @click.pass_context
-def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool,
+def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool, only_web: str,
                  verbose: bool, timeout: int, enum: bool) -> list:
     """
     \b
@@ -662,7 +751,8 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                                     customer if customer else None,
                                     description if description else None,
                                     None,
-                                    None)
+                                    None,
+                                    only_web if only_web else None, )
         result = sap.query_system(sap_system_sql)
 
         if not result:
@@ -673,13 +763,14 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
                                          str(customer).upper() if customer else "",
                                          description.upper() if description else "",
                                          "",
+                                         "",
                                          "")
             utilities.print_system_list(no_system_found, title="NOTHING FOUND according to search criteria",
                                         color=utilities.color_warning)
         else:
             sap_system = [
                 Sap_system(item[0], item[1], item[2], ctx.obj.crypto.decrypto(item[3]), item[4], item[5], item[6],
-                           item[7])
+                           item[7], item[8])
                 for item in result]
 
             utilities.print_system_list(*sap_system, title="Available systems", verbose=verbose,
@@ -979,4 +1070,7 @@ def _sap_db(cfg):
 
 
 if __name__ == "__main__":
-    sap_cli()
+    try:
+        sap_cli()
+    except click.exceptions.Abort:
+        print('Quitting...')

@@ -16,6 +16,8 @@ from sap import utilities
 from sap.exceptions import ConfigExists, ConfigDoesNotExists
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
+#TODO: добавить ключ, чтобы запускать web версию SAP через определенный браузер, а не через default
+
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
                                      'private_key_path', 'language', 'sequence', 'wait_site_to_load', 'time_to_clear'])
 
@@ -161,7 +163,7 @@ class Config:
         Open config file in editor
         ::param locate: True - open folder or web, False - open application
         """
-        return click.launch(url=self.config_file_path, locate=locate)
+        return click.launch(url=str(self.config_file_path), locate=locate)
 
     def remove_config(self):
         """ Remove encryption keys """

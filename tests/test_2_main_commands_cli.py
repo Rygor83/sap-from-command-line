@@ -27,7 +27,8 @@ sap_system_1 = sap.Sap_system(system='ZZZ',
                               customer='Roga & copyta',
                               description='Develop',
                               url='',
-                              autotype='')
+                              autotype='',
+                              only_web='yes',)
 sap_system_2 = sap.Sap_system(system='YYY',
                               mandant='998',
                               user='USER21',
@@ -35,7 +36,8 @@ sap_system_2 = sap.Sap_system(system='YYY',
                               customer='Vasya Pupkin',
                               description='Production',
                               url='www.vasyapupkin.by',
-                              autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}')
+                              autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}',
+                              only_web='yes',)
 sap_system_3 = sap.Sap_system(system='XXX',
                               mandant='100',
                               user='USER15',
@@ -43,7 +45,8 @@ sap_system_3 = sap.Sap_system(system='XXX',
                               customer='XYZ systems',
                               description='Test',
                               url='www.XYZsystems.by',
-                              autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}')
+                              autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}',
+                              only_web='yes',)
 sap_system_1_updated = sap.Sap_system(system='ZZZ',
                                       mandant='999',
                                       user='USER25',
@@ -51,7 +54,8 @@ sap_system_1_updated = sap.Sap_system(system='ZZZ',
                                       customer='Roga & copyta',
                                       description='Dev',
                                       url='',
-                                      autotype='')
+                                      autotype='',
+                                      only_web='no',)
 sap_system_2_updated = sap.Sap_system(system='YYY',
                                       mandant='998',
                                       user='USER21',
@@ -59,7 +63,8 @@ sap_system_2_updated = sap.Sap_system(system='YYY',
                                       customer='Vasya Pupkin',
                                       description='Production',
                                       url='www.vasyapupkin.by',
-                                      autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}')
+                                      autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}',
+                                      only_web='no',)
 
 
 def test_start_cli(temp_start_cli):
@@ -87,7 +92,8 @@ def test_add_system_1(runner, temp_start_cli, mocker):
                                  "-customer", sap_system_1.customer,
                                  "-description", sap_system_1.description,
                                  "-url", sap_system_1.url if sap_system_1.url else "",
-                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else ""])
+                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else "",
+                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else ""],)
 
     assert flat_actual(result.output) == flat_expected(sap_system_1)
 

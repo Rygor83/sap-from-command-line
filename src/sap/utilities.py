@@ -64,7 +64,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
     """
 
     # TODO: переделать, чтобы у нужных параметров были дефолтные значения, а это будет означать, что можно
-    # не передавать параметры при вызове - а значит нужно будет убрать множество None
+    #    не передавать параметры при вызове - а значит нужно будет убрать множество None
 
     try:
         check_if_path_exists(sapshcut_exe_path)
@@ -207,7 +207,7 @@ def choose_system(sap_systems: list) -> Sap_system:
 
     selected_system: Sap_system = Sap_system(
         sap_systems[ans].system, sap_systems[ans].mandant, sap_systems[ans].user, sap_systems[ans].password,
-        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype)
+        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype, sap_systems[ans].only_web)
 
     return selected_system
 
@@ -231,7 +231,7 @@ def choose_parameter(parameters: list):
 
 
 def print_system_list(*sap_systems: Sap_system, title, color=color_success, verbose=False, timeout=0,
-                      enum=False, command: str = '', command_type: str = '', url=False):
+                      enum=False, command: str = '', command_type: str = '', url=False, only_web=''):
     """ Print information in table style """
 
     row = []
@@ -253,6 +253,7 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
     if url:
         header.append('URL')
         header.append('Autotype sequence')
+        header.append('Only web')
     if verbose:
         header.append('Password')
 
@@ -292,7 +293,9 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
             if sap_system.url is not None:
                 row.append(sap_system.url)
                 row.append(sap_system.autotype)
+                row.append(sap_system.only_web)
             else:
+                row.append('')
                 row.append('')
                 row.append('')
 
@@ -406,6 +409,7 @@ PASS_REQUIREMENT = Pass_requirement()
 
 
 def countdown(seconds):
+    # TODO: перевести на Rich Progress Display
     for i in range(seconds, -1, -1):
         # move to the beginning of the line and remove line
         print("\r\033[K", end='', flush=True)

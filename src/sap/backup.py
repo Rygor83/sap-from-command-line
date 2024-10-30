@@ -15,7 +15,7 @@ class Backup:
     """
 
     comment = r"""
-                  1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder 
+                  1. Place 'SAPUILandscape.xml' to '%APPDATA%\SAP\Common' folder
                   2. Place 'sap_config.ini' to 'c:\Users\<USERNAME>\AppData\Local\SAP' folder
                   3. Other files - according to sap_config.ini paths
                   Or you can place whenever you want, just enter new paths to sap_config.ini
@@ -40,6 +40,9 @@ class Backup:
             zip_file.setpassword(pwd)
 
             # Adding files into backup archive:
+            #TODO: Проверять, что путь сущетсвует иначе будет дамп
+            #  FileNotFoundError: [WinError 3] The system cannot find the path
+            #  specified: 'z:\\db\\sap_cmd.db'
             for file in self.files:
                 zip_file.write(file, Path(file).name)
 

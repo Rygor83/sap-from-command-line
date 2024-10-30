@@ -31,6 +31,7 @@ class Sap(Base):
     customer = Column(String(20))
     description = Column(String(20))
     url = Column(String(250))
+    only_web = Column(String(1))
     autotype = Column(String(250))
 
 
@@ -104,7 +105,8 @@ class SapDB():
                      customer=sap_system.customer,
                      description=sap_system.description,
                      url=sap_system.url,
-                     autotype=sap_system.autotype)
+                     autotype=sap_system.autotype,
+                     only_web=sap_system.only_web)
         result = self.session.add(record)
         try:
             self.session.commit()
@@ -117,7 +119,7 @@ class SapDB():
         """ Query system from database """
 
         query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description, Sap.url, Sap.autotype).order_by(asc(Sap.customer),
+                                   Sap.description, Sap.url, Sap.autotype, Sap.only_web).order_by(asc(Sap.customer),
                                                                                     asc(Sap.system_id),
                                                                                     asc(Sap.mandant_num),
                                                                                     asc(Sap.user_id))
@@ -132,6 +134,8 @@ class SapDB():
             query = query.filter(Sap.customer.ilike(f"%{sap_system.customer}%"))
         if sap_system.description:
             query = query.filter(Sap.description.ilike(f"%{sap_system.description}%"))
+        if sap_system.only_web:
+            query = query.filter(Sap.only_web.ilike(f"%{sap_system.only_web}%"))
         return query.all()
 
     def update(self, sap_system):  # type (namedtuple) -> list
@@ -152,6 +156,7 @@ class SapDB():
             result.description = sap_system.description
             result.url = sap_system.url
             result.autotype = sap_system.autotype
+            result.only_web = sap_system.only_web
             self.session.commit()
 
     def delete(self, sap_system):  # type (namedtuple) -> bool
