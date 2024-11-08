@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2024.
 #  ------------------------------------------
 
 """ Command line interface for sap-from-command-line tool """
@@ -18,6 +18,7 @@ import pyperclip
 import rich_click as click  # rich help output. Do not delete it as it works in background
 from rich.console import Console
 from rich.markdown import Markdown
+from sqlalchemy import False_
 
 import sap.config
 from sap import utilities
@@ -134,8 +135,8 @@ def shut(ctx, system: str, mandant: str):
 @click.option("-sqop", "--snc_qop", "snc_qop", help="Activation of the logon via Secure Network Communication (SNC)",
               type=click.STRING)
 @click.option("-t", "--transaction", "transaction", help="Run transaction ", type=click.STRING)
-@click.option("-s", "--system_command", "system_command",
-              help="Run system_command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>, /h")
+@click.option("-s", "--system_cmd", "system_command",
+              help="Run system command: /n, /o, /i, /nend, /nex, /*<transaction_code>, /n<transaction_code>, /o<transaction_code>, /h")
 @click.option("-r", "--report", "report", help="Run report (report name for SE38 transaction)", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
@@ -143,12 +144,15 @@ def shut(ctx, system: str, mandant: str):
               type=click.INT, help='Timer in seconds to wait web site to load')
 @click.option("-n", "--new", "reuse", help="Flag. Defines whether a new connection to an SAP is reused",
               default=False, is_flag=True, show_default=True)
-@click.option("-np", "--no_pass", "no_password", help="Do not enter password for web system",
-              default=True, is_flag=True, show_default=True)
+@click.option("-lgn", "--login", "login", help="Login to the just opened web system",
+              default=False, is_flag=True, show_default=True)
+@click.option("-b", "--browser", "browser",
+              help=f"Choose a browser to open selected SAP system",
+              type=utilities.BROWSER)
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
-        parameter: str, web: bool, timeout: int, reuse: bool, no_password: bool):
+        parameter: str, web: bool, timeout: int, reuse: bool, login: bool, browser: str):
     """
     \b
     Launch SAP system \n
@@ -184,9 +188,17 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 f"Launching web site: {selected_system.url} ({selected_system.description} of {selected_system.customer})",
                 message_type=utilities.message_type_message)
 
-            utilities.open_url(f"{selected_system.url}")
+            if browser:
+                try:
+                    utilities.launch_command_line_with_params(ctx.obj.config.browsers_path[browser],
+                                                              selected_system.url)
+                except WrongPath as err:
+                    utilities.print_message(f"{err}", utilities.message_type_error)
+                    exit()
+            else:
+                utilities.open_url(f"{selected_system.url}")
 
-            if no_password:
+            if login:
                 utilities.print_message(
                     f"Waiting web site to load: {timeout if timeout else ctx.obj.config.wait_site_to_load} seconds",
                     utilities.message_type_message)
@@ -502,6 +514,10 @@ def add(ctx, system: str, mandant: str, user: str, password: str, description: s
 
     # TODO: сделать проверку доступности базы данных перед тем, как вводить данные. Иначе вводишь данные, а тебе - БД не доступна!
 
+    # TODO: Не запрашивать autotype и only_web, если URL пустой т.к. нет необходимости
+    #   глянуть: 1. https://stackoverflow.com/questions/55584012/python-click-dependent-options-on-another-option
+    #               2. https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is
+
     with _sap_db(ctx.obj.config):
         encrypted_password = ctx.obj.crypto.encrypto(str.encode(password))
         sap_system = Sap_system(
@@ -576,16 +592,14 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
         description_new = click.prompt("Enter system description", default=selected_system.description)
         url_new = click.prompt("Enter URL", default=selected_system.url)
 
-        # TODO: система запрашивает Autotype даже когда его не нужно запрашивать
-        #   Посмотреть: 1. https://stackoverflow.com/questions/55584012/python-click-dependent-options-on-another-option
-        #               2. https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is
-
-        autotype_new = click.prompt("Enter Autotype sequence", default=selected_system.autotype)
-
-        only_web_value = click.prompt("Is only web available", type=click.Choice(['yes', 'no']),
-                                      default=selected_system.only_web)
-
-        print(only_web_value)
+        if url_new:
+            autotype_new = click.prompt("Enter Autotype sequence",
+                                        default=selected_system.autotype if selected_system.autotype else ctx.obj.config.sequence)
+            only_web_value = click.prompt("Is only web available", type=click.Choice(['yes', 'no']),
+                                          default=selected_system.only_web)
+        else:
+            autotype_new = ''
+            only_web_value = 'no'
 
         sap_encrypted_system = Sap_system(
             str(selected_system.system).upper(),

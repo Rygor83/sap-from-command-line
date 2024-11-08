@@ -23,5 +23,5 @@ from .api import (
     stop_sap_db,
 )
 
-__version__ = '3.1.5'  # UPDATE setup.py
+__version__ = '3.2.0'  # UPDATE setup.py
 __author__ = "Rygor"

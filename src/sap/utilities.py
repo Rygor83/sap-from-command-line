@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2024.
 #  ------------------------------------------
 
 """ helpful functions """
@@ -24,6 +24,7 @@ from rich import box
 from rich.panel import Panel
 from rich.text import Text
 from rich.prompt import IntPrompt
+from rich.progress import track
 
 from rich_click.rich_click import (
     ALIGN_ERRORS_PANEL,
@@ -32,7 +33,7 @@ from rich_click.rich_click import (
     STYLE_SWITCH,
 )
 
-# Цвета сообщений
+# Message color
 color_message = {'bg': 'black', 'fg': 'white'}
 color_success = {'bg': 'black', 'fg': 'green'}
 color_warning = {'bg': 'black', 'fg': 'yellow'}
@@ -163,14 +164,16 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
 
 
 def launch_command_line_with_params(command_line_path, param):
-    """ Запуск sapshcut.exe с разными параметрами"""
-    if not command_line_path.exists():
-        raise WrongPath('sapshcut.exe', command_line_path)
+    """ Launch executable with different parameters"""
 
-    # Добавляем путь к командному файлу
+    try:
+        check_if_path_exists(command_line_path)
+    except WrongPath as err:
+        print_message(f"{err}", message_type_error)
+        raise click.Abort
+
     argument = [command_line_path, param]
 
-    # Запускаем SAP
     pop = Popen(argument)
     pop.wait()
 
@@ -179,7 +182,7 @@ def launch_command_line_with_params(command_line_path, param):
 
 
 def launch_saplogon_with_params(saplogon):
-    """ Запуск sapshcut.exe с разными параметрами"""
+    """ Launch saplogon.exe with different parameters"""
 
     try:
         check_if_path_exists(saplogon)
@@ -193,6 +196,7 @@ def launch_saplogon_with_params(saplogon):
 
 
 def choose_system(sap_systems: list) -> Sap_system:
+    """ Choose a system you want to login """
     ans = 0
     if len(sap_systems) >= 2:
 
@@ -207,12 +211,14 @@ def choose_system(sap_systems: list) -> Sap_system:
 
     selected_system: Sap_system = Sap_system(
         sap_systems[ans].system, sap_systems[ans].mandant, sap_systems[ans].user, sap_systems[ans].password,
-        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype, sap_systems[ans].only_web)
+        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype,
+        sap_systems[ans].only_web)
 
     return selected_system
 
 
 def choose_parameter(parameters: list):
+    """ Choose a transaction with parameter """
     ans = 0
     if len(parameters) >= 2:
 
@@ -312,7 +318,7 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
 
     if verbose:
         print_message(
-            f"Information about passwords will be deleted from screen in {timeout}", message_type_message)
+            f"Information about passwords will be deleted from screen in {timeout} seconds", message_type_message)
         try:
             countdown(timeout)
         except KeyboardInterrupt:
@@ -408,13 +414,29 @@ class Pass_requirement(click.ParamType):
 PASS_REQUIREMENT = Pass_requirement()
 
 
+class Browser_list(click.ParamType):
+    """Click check class for parameters type"""
+
+    name = "Browser's name"
+
+    def convert(self, value, param, ctx):
+        if value in ctx.obj.config.browsers_list:
+            return value
+
+        self.fail(
+            f"{value!r} is not valid Browser. Must be browser from configuration file: {ctx.obj.config.browsers_list}",
+            param,
+            ctx,
+        )
+
+
+BROWSER = Browser_list()
+
+
 def countdown(seconds):
-    # TODO: перевести на Rich Progress Display
-    for i in range(seconds, -1, -1):
-        # move to the beginning of the line and remove line
-        print("\r\033[K", end='', flush=True)
-        print(f"\r{i}", end='', flush=True)
-        time.sleep(1)
+    print('\n')
+    for i in track(range(seconds), description="Clearing in ..."):
+        time.sleep(1)  # Simulate work being done
 
 
 def print_message(message, message_type):

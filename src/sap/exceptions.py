@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2024.
 #  ------------------------------------------
 """ Custom Exceptions """
 
@@ -11,6 +11,7 @@ class ConfigExists(Exception):
 
     def __init__(self, config_path, message="SAP_CONFIG.INI already exists"):
         self.message = f"\n{message}. \nPath: {config_path}"
+        self.message += f"\nRun command 'sap config -open' to open the config file"
         super().__init__(self.message)
 
 
@@ -25,8 +26,8 @@ class ConfigDoesNotExists(Exception):
 class WrongPath(Exception):
     """ Exception. SAP executables do not exist """
 
-    def __init__(self, file, path, message="SAP executable does not exist:"):
-        self.message = f'\n{message} {file} \nCheck the following path: {path}'
+    def __init__(self, file, path, message="Executable does not exist:"):
+        self.message = f'\n{message} {file} \nCheck the following path: "{path}" in your configuration with "sap config -open" command'
         super().__init__(self.message)
 
 

@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2024.
 #  ------------------------------------------
 
 """ Config file management """
@@ -16,10 +16,9 @@ from sap import utilities
 from sap.exceptions import ConfigExists, ConfigDoesNotExists
 from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAME
 
-#TODO: добавить ключ, чтобы запускать web версию SAP через определенный браузер, а не через default
-
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
-                                     'private_key_path', 'language', 'sequence', 'wait_site_to_load', 'time_to_clear'])
+                                     'private_key_path', 'language', 'sequence', 'wait_site_to_load', 'time_to_clear',
+                                     'browsers_list', 'browsers_path'])
 
 
 class Config:
@@ -39,6 +38,8 @@ class Config:
             sequence=None,
             wait_site_to_load=None,
             time_to_clear=None,
+            browsers_list=None,
+            browsers_path=None,
     ):
 
         self.ini_name = CONFIG_NAME
@@ -53,7 +54,7 @@ class Config:
         self.public_key_path = Path(public_key_path) if public_key_path else Path(self.config_path / PUBLIC_KEY_NAME)
         self.private_key_path = Path(private_key_path) if private_key_path else Path(
             self.config_path / PRIVATE_KEY_NAME)
-        self.language = 'RU'
+        self.language = 'EN'
 
         # TODO: сделать мультиязычность
         #   1. https://docs.python.org/3.10/library/i18n.html
@@ -63,6 +64,8 @@ class Config:
         self.wait_site_to_load = wait_site_to_load
 
         self.time_to_clear = time_to_clear
+        self.browsers_list = browsers_list
+        self.browsers_path = browsers_path
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -87,6 +90,10 @@ class Config:
 
             self.time_to_clear = int(parser.get('PASSWORD', 'time_to_clear'))
 
+            browsers_tuple = parser.items('BROWSER')
+            self.browsers_list = [item[0] for item in browsers_tuple]
+            self.browsers_path = {item[0]: Path(item[1]) for item in browsers_tuple}
+
             # TODO: Сделать проверку и уведомление, если приватный ключ и база данных лежат в одной папке
             #   db_path = pathlib.Path(self.db_path)
             #   private_key_path = pathlib.Path(self.private_key_path)
@@ -97,7 +104,7 @@ class Config:
 
             return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
                              self.public_key_path, self.private_key_path, self.language, self.sequence,
-                             self.wait_site_to_load, self.time_to_clear)
+                             self.wait_site_to_load, self.time_to_clear, self.browsers_list, self.browsers_path)
         else:
             raise ConfigDoesNotExists(self.config_file_path)
 
@@ -136,6 +143,10 @@ class Config:
             parser['PASSWORD'] = {
                 "; time_to_clear - Time to wait to clear clipboard with password": None,
                 'time_to_clear': 10}
+
+            parser['BROWSER'] = {
+                "; browser_name - Time to wait to clear clipboard with password": None,
+            }
 
         # Определение языка
         win_dll = ctypes.windll.kernel32
