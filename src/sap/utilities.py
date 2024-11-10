@@ -3,6 +3,7 @@
 #  ------------------------------------------
 
 """ helpful functions """
+from os import utime
 
 import click
 from pathlib import Path
@@ -11,6 +12,7 @@ import re
 import time
 import getpass
 import pyautogui
+from jaraco.functools import retry
 
 import sap.api
 import sap.config
@@ -45,9 +47,9 @@ message_type_sensitive = "Sensitive"
 message_type_error = "Error"
 
 
-def prepare_parameters_to_launch_system(selected_system: Sap_system, language, external_user, guiparm, snc_name,
+def prepare_parameters_to_launch_system(selected_system: Sap_system, external_user, guiparm, snc_name,
                                         snc_qop, transaction='', parameter='', report='', system_command='', reuse='',
-                                        sapshcut_exe_path: str = ""):
+                                        sapshcut_exe_path: str = "", language: str = ''):
     """
     Constructing a string to start the system
     :param selected_system:
@@ -90,7 +92,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
     else:
         argument = argument + f" -pw={selected_system.password}"  # Пароль
 
-    argument = argument + f" -language={language}"  # Язык для входа
+    argument = argument + f" -language={language if language else selected_system.language}"  # Язык для входа
 
     if guiparm:
         argument = argument + f" -guiparm={guiparm}"  #
@@ -105,8 +107,8 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, language, e
 
     if external_user:
         edited_system = Sap_system(selected_system.system, selected_system.mandant, str(user).upper(), password,
-                                   selected_system.customer, selected_system.description, selected_system.url,
-                                   selected_system.autotype)
+                                   selected_system.language, selected_system.customer, selected_system.description,
+                                   selected_system.url, selected_system.autotype, selected_system.only_web)
     else:
         edited_system = selected_system
 
@@ -190,7 +192,7 @@ def launch_saplogon_with_params(saplogon):
         print_message(f"{err}", message_type_error)
         raise click.Abort
     else:
-        click.echo(f'Trying to launch: {saplogon}')
+        print_message(f'Trying to launch: {saplogon}', message_type_message)
 
     click.launch(url=str(saplogon))
 
@@ -209,10 +211,7 @@ def choose_system(sap_systems: list) -> Sap_system:
                 f"\n[bold red]Choose a system you want to login.[/bold red] Available values from 1 to {str(len(sap_systems))}: \n>>>")
         ans = ans - 1
 
-    selected_system: Sap_system = Sap_system(
-        sap_systems[ans].system, sap_systems[ans].mandant, sap_systems[ans].user, sap_systems[ans].password,
-        sap_systems[ans].customer, sap_systems[ans].description, sap_systems[ans].url, sap_systems[ans].autotype,
-        sap_systems[ans].only_web)
+    selected_system: Sap_system = Sap_system(*sap_systems[ans])
 
     return selected_system
 
@@ -253,9 +252,9 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
 
     # Header
     if enum:
-        header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User']
+        header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User', 'Lang']
     else:
-        header = ['Customer', 'System', 'Mandant', 'Description', 'User']
+        header = ['Customer', 'System', 'Mandant', 'Description', 'User', 'Lang']
     if url:
         header.append('URL')
         header.append('Autotype sequence')
@@ -295,6 +294,11 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
         else:
             row.append('')
 
+        if sap_system.language is not None:
+            row.append(sap_system.language)
+        else:
+            row.append('')
+
         if url:
             if sap_system.url is not None:
                 row.append(sap_system.url)
@@ -320,7 +324,7 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
         print_message(
             f"Information about passwords will be deleted from screen in {timeout} seconds", message_type_message)
         try:
-            countdown(timeout)
+            countdown(timeout, 'Clearing in ...')
         except KeyboardInterrupt:
             print_message("Aborted!", message_type_error)
         click.clear()
@@ -433,9 +437,79 @@ class Browser_list(click.ParamType):
 BROWSER = Browser_list()
 
 
-def countdown(seconds):
+def launch_autotype_sequence(selected_system: Sap_system, language):
+    """
+    Entering data according autotype sequence at website
+
+    :param autotype: autotype sequence
+    :param selected_system: parameters of the selected system
+    :return: None
+    """
+    key_strokes = re.findall(r'{(.+?)}', selected_system.autotype)
+
+    for item in key_strokes:
+        if item == 'USER':
+            pyautogui.write(str(selected_system.user))
+        elif item == 'PASS':
+            pyautogui.write(str(selected_system.password))
+        elif item == 'CLIENT':
+            pyautogui.write(str(selected_system.mandant))
+        elif item == 'LANG':
+            pyautogui.write(str(language if language else selected_system.language))
+        elif 'DELAY' in item:
+            time2wait = int(re.findall(r'\d{1,10}', item)[0])
+            countdown(time2wait, 'Waiting for web site to load')
+        else:  # ENTER, TAB and other
+            pyautogui.press(item)
+
+
+class Autotype_sequence(click.ParamType):
+    """Click check class for parameters type"""
+
+    name = "Autotype items"
+
+    def convert(self, value, param, ctx):
+        autotype_list = ['USER', 'PASS', 'LANG', 'DELAY', 'ENTER', 'TAB', 'SYSTEM', 'CLIENT']
+
+        # key_strokes = re.findall(r'{(.+?)}', value)
+        # if key_strokes in autotype_list:
+        #     return key_strokes
+        return value
+
+        self.fail(
+            f"\n{key_strokes!r} is not valid Autotype item. Choose item from the allowed: {autotype_list}\n",
+            param,
+            ctx,
+        )
+
+
+AUTOTYPE = Autotype_sequence()
+
+
+class Default_language(click.ParamType):
+    """Click check class for parameters type"""
+
+    name = "Autotype items"
+
+    def convert(self, value, param, ctx):
+        lang_list = ['EN', 'RU']
+
+        if value in lang_list:
+            return value
+
+        self.fail(
+            f"\n{value!r} is not valid language. Choose item from the allowed: {lang_list}\n",
+            param,
+            ctx,
+        )
+
+
+DEFAULT_LANG = Default_language()
+
+
+def countdown(seconds, message):
     print('\n')
-    for i in track(range(seconds), description="Clearing in ..."):
+    for i in track(range(seconds), description=message):
         time.sleep(1)  # Simulate work being done
 
 
@@ -509,6 +583,20 @@ def default_time_to_wait_for_web():
     return _config.wait_site_to_load
 
 
+def list_of_browsers():
+    """
+    List of browser for @click.option help
+    """
+    config = ""
+    config = sap.config.Config()
+    try:
+        _config = config.read()
+    except:
+        return ""
+
+    return _config.browsers_list
+
+
 def open_sap(argument):
     pop = Popen(argument)
     pop.wait()
@@ -521,26 +609,6 @@ def check_if_path_exists(path):
     if not path.exists():
         raise WrongPath(path.name, path)
     return True
-
-
-def launch_autotype_sequence(autotype, user, password):
-    """
-    Entering data according autotype sequence at website
-
-    :param autotype: autotype sequence
-    :param user: user id
-    :param password: user's password
-    :return: None
-    """
-    key_strokes = re.findall(r'{(.+?)}', autotype)
-
-    for item in key_strokes:
-        if item == 'USER':
-            pyautogui.write(str(user))
-        elif item == 'PASS':
-            pyautogui.write(str(password))
-        else:
-            pyautogui.press(item)
 
 
 def open_url(url, locate=False):

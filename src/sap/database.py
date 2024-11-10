@@ -33,6 +33,7 @@ class Sap(Base):
     url = Column(String(250))
     only_web = Column(String(1))
     autotype = Column(String(250))
+    language = Column(String(20))
 
 
 class Param(Base):
@@ -106,7 +107,8 @@ class SapDB():
                      description=sap_system.description,
                      url=sap_system.url,
                      autotype=sap_system.autotype,
-                     only_web=sap_system.only_web)
+                     only_web=sap_system.only_web,
+                     language=sap_system.language)
         result = self.session.add(record)
         try:
             self.session.commit()
@@ -118,11 +120,19 @@ class SapDB():
     def query_system(self, sap_system):
         """ Query system from database """
 
-        query = self.session.query(Sap.system_id, Sap.mandant_num, Sap.user_id, Sap.password, Sap.customer,
-                                   Sap.description, Sap.url, Sap.autotype, Sap.only_web).order_by(asc(Sap.customer),
-                                                                                    asc(Sap.system_id),
-                                                                                    asc(Sap.mandant_num),
-                                                                                    asc(Sap.user_id))
+        query = self.session.query(Sap.system_id,
+                                   Sap.mandant_num,
+                                   Sap.user_id,
+                                   Sap.password,
+                                   Sap.language,
+                                   Sap.customer,
+                                   Sap.description,
+                                   Sap.url,
+                                   Sap.autotype,
+                                   Sap.only_web).order_by(asc(Sap.customer),
+                                                          asc(Sap.system_id),
+                                                          asc(Sap.mandant_num),
+                                                          asc(Sap.user_id))
         if sap_system.system:
             # noinspection PyUnresolvedReferences
             query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
@@ -152,6 +162,7 @@ class SapDB():
 
         if result:
             result.password = sap_system.password
+            result.language = sap_system.language
             result.customer = sap_system.customer
             result.description = sap_system.description
             result.url = sap_system.url
