@@ -47,9 +47,10 @@ message_type_sensitive = "Sensitive"
 message_type_error = "Error"
 
 
-def prepare_parameters_to_launch_system(selected_system: Sap_system, external_user, guiparm, snc_name,
-                                        snc_qop, transaction='', parameter='', report='', system_command='', reuse='',
-                                        sapshcut_exe_path: str = "", language: str = ''):
+def prepare_parameters_to_launch_system(selected_system: Sap_system, external_user: bool = '', guiparm: str = '',
+                                        snc_name: str = '', snc_qop: str = '', transaction: str = '',
+                                        parameter: str = '', report: str = '', system_command: str = '',
+                                        reuse: bool = '', sapshcut_exe_path: str = "", language: str = ''):
     """
     Constructing a string to start the system
     :param selected_system:
@@ -469,15 +470,18 @@ class Autotype_sequence(click.ParamType):
     name = "Autotype items"
 
     def convert(self, value, param, ctx):
-        autotype_list = ['USER', 'PASS', 'LANG', 'DELAY', 'ENTER', 'TAB', 'SYSTEM', 'CLIENT']
+        autotype_list = '(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)'
 
-        # key_strokes = re.findall(r'{(.+?)}', value)
-        # if key_strokes in autotype_list:
-        #     return key_strokes
-        return value
+        # r'\{(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)(?: \d*)?\}'
+        re_str = fr'{{{autotype_list}(?: *\d*)?}}'
+        re_comp = re.compile(re_str)
+        result = re_comp.sub('', value)
+
+        if not result:
+            return value
 
         self.fail(
-            f"\n{key_strokes!r} is not valid Autotype item. Choose item from the allowed: {autotype_list}\n",
+            f"\n{result!r}. Wrong Autotype item(s). Choose item from the allowed: {autotype_list} and check parameters\n",
             param,
             ctx,
         )
@@ -492,9 +496,13 @@ class Default_language(click.ParamType):
     name = "Autotype items"
 
     def convert(self, value, param, ctx):
-        lang_list = ['EN', 'RU']
+        # Note 73606 - Supported Languages and Code Pages
+        # Or from any table with SPRAS data element
+        lang_list = ['AF', 'AR', 'BG', 'CA', 'CS', 'DA', 'DE', 'EL', 'EN', 'ES', 'ET', 'FI', 'FR', 'HE', 'HI', 'HR',
+                     'HU', 'ID', 'IS', 'IT', 'JA', 'KK', 'KO', 'LT', 'LV', 'MS', 'NL', 'NO', 'PL', 'PT', 'RO', 'RU',
+                     'SH', 'SK', 'SL', 'SR', 'SV', 'TH', 'TR', 'UK', 'VI', 'Z1', 'ZF', 'ZH']
 
-        if value in lang_list:
+        if value.upper() in lang_list:
             return value
 
         self.fail(

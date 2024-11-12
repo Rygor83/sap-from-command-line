@@ -336,8 +336,7 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
             argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
-                selected_system, language,
-                None, guiparm, snc_name,
+                selected_system, None, guiparm, snc_name,
                 snc_qop, None, None, None, None, None,
                 ctx.obj.config.command_line_path)
         except WrongPath as err:
@@ -508,7 +507,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
             str(mandant).zfill(3),
             str(user).upper(),
             encrypted_password,
-            str(language),
+            str(language).upper(),
             str(customer),
             str(description),
             str(url),

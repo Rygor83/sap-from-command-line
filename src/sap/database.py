@@ -28,7 +28,8 @@ class Sap(Base):
     mandant_num = Column(String(3), primary_key=True)
     user_id = Column(String(10), primary_key=True)
     password = Column(BLOB)
-    customer = Column(String(20))
+    customer = Column(
+        String(20))  # TODO: make it primary as for example ALM system can exists in many customer's ecosystem
     description = Column(String(20))
     url = Column(String(250))
     only_web = Column(String(1))
