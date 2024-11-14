@@ -622,3 +622,22 @@ def check_if_path_exists(path):
 def open_url(url, locate=False):
     """ Open url in web browser"""
     click.launch(url=url, locate=locate)
+
+
+class RequiredIf(click.Option):
+    """ Disable autotype and only_web options if url is empty """
+
+    def __init__(self, *args, **kwargs):
+        self.required_if = kwargs.pop('required_if')
+        assert self.required_if, "'required_if' parameter required"
+        kwargs['help'] = (kwargs.get('help', '') +
+                          '. This argument is required for argument %s' % self.required_if.upper()).strip()
+        super(RequiredIf, self).__init__(*args, **kwargs)
+
+    def handle_parse_result(self, ctx, opts, args):
+        if not ctx.params[self.required_if]:
+            self.prompt = None
+            self.required = False
+            self.default = '' if self.name == 'autotype' else self.default
+
+        return super(RequiredIf, self).handle_parse_result(ctx, opts, args)

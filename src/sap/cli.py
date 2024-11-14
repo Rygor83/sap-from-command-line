@@ -480,16 +480,16 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
 @click.option("-autotype", prompt=True, help="Autotype sequence for logining to web site",
-              type=utilities.AUTOTYPE, default=utilities.default_sequence(), show_default=True)
+              type=utilities.AUTOTYPE, default=utilities.default_sequence(), show_default=True,
+              cls=utilities.RequiredIf, required_if='url')
 @click.option("-only_web", prompt=True, help="Is SAP system used only as web", type=click.Choice(['yes', 'no']),
-              default='no', show_default=True)
+              default='no', show_default=True, cls=utilities.RequiredIf, required_if='url')
 @click.option("-v", "--verbose", "verbose", help="Flag. Show passwords for selected systems", is_flag=True,
               default=False)
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
 def add(ctx, system: str, mandant: str, user: str, password: str, language: str, description: str, customer: str,
-        url: str,
-        autotype: str, only_web: str, verbose: bool, timeout: int):
+        url: str, autotype: str, only_web: str, verbose: bool, timeout: int):
     """
     Add sap system with its parameters to db. Just run 'sap add' and follow instructions.
     """
