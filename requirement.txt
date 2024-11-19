@@ -1,6 +1,5 @@
 click
 cryptography
-prettytable
 pyperclip
 sqlalchemy
 sqlalchemy_utils

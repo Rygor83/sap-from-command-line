@@ -5,6 +5,7 @@
 """ Config file management """
 
 import ctypes
+import re
 from pathlib import Path
 from collections import namedtuple
 from configparser import ConfigParser
@@ -18,7 +19,7 @@ from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAM
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
                                      'private_key_path', 'language', 'sequence', 'wait_site_to_load', 'time_to_clear',
-                                     'browsers_list', 'browsers_path'])
+                                     'browsers_list', 'browsers_path', 'browsers_params'])
 
 
 class Config:
@@ -38,8 +39,9 @@ class Config:
             sequence=None,
             wait_site_to_load=None,
             time_to_clear=None,
-            browsers_list=None,
-            browsers_path=None,
+            browsers_list: typing.List = [],
+            browsers_path: typing.Dict = {},
+            browsers_params: typing.Dict = {},
     ):
 
         self.ini_name = CONFIG_NAME
@@ -66,6 +68,7 @@ class Config:
         self.time_to_clear = time_to_clear
         self.browsers_list = browsers_list
         self.browsers_path = browsers_path
+        self.browsers_params = browsers_params
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -92,7 +95,9 @@ class Config:
 
             browsers_tuple = parser.items('BROWSER')
             self.browsers_list = [item[0] for item in browsers_tuple]
-            self.browsers_path = {item[0]: Path(item[1]) for item in browsers_tuple}
+            self.browsers_path = {item[0]: Path(re.match(r'.+\.exe', item[1]).group(0)) for item in browsers_tuple}
+            self.browsers_params = {item[0]: item[1][re.match(r'.+\.exe', item[1]).end() + 1:].split() for item
+                                    in browsers_tuple}
 
             # TODO: Сделать проверку и уведомление, если приватный ключ и база данных лежат в одной папке
             #   db_path = pathlib.Path(self.db_path)
@@ -104,7 +109,8 @@ class Config:
 
             return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
                              self.public_key_path, self.private_key_path, self.language, self.sequence,
-                             self.wait_site_to_load, self.time_to_clear, self.browsers_list, self.browsers_path)
+                             self.wait_site_to_load, self.time_to_clear, self.browsers_list, self.browsers_path,
+                             self.browsers_params)
         else:
             raise ConfigDoesNotExists(self.config_file_path)
 

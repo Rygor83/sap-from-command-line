@@ -3,8 +3,6 @@
 #  ------------------------------------------
 
 """ helpful functions """
-from os import utime
-
 import click
 from pathlib import Path
 from subprocess import Popen
@@ -12,7 +10,7 @@ import re
 import time
 import getpass
 import pyautogui
-from jaraco.functools import retry
+import typing
 
 import sap.api
 import sap.config
@@ -166,7 +164,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, external_us
     return argument, edited_system, command, command_type
 
 
-def launch_command_line_with_params(command_line_path, param):
+def launch_command_line_with_params(command_line_path, param: typing.List):
     """ Launch executable with different parameters"""
 
     try:
@@ -175,10 +173,12 @@ def launch_command_line_with_params(command_line_path, param):
         print_message(f"{err}", message_type_error)
         raise click.Abort
 
-    argument = [command_line_path, param]
+    argument = [command_line_path]
+    for item in param:
+        argument.append(item)
 
     pop = Popen(argument)
-    pop.wait()
+    # pop.wait()
 
     if pop.returncode:
         click.echo(pop.returncode, pop.communicate()[0])
@@ -438,14 +438,19 @@ class Browser_list(click.ParamType):
 BROWSER = Browser_list()
 
 
-def launch_autotype_sequence(selected_system: Sap_system, language):
+def launch_autotype_sequence(selected_system: Sap_system, language, minimize=''):
     """
     Entering data according autotype sequence at website
 
-    :param autotype: autotype sequence
     :param selected_system: parameters of the selected system
+    :param language: language entered with command and not take from selected_system
+    :param minimize: switch from current window to browser with opened url
     :return: None
     """
+
+    if minimize:
+        pyautogui.hotkey('alt', 'tab')
+
     key_strokes = re.findall(r'{(.+?)}', selected_system.autotype)
 
     for item in key_strokes:
@@ -551,58 +556,35 @@ def print_markdown(markdown):
     console.print(md)
 
 
-def default_sequence():
+def default_from_context(default_name):
     """
-    Default values from configuration file for CLICK.OPTION for [AUTO-TYPE]->sequence
+    Get default parameters for "self.default_name" variable from context (ctx.obj.config.<config_parameter>)
+    # https://stackoverflow.com/questions/56042757/can-i-use-a-context-value-as-a-click-option-default
     """
-    config = sap.config.Config()
-    try:
-        _config = config.read()
-    except:
-        return ""
 
-    return _config.sequence
+    class OptionDefaultFromContext(click.Option):
+        def get_default(self, ctx):
+            self.default = ctx.obj.config.__getattribute__(default_name)
+            return super(OptionDefaultFromContext, self).get_default(ctx)
 
-
-def default_time_to_clear():
-    """
-    Default values from configuration file for CLICK.OPTION for [PASSWORD]->time_to_clear
-    """
-    config = sap.config.Config()
-    try:
-        _config = config.read()
-    except:
-        return ""
-
-    return _config.time_to_clear
-
-
-def default_time_to_wait_for_web():
-    """
-    Default values from configuration file for CLICK.OPTION for [AUTO-TYPE]->wait
-    """
-    config = ""
-    config = sap.config.Config()
-    try:
-        _config = config.read()
-    except:
-        return ""
-
-    return _config.wait_site_to_load
+    return OptionDefaultFromContext
 
 
 def list_of_browsers():
     """
     List of browser for @click.option help
     """
-    config = ""
-    config = sap.config.Config()
-    try:
-        _config = config.read()
-    except:
-        return ""
 
-    return _config.browsers_list
+    class OptionDefaultBrowserList(click.Option):
+
+        def get_default(self, ctx, **kwargs):
+            """
+            Get ctx.obj.config.browsers_list
+            """
+            self.default = ctx.obj.config.browsers_list
+            return super(OptionDefaultBrowserList, self).get_default(ctx)
+
+    return OptionDefaultBrowserList
 
 
 def open_sap(argument):
@@ -624,20 +606,46 @@ def open_url(url, locate=False):
     click.launch(url=url, locate=locate)
 
 
-class RequiredIf(click.Option):
-    """ Disable autotype and only_web options if url is empty """
+class OptionADD(click.Option):
+    """
+    Overriding "ADD" command's options
+    """
 
     def __init__(self, *args, **kwargs):
-        self.required_if = kwargs.pop('required_if')
-        assert self.required_if, "'required_if' parameter required"
+
+        try:
+            self.required_if = kwargs.pop('required_if')
+        except KeyError:
+            self.required_if = ''
+
+        try:
+            self.default_name = kwargs.pop('default_name')
+        except KeyError:
+            self.default_name = ''
+
+        # assert self.required_if, "'required_if' parameter required"
+        # assert self.default_name, "'default_name' parameter required"
+
         kwargs['help'] = (kwargs.get('help', '') +
                           '. This argument is required for argument %s' % self.required_if.upper()).strip()
-        super(RequiredIf, self).__init__(*args, **kwargs)
+        super(OptionADD, self).__init__(*args, **kwargs)
 
     def handle_parse_result(self, ctx, opts, args):
+        """
+        In "Add" command request "autotype" and "only_web" parameters only if "url" parameter is entered
+        """
         if not ctx.params[self.required_if]:
             self.prompt = None
             self.required = False
             self.default = '' if self.name == 'autotype' else self.default
 
-        return super(RequiredIf, self).handle_parse_result(ctx, opts, args)
+        return super(OptionADD, self).handle_parse_result(ctx, opts, args)
+
+    def get_default(self, ctx, **kwargs):
+        """
+        Get default parameters for "self.default_name" variable from context (ctx.obj.config.<config_parameter>)
+        """
+        if self.default_name:
+            self.default = ctx.obj.config.__getattribute__(self.default_name)
+            return super(OptionADD, self).get_default(ctx, **kwargs)
+        return None

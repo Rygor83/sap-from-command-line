@@ -1,7 +1,6 @@
 click
 click_log
 cryptography
-prettytable
 pyautogui
 pyperclip
 pyzipper

@@ -8,7 +8,6 @@ from collections import namedtuple
 import click
 from sap.exceptions import DatabaseDoesNotExists
 
-# TODO: add default system language - needed for login and autotype sequence
 Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'language', 'customer', 'description', 'url',
                                 'autotype', 'only_web'])
 Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None, None, None)

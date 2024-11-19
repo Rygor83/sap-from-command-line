@@ -4,6 +4,7 @@
 
 """ Command line interface for sap-from-command-line tool """
 
+import typing
 import ctypes
 import os
 from pathlib import Path
@@ -16,9 +17,9 @@ import click
 import pyperclip
 
 import rich_click as click  # rich help output. Do not delete it as it works in background
+from click.shell_completion import shell_complete
 from rich.console import Console
 from rich.markdown import Markdown
-from sqlalchemy import False_
 
 import sap.config
 from sap import utilities
@@ -140,11 +141,12 @@ def shut(ctx, system: str, mandant: str):
 @click.option("-r", "--report", "report", help="Run report (report name for SE38 transaction)", type=click.STRING)
 @click.option("-p", "--parameter", "parameter", help="Transaction's parameters")
 @click.option("-w", "--web", "web", help="Flag. Launch system's web site", default=False, is_flag=True)
-@click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_wait_for_web(), show_default=True,
-              type=click.INT, help='Timer in seconds to wait web site to load')
+@click.option('-time', "--timeout", "timeout", show_default=True,
+              type=click.INT, help='Timer in seconds to wait web site to load',
+              cls=utilities.default_from_context('wait_site_to_load'))
 @click.option("-n", "--new", "reuse", help="Flag. Defines whether a new connection to an SAP is reused",
               default=False, is_flag=True, show_default=True)
-@click.option("-lgn", "--login", "login", help="Login to the just opened web system",
+@click.option("-li", "--login", "signin", help="Login to the just opened web system",
               default=False, is_flag=True, show_default=True)
 @click.option("-b", "--browser", "browser",
               help=f"Choose a browser to open selected SAP system: {utilities.list_of_browsers()}",
@@ -152,7 +154,7 @@ def shut(ctx, system: str, mandant: str):
 @click.pass_context
 def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
         language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
-        parameter: str, web: bool, timeout: int, reuse: bool, login: bool, browser: str):
+        parameter: str, web: bool, timeout: int, reuse: bool, signin: bool, browser: str):
     """
     \b
     Launch SAP system \n
@@ -183,22 +185,24 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 f"Launching web site: {selected_system.url} ({selected_system.description} of {selected_system.customer})",
                 message_type=utilities.message_type_message)
 
-            if browser:
+            if browser:  # Selected browser
+                ctx.obj.config.browsers_params[browser].append(selected_system.url)
+
                 try:
                     utilities.launch_command_line_with_params(ctx.obj.config.browsers_path[browser],
-                                                              selected_system.url)
+                                                              ctx.obj.config.browsers_params[browser])
                 except WrongPath as err:
                     utilities.print_message(f"{err}", utilities.message_type_error)
                     exit()
-            else:
+            else:  # Default browser
                 utilities.open_url(f"{selected_system.url}")
 
-            if login:
-                utilities.countdown(timeout if timeout else ctx.obj.config.wait_site_to_load,
-                                    'Waiting web site to load')
-
-                logger.info(f"Autotype sequence: {selected_system.autotype}")
-                utilities.launch_autotype_sequence(selected_system, language)
+            if signin:
+                ctx.invoke(login, system=selected_system.system, mandant=selected_system.mandant,
+                           user=selected_system.user, customer=selected_system.customer,
+                           description=selected_system.description,
+                           language=language if language else selected_system.language, timeout=timeout,
+                           minimize=False)
 
         else:
             no_system_found = Sap_system(system.upper() if system else None,
@@ -246,16 +250,17 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option("-l", "--language", "language", help="Logon language", type=click.STRING)
-@click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_wait_for_web(), show_default=True,
-              type=click.INT, help='Timer in seconds to wait web site to load')
+@click.option('-time', "--timeout", "timeout", show_default=True, type=click.INT,
+              help='Timer in seconds to wait web site to load')
+@click.option("-m", "--minimize", "minimize", show_default=True, default=True, is_flag=True)
 @click.pass_context
-def login(ctx, system: str, mandant: int, user: str, customer: str, description: str, language: str, timeout: int):
+def login(ctx, system: str, mandant: int, user: str, customer: str, description: str, language: str, timeout: int,
+          minimize: bool):
     """
     Login to web system: enter user and password. The website has to be opened.
     """
     query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
-                              description=description,
-                              url="", verbose=False, enum=True)
+                              description=description, url="", verbose=False, enum=True)
     if not query_result:
         return
     # --------------------------
@@ -263,8 +268,9 @@ def login(ctx, system: str, mandant: int, user: str, customer: str, description:
 
     selected_system = utilities.choose_system(selected_sap_systems)
 
-    utilities.countdown(timeout if timeout else ctx.obj.config.wait_site_to_load, 'Waiting for web site to load')
-    utilities.launch_autotype_sequence(selected_system, language)
+    if timeout:
+        utilities.countdown(timeout, 'Waiting for web site to load')
+    utilities.launch_autotype_sequence(selected_system, language, minimize=minimize)
 
 
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debugging")
@@ -405,8 +411,9 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option('--clear/--no_clear', "clear_clipboard", is_flag=True, default=True,
               help='Clear clipboard', show_default=True)
-@click.option('-time', "--timeout", "timeout", default=utilities.default_time_to_clear(), show_default=True,
-              type=click.INT, help='Timer in seconds to clear clipboard')
+@click.option('-time', "--timeout", "timeout", show_default=True,
+              type=click.INT, help='Timer in seconds to clear clipboard',
+              cls=utilities.default_from_context('time_to_clear'))
 @click.pass_context
 def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str, description: str,
          clear_clipboard: bool,
@@ -480,10 +487,10 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
 @click.option("-autotype", prompt=True, help="Autotype sequence for logining to web site",
-              type=utilities.AUTOTYPE, default=utilities.default_sequence(), show_default=True,
-              cls=utilities.RequiredIf, required_if='url')
+              type=utilities.AUTOTYPE, show_default=True,
+              cls=utilities.OptionADD, required_if='url', default_name='sequence')
 @click.option("-only_web", prompt=True, help="Is SAP system used only as web", type=click.Choice(['yes', 'no']),
-              default='no', show_default=True, cls=utilities.RequiredIf, required_if='url')
+              default='no', show_default=True, cls=utilities.OptionADD, required_if='url')
 @click.option("-v", "--verbose", "verbose", help="Flag. Show passwords for selected systems", is_flag=True,
               default=False)
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
@@ -495,10 +502,6 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
     """
 
     # TODO: сделать проверку доступности базы данных перед тем, как вводить данные. Иначе вводишь данные, а тебе - БД не доступна!
-
-    # TODO: Не запрашивать autotype и only_web, если URL пустой т.к. нет необходимости
-    #   глянуть: 1. https://stackoverflow.com/questions/55584012/python-click-dependent-options-on-another-option
-    #               2. https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is
 
     with _sap_db(ctx.obj.config):
         encrypted_password = ctx.obj.crypto.encrypto(str.encode(password))
@@ -566,11 +569,13 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 
         selected_system = utilities.choose_system(selected_sap_systems)
 
-        # TODO: попробовать переделать на
-        #  password = getpass.getpass("Enter password for external user: ")
-        #  если пользователь нажимает ENTER, а поле пустое, то запрашивать хочет ли он оставить старый пароль
+        change_pass = click.prompt("\nWould you like to change the password?", default='no', show_default=True,
+                                   type=click.Choice(['yes', 'no']))
+        if change_pass == 'yes':
+            password_new = click.prompt("Enter new password", confirmation_prompt=True, hide_input=True)
+        else:
+            password_new = selected_system.password
 
-        password_new = click.prompt("\nEnter new password", default=selected_system.password)
         language_new = click.prompt("Enter new language", default=selected_system.language)
         customer_new = click.prompt("Enter Customer", default=selected_system.customer)
         description_new = click.prompt("Enter system description", default=selected_system.description)

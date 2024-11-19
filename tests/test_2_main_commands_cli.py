@@ -3,10 +3,11 @@
 #  ------------------------------------------
 
 """ Command Line Tests for main commands: add, list, delete, update """
-
+import time
 from pathlib import Path
 import click
 import pyperclip
+import psutil
 import pytest
 from pytest_mock import mocker  # do not delete it
 
@@ -24,47 +25,63 @@ sap_system_1 = sap.Sap_system(system='ZZZ',
                               mandant='999',
                               user='USER25',
                               password=PASSWORD,
+                              language='EN',
                               customer='Roga & copyta',
                               description='Develop',
                               url='',
                               autotype='',
-                              only_web='yes',)
+                              only_web='yes', )
 sap_system_2 = sap.Sap_system(system='YYY',
                               mandant='998',
                               user='USER21',
                               password=PASSWORD,
+                              language='EN',
                               customer='Vasya Pupkin',
                               description='Production',
                               url='www.vasyapupkin.by',
-                              autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}',
-                              only_web='yes',)
+                              autotype='{USER}{TAB}{PASS}{ENTER}',
+                              only_web='yes', )
 sap_system_3 = sap.Sap_system(system='XXX',
                               mandant='100',
                               user='USER15',
                               password=PASSWORD,
+                              language='EN',
                               customer='XYZ systems',
                               description='Test',
                               url='www.XYZsystems.by',
-                              autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}',
-                              only_web='yes',)
+                              autotype='{USER}{TAB}{PASS}{ENTER}',
+                              only_web='yes', )
 sap_system_1_updated = sap.Sap_system(system='ZZZ',
                                       mandant='999',
                                       user='USER25',
                                       password=UPDATED_PASSWORD,
+                                      language='EN',
                                       customer='Roga & copyta',
                                       description='Dev',
                                       url='',
                                       autotype='',
-                                      only_web='no',)
+                                      only_web='no', )
 sap_system_2_updated = sap.Sap_system(system='YYY',
                                       mandant='998',
                                       user='USER21',
                                       password=PASSWORD,
+                                      language='EN',
                                       customer='Vasya Pupkin',
                                       description='Production',
                                       url='www.vasyapupkin.by',
-                                      autotype='{USERNAME}{TAB}{PASSWORD}{ENTER}',
-                                      only_web='no',)
+                                      autotype='{USER}{TAB}{PASS}{ENTER}',
+                                      only_web='no', )
+
+non_existing_system = Sap_system(system='BBB',
+                                 mandant='',
+                                 user='',
+                                 password='',
+                                 language='',
+                                 customer='',
+                                 description='',
+                                 url='',
+                                 autotype='',
+                                 only_web='')
 
 
 def test_start_cli(temp_start_cli):
@@ -89,11 +106,14 @@ def test_add_system_1(runner, temp_start_cli, mocker):
                                  "-mandant", sap_system_1.mandant,
                                  "-user", sap_system_1.user,
                                  "-password", sap_system_1.password,
+                                 "-language", sap_system_1.language,
                                  "-customer", sap_system_1.customer,
                                  "-description", sap_system_1.description,
                                  "-url", sap_system_1.url if sap_system_1.url else "",
                                  "-autotype", sap_system_1.autotype if sap_system_1.autotype else "",
-                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else ""],)
+                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else ""], )
+
+    # TODO: Нужно делать запрос в базу данных - и сравнивать результаты, а не выводы в терминал
 
     assert flat_actual(result.output) == flat_expected(sap_system_1)
 
@@ -111,10 +131,12 @@ def test_add_system_2_with_url(runner, temp_start_cli, mocker):
                                  "-mandant", sap_system_2.mandant,
                                  "-user", sap_system_2.user,
                                  "-password", sap_system_2.password,
+                                 "-language", sap_system_2.language,
                                  "-customer", sap_system_2.customer,
                                  "-description", sap_system_2.description,
                                  "-url", sap_system_2.url if sap_system_2.url else "",
-                                 "-autotype", sap_system_2.autotype if sap_system_2.autotype else ""])
+                                 "-autotype", sap_system_2.autotype if sap_system_2.autotype else "",
+                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else ""])
 
     assert flat_actual(result.output) == flat_expected(sap_system_2)
 
@@ -132,10 +154,12 @@ def test_add_system_3_verbose(runner, temp_start_cli, mocker):
                                  "-mandant", sap_system_3.mandant,
                                  "-user", sap_system_3.user,
                                  "-password", sap_system_3.password,
+                                 "-language", sap_system_3.language,
                                  "-customer", sap_system_3.customer,
                                  "-description", sap_system_3.description,
                                  "-url", sap_system_3.url if sap_system_3.url else "",
                                  "-autotype", sap_system_3.autotype if sap_system_3.autotype else "",
+                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else "",
                                  "-v",
                                  "-time", "1"])
 
@@ -156,10 +180,12 @@ def test_add_system_1_no_config_exists(runner, tmp_path, mocker):  # , temp_star
                                  "-mandant", sap_system_1.mandant,
                                  "-user", sap_system_1.user,
                                  "-password", sap_system_1.password,
+                                 "-language", sap_system_1.language,
                                  "-customer", sap_system_1.customer,
                                  "-description", sap_system_1.description,
                                  "-url", sap_system_1.url if sap_system_1.url else "",
-                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else ""])
+                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else "",
+                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else ""])
 
     assert result.output.replace('\n', '') == ('SAP_CONFIG.INI does not exist.. Check path: '
                                                f'{tmp_path / CONFIG_NAME} '
@@ -181,10 +207,12 @@ def test_add_system_1_no_database_exists(runner, tmp_path, mocker, config_tmp_pa
                                  "-mandant", sap_system_1.mandant,
                                  "-user", sap_system_1.user,
                                  "-password", sap_system_1.password,
+                                 "-language", sap_system_1.language,
                                  "-customer", sap_system_1.customer,
                                  "-description", sap_system_1.description,
                                  "-url", sap_system_1.url if sap_system_1.url else "",
-                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else ""])
+                                 "-autotype", sap_system_1.autotype if sap_system_1.autotype else "",
+                                 "-only_web", sap_system_1.only_web if sap_system_1.only_web else ""])
 
     assert result.output.replace('\n', '') == (
         'Database does not exist or there is no possibility for connection.. Check '
@@ -309,7 +337,7 @@ def test_list_existing_system_with_url_cli(runner, temp_start_cli, mocker):
     'sap list system_id -url'
     """
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", sap_system_2.system, "-url"])
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", sap_system_2.system, "-u"])
     assert flat_actual(result.output) == flat_expected(sap_system_2)
 
 
@@ -329,9 +357,6 @@ def test_list_no_existing_systems_cli(runner, temp_start_cli, mocker):
     'sap list non_existent_system_id'
     """
 
-    non_existing_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
-                                     url='', autotype='')
-
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", non_existing_system.system])
     assert flat_actual(result.output) == flat_expected(non_existing_system)
@@ -344,7 +369,7 @@ def test_pw_no_clipboard_clear_cli(runner, temp_start_cli):
     """
     runner.invoke(sap_cli,
                   args=["--config_path", temp_start_cli,
-                        "pw", "zzz", "--no_clear"])
+                        "copy", "password", "zzz", "--no_clear"])
     password_from_database = pyperclip.paste()
 
     assert password_from_database == PASSWORD
@@ -360,7 +385,9 @@ def test_pw_clipboard_clear_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'countdown', return_value=True)
 
     result = runner.invoke(sap_cli,
-                           args=["--config_path", temp_start_cli, "pw", sap_system_3.system, "--clear", "-time", "1"])
+                           args=["--config_path", temp_start_cli, "copy", "password", sap_system_3.system, "--clear",
+                                 "-time",
+                                 "1"])
     assert flat_actual(result.output) == flat_expected(sap_system_3)
 
 
@@ -371,13 +398,13 @@ def test_pw_no_existing_system_cli(runner, temp_start_cli, mocker):
     """
 
     non_existing_system = 'BBB'
-    sap_system_bbb = Sap_system(non_existing_system, mandant='', user='', password='', customer='', description='',
-                                url='', autotype='')
+    sap_system_bbb = Sap_system(non_existing_system, mandant='', user='', password='', language='', customer='',
+                                description='', url='', autotype='', only_web='')
 
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     mocker.patch.object(sap.utilities, 'print_message', return_value=True)
     mocker.patch.object(sap.utilities, 'countdown', return_value=True)
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "pw", non_existing_system])
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "copy", "password", non_existing_system])
     assert flat_actual(result.output) == flat_expected(sap_system_bbb)
 
 
@@ -643,11 +670,17 @@ def test_logon_cli(runner, temp_start_cli, mocker):
     'sap logon'
     """
 
-    path_to_config_file = Path(temp_start_cli) / CONFIG_NAME
-    mocker.patch.object(click, 'launch', return_value=True)
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "logon", "-s", path_to_config_file])
+    def check_if_process_running(process_name):
+        for process in psutil.process_iter(['name']):
+            if process.info['name'] == process_name:
+                return True
+        return False
 
-    assert result.output == f"Trying to launch: {path_to_config_file}\n"
+    path_to_saplogon = Path("c:\Program Files\SAP\FrontEnd\SAPGUI\saplogon.exe")
+    # mocker.patch.object(click, 'launch', return_value=True)
+    result = runner.invoke(sap_cli, args=["logon", "-s", path_to_saplogon])
+    time.sleep(10)
+    assert check_if_process_running("saplogon.exe") == True
 
 
 def test_logon_wrong_saplogon_path_cli(runner, temp_start_cli, mocker):
@@ -659,7 +692,7 @@ def test_logon_wrong_saplogon_path_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_message', new=stub_print_message)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "logon"])
     assert str(result.output).replace('\n', '') == (
-        'SAP executable does not exist: path to saplogon.exe file. Check the '
+        'Executable does not exist: path to saplogon.exe file. Check the '
         'following path: path to saplogon.exe file.Aborted.')
 
 
@@ -715,9 +748,6 @@ def test_update_no_existing_system_cli(runner, temp_start_cli, mocker):
     'sap update non_existent_system_id'
     """
 
-    non_existing_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
-                                     url='', autotype='')
-
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "update", non_existing_system.system])
     assert flat_actual(result.output) == flat_expected(non_existing_system)
@@ -764,8 +794,6 @@ def test_delete_no_existing_system_cli(runner, temp_start_cli, mocker):
     Test DELETE command: Request for a non-existent system to delete
     'sap delete non_existent_system_id'
     """
-    non_existing_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
-                                     url='', autotype='')
 
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "delete", non_existing_system.system])
