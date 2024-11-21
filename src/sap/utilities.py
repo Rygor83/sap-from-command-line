@@ -8,14 +8,13 @@ from pathlib import Path
 from subprocess import Popen
 import re
 import time
-import getpass
 import pyautogui
 import typing
 
 import sap.api
 import sap.config
 from sap.api import Sap_system, Parameter
-from sap.exceptions import WrongPath
+from sap.exceptions import WrongPath, FailedRequirements, DatabaseDoesNotExists
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -23,7 +22,7 @@ from rich.table import Table
 from rich import box
 from rich.panel import Panel
 from rich.text import Text
-from rich.prompt import IntPrompt
+from rich.prompt import IntPrompt, Prompt
 from rich.progress import track
 
 from rich_click.rich_click import (
@@ -80,13 +79,13 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, external_us
     argument = argument + f" -client={str(selected_system.mandant).zfill(3)}"  # Номер манданта
 
     if external_user:
-        user = input("\nEnter external user id: ")
+        user = click.prompt("\nEnter external user id: ", type=click.STRING)
         argument = argument + f" -user={user}"  # Пользователь
     else:
         argument = argument + f" -user={selected_system.user}"  # Пользователь
 
     if external_user:
-        password = getpass.getpass("Enter password for external user: ")
+        password = click.prompt("Enter PASSWORD for external user", type=click.STRING, hide_input=True)
         argument = argument + f" -pw={password}"  # Пароль
     else:
         argument = argument + f" -pw={selected_system.password}"  # Пароль
@@ -388,35 +387,72 @@ class String_3(click.ParamType):
         if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
             return value
 
-        self.fail(
-            f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers. Must be 3 chars length",
-            param,
-            ctx,
-        )
+        self.fail(f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers - 3 chars length",
+                  param, ctx)
+
+    def fail(self, message, param, ctx):
+        raise FailedRequirements(message)
 
 
-LETTERS_NUMBERS_3 = String_3()
+SYSTEM_ID = String_3()
 
 
-class Pass_requirement(click.ParamType):
+class Mandant(click.ParamType):
     """Click check class for parameters type"""
 
-    # TODO: доделать требования к паролю, чтобы он был не простым
-
-    name = "Password"
+    name = "Only letters and numbers. 3 chars length"
 
     def convert(self, value, param, ctx):
-        if re.match("^[A-Za-z0-9]*$", value):
+        if re.match(r"^\d{3}$", value):
             return value
 
-        self.fail(
-            f"{value!r} Password is week. Use xxxxxx chars",
-            param,
-            ctx,
-        )
+        self.fail(f"{value!r} is not valid [CLIENT] id. Must contain only numbers - 3 chars length",
+                  param, ctx)
+
+    def fail(self, message, param, ctx):
+        raise FailedRequirements(message)
 
 
-PASS_REQUIREMENT = Pass_requirement()
+MANDANT = Mandant()
+
+
+class PassRequirement(click.ParamType):
+    """Click check class for password"""
+
+    name = "Password requirements"
+
+    def convert(self, value, param, ctx):
+        pw_strength = ""
+        pw_req = ""
+
+        if ctx.obj.config.password_strength == 1:
+            pw_req = "Minimum eight characters, at least one letter and one number"
+            pw_strength = r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$"
+        elif ctx.obj.config.password_strength == 2:
+            pw_req = "Minimum eight characters, at least one letter, one number and one special character"
+            pw_strength = r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$"
+        elif ctx.obj.config.password_strength == 3:
+            pw_req = "Minimum eight characters, at least one uppercase letter, one lowercase letter and one number"
+            pw_strength = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$"
+        elif ctx.obj.config.password_strength == 4:
+            pw_req = "Minimum eight characters, at least one uppercase letter, one lowercase letter, one number and one special character"
+            pw_strength = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+        elif ctx.obj.config.password_strength == 5:
+            pw_req = "Minimum eight and maximum 10 characters, at least one uppercase letter, one lowercase letter, one number and one special character"
+            pw_strength = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,10}$"
+
+        if re.match(pw_strength, value):
+            return value
+
+        # TODO: sends error "Error: The value you entered was invalid", and not custom from line 429
+        #  https://github.com/pallets/click/issues/2809
+        self.fail(f"Your password is week. Use {pw_req!r}", param, ctx)
+
+    def fail(self, message="", param=None, ctx=None):
+        raise click.BadParameter(message, ctx, param)
+
+
+PASS_REQUIREMENT = PassRequirement()
 
 
 class Browser_list(click.ParamType):
@@ -434,8 +470,68 @@ class Browser_list(click.ParamType):
             ctx,
         )
 
+    def fail(self, message, param, ctx):
+        raise FailedRequirements(message)
+
 
 BROWSER = Browser_list()
+
+
+class Autotype_sequence(click.ParamType):
+    """Click check class for parameters type"""
+
+    name = "Autotype items"
+
+    def convert(self, value, param, ctx):
+        autotype_list = '(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)'
+
+        # r'\{(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)(?: \d*)?\}'
+        re_str = fr'{{{autotype_list}(?: *\d*)?}}'
+        re_comp = re.compile(re_str)
+        result = re_comp.sub('', value)
+
+        if not result:
+            return value
+
+        self.fail(
+            f"\n{result!r}. Wrong Autotype item(s). Choose item from the allowed: {autotype_list} and check parameters\n",
+            param,
+            ctx,
+        )
+
+    def fail(self, message, param, ctx):
+        raise FailedRequirements(message)
+
+
+AUTOTYPE = Autotype_sequence()
+
+
+class Default_language(click.ParamType):
+    """Click check class for parameters type"""
+
+    name = "Autotype items"
+
+    def convert(self, value, param, ctx):
+        # Note 73606 - Supported Languages and Code Pages
+        # Or from any table with SPRAS data element
+        lang_list = ['AF', 'AR', 'BG', 'CA', 'CS', 'DA', 'DE', 'EL', 'EN', 'ES', 'ET', 'FI', 'FR', 'HE', 'HI', 'HR',
+                     'HU', 'ID', 'IS', 'IT', 'JA', 'KK', 'KO', 'LT', 'LV', 'MS', 'NL', 'NO', 'PL', 'PT', 'RO', 'RU',
+                     'SH', 'SK', 'SL', 'SR', 'SV', 'TH', 'TR', 'UK', 'VI', 'Z1', 'ZF', 'ZH']
+
+        if value.upper() in lang_list:
+            return value
+
+        self.fail(
+            f"\n{value!r} is not valid language. Choose item from the allowed: {lang_list}\n",
+            param,
+            ctx,
+        )
+
+    def fail(self, message, param, ctx):
+        raise FailedRequirements(message)
+
+
+DEFAULT_LANG = Default_language()
 
 
 def launch_autotype_sequence(selected_system: Sap_system, language, minimize=''):
@@ -467,57 +563,6 @@ def launch_autotype_sequence(selected_system: Sap_system, language, minimize='')
             countdown(time2wait, 'Waiting for web site to load')
         else:  # ENTER, TAB and other
             pyautogui.press(item)
-
-
-class Autotype_sequence(click.ParamType):
-    """Click check class for parameters type"""
-
-    name = "Autotype items"
-
-    def convert(self, value, param, ctx):
-        autotype_list = '(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)'
-
-        # r'\{(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)(?: \d*)?\}'
-        re_str = fr'{{{autotype_list}(?: *\d*)?}}'
-        re_comp = re.compile(re_str)
-        result = re_comp.sub('', value)
-
-        if not result:
-            return value
-
-        self.fail(
-            f"\n{result!r}. Wrong Autotype item(s). Choose item from the allowed: {autotype_list} and check parameters\n",
-            param,
-            ctx,
-        )
-
-
-AUTOTYPE = Autotype_sequence()
-
-
-class Default_language(click.ParamType):
-    """Click check class for parameters type"""
-
-    name = "Autotype items"
-
-    def convert(self, value, param, ctx):
-        # Note 73606 - Supported Languages and Code Pages
-        # Or from any table with SPRAS data element
-        lang_list = ['AF', 'AR', 'BG', 'CA', 'CS', 'DA', 'DE', 'EL', 'EN', 'ES', 'ET', 'FI', 'FR', 'HE', 'HI', 'HR',
-                     'HU', 'ID', 'IS', 'IT', 'JA', 'KK', 'KO', 'LT', 'LV', 'MS', 'NL', 'NO', 'PL', 'PT', 'RO', 'RU',
-                     'SH', 'SK', 'SL', 'SR', 'SV', 'TH', 'TR', 'UK', 'VI', 'Z1', 'ZF', 'ZH']
-
-        if value.upper() in lang_list:
-            return value
-
-        self.fail(
-            f"\n{value!r} is not valid language. Choose item from the allowed: {lang_list}\n",
-            param,
-            ctx,
-        )
-
-
-DEFAULT_LANG = Default_language()
 
 
 def countdown(seconds, message):

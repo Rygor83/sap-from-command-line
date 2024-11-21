@@ -679,7 +679,7 @@ def test_logon_cli(runner, temp_start_cli, mocker):
     path_to_saplogon = Path("c:\Program Files\SAP\FrontEnd\SAPGUI\saplogon.exe")
     # mocker.patch.object(click, 'launch', return_value=True)
     result = runner.invoke(sap_cli, args=["logon", "-s", path_to_saplogon])
-    time.sleep(10)
+    time.sleep(5)
     assert check_if_process_running("saplogon.exe") == True
 
 

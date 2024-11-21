@@ -130,9 +130,9 @@ def stop_sap_db():
 
 class Obj_structure:
     def __init__(self):
-        config: sap.config.Config = None
-        crypto: Crypto = None
-        database: sap.database.SapDB = None
+        self.config = None
+        self.crypto = None
+        self.database = None
 
 
 # File names

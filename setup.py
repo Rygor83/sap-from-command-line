@@ -17,6 +17,9 @@ setup(
 
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
+    include_package_data=True,
+    ## https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+    # package_data={'sap': ['*.ini']},
 
     install_requires=['click', 'SQLAlchemy', 'sqlalchemy_utils', 'cryptography', 'pyperclip', 'prettytable',
                       'six', 'pyzipper', 'rich', 'click_log', 'pyautogui', 'rich_click'],
@@ -27,4 +30,3 @@ setup(
         ]
     },
 )
-

@@ -24,8 +24,8 @@ def test_paradd_1_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "paradd",
-                                          "-t", parameter_1.transaction,
-                                          "-p", parameter_1.parameter])
+                                          parameter_1.transaction,
+                                          parameter_1.parameter])
 
     assert flat_actual(result.output) == flat_expected(parameter_1)
 
@@ -39,8 +39,8 @@ def test_paradd_2_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "paradd",
-                                          "-t", parameter_2.transaction,
-                                          "-p", parameter_2.parameter])
+                                          parameter_2.transaction,
+                                          parameter_2.parameter])
     assert flat_actual(result.output) == flat_expected(parameter_2)
 
 
@@ -55,8 +55,8 @@ def test_parupdate_existing_transaction_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "parupdate",
-                                          "-t", parameter_updated.transaction,
-                                          "-p", parameter_updated.parameter])
+                                          parameter_updated.transaction,
+                                          parameter_updated.parameter])
     assert flat_actual(result.output) == f"{flat_expected(parameter_1)}{flat_expected(parameter_updated)}"
 
 
@@ -73,8 +73,8 @@ def test_parupdate_no_existing_transaction_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "parupdate",
-                                          "-t", transaction,
-                                          "-p", parameter])
+                                          transaction,
+                                          parameter])
 
     assert flat_actual(result.output) == flat_expected(non_existing_parameter)
 
@@ -110,7 +110,7 @@ def test_parlist_existing_transaction_partial_name_cli(runner, temp_start_cli, m
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "parlist",
-                                          "-t", "SE1"])
+                                          "SE1"])
     assert flat_actual(result.output) == flat_expected(parameter_1_updated)
 
 
@@ -124,7 +124,7 @@ def test_parlist_no_existing_transaction_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "parlist",
-                                          "-t", non_existing_parameter.transaction])
+                                          non_existing_parameter.transaction])
     assert flat_actual(result.output) == flat_expected(non_existing_parameter)
 
 
@@ -137,7 +137,7 @@ def test_pardelete_existing_transaction_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli,
                                           "pardel",
-                                          "-t", parameter_1.transaction,
+                                          parameter_1.transaction,
                                           "-confirm"])
     assert flat_actual(
         result.output) == f"{flat_expected(parameter_1)}{flat_expected(parameter_1)}{flat_expected(parameter_1)}"
@@ -153,6 +153,6 @@ def test_pardelete_no_transaction_exists_cli(runner, temp_start_cli, mocker):
 
     mocker.patch.object(sap.utilities, 'print_parameters_list', new=stub_print_parameters_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "pardel",
-                                          "-t", non_existing_parameter.transaction,
+                                          non_existing_parameter.transaction,
                                           "-confirm"])
     assert flat_actual(result.output) == flat_expected(non_existing_parameter)

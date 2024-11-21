@@ -2,6 +2,7 @@
 #   Copyright (c) Rygor. 2024.
 #  ------------------------------------------
 """ Custom Exceptions """
+import click.exceptions
 
 
 # ========================== CONFIG ==========================
@@ -89,3 +90,13 @@ class EncryptionKeysAlreadyExist(Exception):
     def __init__(self, public_path, private_path, message="Encryption keys already exist"):
         self.message = f'\n{message}: \nPrivate: {private_path}\nPublic: {public_path}'
         super().__init__(self.message)
+
+
+class FailedRequirements(click.exceptions.BadParameter):
+    """ Exception. Public key already exists """
+
+    def __init__(self, message="", ctx=None, param=None):
+        super().__init__(self.message, ctx, param)
+
+    def format_message(self) -> str:
+        return self.message

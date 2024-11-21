@@ -17,7 +17,7 @@ import click
 import pyperclip
 
 import rich_click as click  # rich help output. Do not delete it as it works in background
-from click.shell_completion import shell_complete
+from click import Abort
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -26,9 +26,10 @@ from sap import utilities
 from sap.api import Sap_system, Obj_structure, Parameter
 from sap.config import create_config, open_config, open_folder
 from sap.crypto import Crypto
-from sap.database import SapDB
+from sap.database import SapDB, database_exists
 from sap.api import DEBUG_FILE_NAME, SAPLOGON_INI
 from sap.exceptions import ConfigDoesNotExists, WrongPath, ConfigExists, EncryptionKeysAlreadyExist, DatabaseExists
+from sap.exceptions import DatabaseDoesNotExists
 from sap.backup import Backup
 
 if (sys.version_info[0] < 3) or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
@@ -44,18 +45,18 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help', '/?'],
 log_level = ['--log_level', '-l']
 
 
-# TODO: Если я обновил настройку конфигурационного файл, то как мне ее передать пользователю ?
-#   смотреть в сторону Windows Terminal с 2мя json файлами
-#  По такому же принципу работать с базой данных - посмотреть в сторону alembic
-#  https://alembic.sqlalchemy.org/en/latest/
+# TODO: при обновлении базы данных - посмотреть в сторону alembic
+#   https://alembic.sqlalchemy.org/en/latest/
 
-# TODO: Как сделать, чтобы по TAB раскрывались команды - https://python-prompt-toolkit.readthedocs.io/en/stable/
+# TODO: Как сделать, чтобы по TAB раскрывались команды -
+#   https://click.palletsprojects.com/en/stable/shell-completion/
+#   https://python-prompt-toolkit.readthedocs.io/en/stable/
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.pass_context
 @click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
 @click.version_option(version=sap.__version__)
 @click_log.simple_verbosity_option(logger, *log_level, default='ERROR')
+@click.pass_context
 def sap_cli(ctx, config_path: str):
     """
     \b
@@ -92,6 +93,13 @@ def sap_cli(ctx, config_path: str):
 
     ctx.obj.database = SapDB(db_path=ctx.obj.config.db_path if ctx.obj.config.db_path else '')
 
+    # Database existence check before prompting values, for example, for ADD command
+    if not Path(ctx.obj.config.db_path).exists():
+        message = f'Database does not exist or there is no possibility for connection.'
+        message += f'\nCheck the following path: {ctx.obj.config.db_path}'
+        utilities.print_message(message, utilities.message_type_error)
+        raise Abort
+
 
 @sap_cli.command("logon")
 @click.option("-s", "--saplogon", "saplogon_path", help="Path to saplogon.exe file")
@@ -104,7 +112,7 @@ def logon(ctx, saplogon_path):
 
 @sap_cli.command("shut")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.pass_context
 def shut(ctx, system: str, mandant: str):
     """
@@ -121,8 +129,8 @@ def shut(ctx, system: str, mandant: str):
 
 
 @sap_cli.command("run")
-@click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("system", required=False, type=utilities.SYSTEM_ID)
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING)
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -245,7 +253,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
 @sap_cli.command("login")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -274,8 +282,8 @@ def login(ctx, system: str, mandant: int, user: str, customer: str, description:
 
 
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debugging")
-@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("system", required=False, type=utilities.SYSTEM_ID)
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -359,8 +367,8 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
 
 
 @sap_cli.command("stat")
-@click.argument("system", required=False, type=utilities.LETTERS_NUMBERS_3)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("system", required=False, type=utilities.SYSTEM_ID)
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -404,8 +412,8 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 
 @sap_cli.command("copy")
 @click.argument("command", required=True, type=click.STRING)
-@click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("system", required=False, type=utilities.SYSTEM_ID)
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -477,11 +485,11 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
 
 
 @sap_cli.command("add")
-@click.pass_context
-@click.option("-system", prompt=True, help="System Id", type=utilities.LETTERS_NUMBERS_3)
-@click.option("-mandant", prompt=True, help="Mandant/Client number", type=click.IntRange(1, 999))
+@click.option("-system", prompt=True, help="System Id", type=utilities.SYSTEM_ID)
+@click.option("-mandant", prompt=True, help="Mandant/Client number", type=utilities.MANDANT)
 @click.option("-user", prompt=True, help="User")
-@click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True)
+@click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True,
+              type=utilities.PASS_REQUIREMENT)
 @click.option("-language", help="Default SAP system language", prompt=True, type=utilities.DEFAULT_LANG)
 @click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
@@ -495,13 +503,12 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
               default=False)
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
+@click.pass_context
 def add(ctx, system: str, mandant: str, user: str, password: str, language: str, description: str, customer: str,
         url: str, autotype: str, only_web: str, verbose: bool, timeout: int):
     """
     Add sap system with its parameters to db. Just run 'sap add' and follow instructions.
     """
-
-    # TODO: сделать проверку доступности базы данных перед тем, как вводить данные. Иначе вводишь данные, а тебе - БД не доступна!
 
     with _sap_db(ctx.obj.config):
         encrypted_password = ctx.obj.crypto.encrypto(str.encode(password))
@@ -539,7 +546,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
 
 @sap_cli.command("update", short_help="Update record from database")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -632,7 +639,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 
 @sap_cli.command("delete")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=click.IntRange(1, 999))
+@click.argument("mandant", required=False, type=utilities.MANDANT)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -721,7 +728,7 @@ def config(ctx):
 
 @sap_cli.command("list", short_help="Print information about SAP systems")
 @click.argument("system", required=False, type=click.STRING, default=None)
-@click.argument("mandant", required=False, type=click.IntRange(0, 999), default=None)
+@click.argument("mandant", required=False, type=utilities.MANDANT, default=None)
 @click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING, default=None)
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING, default=None)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING,
@@ -815,7 +822,7 @@ def keys(ctx):
 @click.pass_context
 def about(ctx):
     """ Displays a dialog box with version information about SAP shortcut """
-    parameter = "-version"
+    parameter = ["-version"]
     logger.info(f"{[ctx.obj.config.command_line_path, parameter]}")
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
@@ -827,7 +834,7 @@ def about(ctx):
 @click.pass_context
 def shortcut(ctx):
     """ Displays a brief help text about the parameterization of SAP shortcut """
-    parameter = "-help"
+    parameter = ["-help"]
     logger.info(f"{[ctx.obj.config.command_line_path, parameter]}")
     try:
         utilities.launch_command_line_with_params(ctx.obj.config.command_line_path, parameter)
@@ -892,8 +899,7 @@ def start(ctx, skip_message):
 @sap_cli.command("backup", short_help="Create backup")
 @click.option("-password", help="Password for backup", prompt=True, confirmation_prompt=True, hide_input=True,
               type=utilities.PASS_REQUIREMENT)
-@click.option('-skip_message', '--skip_message', 'skip_message', is_flag=True, default=False,
-              help="Skip result message")
+@click.option('-skip_message', is_flag=True, default=False, help="Skip result message")
 @click.pass_context
 def backup(ctx, password, skip_message):
     """
@@ -931,7 +937,10 @@ def backup(ctx, password, skip_message):
         if not skip_message:
             utilities.print_message(f'Backup successfully created: {back_path}',
                                     message_type=utilities.message_type_message)
-            click.launch(url=back_path, locate=True)
+            try:
+                click.launch(url=back_path, locate=True)
+            except TypeError as err:
+                pass
         else:
             click.echo(backup_obj.backup_file_path)
     else:
@@ -940,12 +949,16 @@ def backup(ctx, password, skip_message):
 
 
 @sap_cli.command("parlist")
-@click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
+@click.argument("transaction", required=False, type=click.STRING)
 @click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, type=click.BOOL, default=False)
 @click.pass_context
 def parameter_list(ctx, transaction, enum):
     """
-    List transaction's parameter from database 'Parameters'
+    \b
+    List transaction's parameters (Dynpro Fields) from database 'Parameters'
+    \b
+    Optional arguments:
+    1. TRANSACTION: Request parameters for specified transaction
     """
 
     param = Parameter(str(transaction).upper() if transaction else None, None)
@@ -965,16 +978,18 @@ def parameter_list(ctx, transaction, enum):
 
 
 @sap_cli.command("pardel")
-@click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
+@click.argument("transaction", required=False, type=click.STRING)
 @click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", is_flag=True, default=False,
               show_default=True)
 @click.pass_context
 def parameter_delete(ctx, transaction, confirm):
     """
-    Delete transaction's parameter from database 'Parameters'
+    \b
+    Delete transaction's parameter (Dynpro Field) from database 'Parameters'
+    \b
+    Optional arguments:
+    1. TRANSACTION: Delete parameters for specified transaction
     """
-
-    # TODO: перед запросом разрешение на удаление нужно вывести систему, которую мы удаляем. как в SAP DEL
 
     param = Parameter(str(transaction).upper() if transaction else None, None)
 
@@ -1012,12 +1027,17 @@ def parameter_delete(ctx, transaction, confirm):
 
 
 @sap_cli.command("paradd")
-@click.option("-t", "--transaction", "transaction", prompt=True, help="Transaction code", type=click.STRING)
-@click.option("-p", "--parameter", "parameter", prompt=True, help="Transaction's parameter", type=click.STRING)
+@click.argument("transaction", required=False, type=click.STRING)
+@click.argument("parameter", required=False, type=click.STRING)
 @click.pass_context
 def parameter_add(ctx, transaction, parameter):
     """
-    Add transaction's parameter to database 'Parameters'
+    \b
+    Add transaction's parameter (Dynpro Field) to database 'Parameters'
+    \b
+    Optional arguments:
+    1. TRANSACTION: transaction
+    2. PARAMETER: parameter for transaction
     """
 
     param = Parameter(str(transaction).upper(), str(parameter).upper())
@@ -1033,13 +1053,17 @@ def parameter_add(ctx, transaction, parameter):
 
 
 @sap_cli.command("parupdate", short_help="Update record from database")
-@click.option("-t", "--transaction", "transaction", help="Transaction code", type=click.STRING)
-@click.option("-p", "--parameter", "parameter", prompt=True, help="Transaction's parameter", type=click.STRING)
+@click.argument("transaction", required=False, type=click.STRING)
+@click.argument("parameter", required=False, type=click.STRING)
 @click.pass_context
 def parameter_update(ctx, transaction: str, parameter: str):
     """
     \b
-    Update parameters for selected transaction
+    Update transaction's parameters for selected transaction
+    \b
+    Optional arguments:
+    1. TRANSACTION: transaction
+    2. PARAMETER: parameter for transaction
     """
 
     param = Parameter(str(transaction).upper() if transaction else None, None)

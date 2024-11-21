@@ -19,7 +19,7 @@ from sap.api import PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, CONFIG_NAME, DATABASE_NAM
 
 SapConfig = namedtuple('SapConfig', ['db_path', 'db_type', 'command_line_path', 'saplogon_path', 'public_key_path',
                                      'private_key_path', 'language', 'sequence', 'wait_site_to_load', 'time_to_clear',
-                                     'browsers_list', 'browsers_path', 'browsers_params'])
+                                     'browsers_list', 'browsers_path', 'browsers_params', 'password_strength'])
 
 
 class Config:
@@ -42,6 +42,7 @@ class Config:
             browsers_list: typing.List = [],
             browsers_path: typing.Dict = {},
             browsers_params: typing.Dict = {},
+            password_strength: int = 4
     ):
 
         self.ini_name = CONFIG_NAME
@@ -56,11 +57,11 @@ class Config:
         self.public_key_path = Path(public_key_path) if public_key_path else Path(self.config_path / PUBLIC_KEY_NAME)
         self.private_key_path = Path(private_key_path) if private_key_path else Path(
             self.config_path / PRIVATE_KEY_NAME)
-        self.language = 'EN'
 
         # TODO: сделать мультиязычность
         #   1. https://docs.python.org/3.10/library/i18n.html
         #   2. https://github.com/alexa-samples/skill-sample-python-howto/blob/master/instructions/localization.md
+        self.language = 'EN'
 
         self.sequence = sequence
         self.wait_site_to_load = wait_site_to_load
@@ -69,6 +70,7 @@ class Config:
         self.browsers_list = browsers_list
         self.browsers_path = browsers_path
         self.browsers_params = browsers_params
+        self.password_strength = password_strength
 
     def read(self):
         """Return SapConfig object after reading config file."""
@@ -92,6 +94,7 @@ class Config:
             self.wait_site_to_load = int(parser.get('AUTO-TYPE', 'wait'))
 
             self.time_to_clear = int(parser.get('PASSWORD', 'time_to_clear'))
+            self.password_strength = int(parser.get('PASSWORD', 'password_strength'))
 
             browsers_tuple = parser.items('BROWSER')
             self.browsers_list = [item[0] for item in browsers_tuple]
@@ -99,18 +102,17 @@ class Config:
             self.browsers_params = {item[0]: item[1][re.match(r'.+\.exe', item[1]).end() + 1:].split() for item
                                     in browsers_tuple}
 
-            # TODO: Сделать проверку и уведомление, если приватный ключ и база данных лежат в одной папке
-            #   db_path = pathlib.Path(self.db_path)
-            #   private_key_path = pathlib.Path(self.private_key_path)
-            #   if db_path.parent == private_key_path.parent:
-            #       click.echo(click.style(
-            #           f"\nPrivate key ({db_path}) file and Database ({private_key_path}) file have to be in a separate folders for safety reason.",
-            #           bg='red', fg='white'))
+            # Check if Private key file and Database are in the same directory
+            db_path = pathlib.Path(self.db_path)
+            private_key_path = pathlib.Path(self.private_key_path)
+            if db_path.parent == private_key_path.parent:
+                message = f"Private key file ({private_key_path}) and Database file ({db_path}) have to be placed in a separate folders for security reason."
+                utilities.print_message(message, utilities.message_type_warning)
 
             return SapConfig(self.db_path, self.db_type, self.command_line_path, self.saplogon_path,
                              self.public_key_path, self.private_key_path, self.language, self.sequence,
                              self.wait_site_to_load, self.time_to_clear, self.browsers_list, self.browsers_path,
-                             self.browsers_params)
+                             self.browsers_params, self.password_strength)
         else:
             raise ConfigDoesNotExists(self.config_file_path)
 
@@ -148,7 +150,9 @@ class Config:
 
             parser['PASSWORD'] = {
                 "; time_to_clear - Time to wait to clear clipboard with password": None,
-                'time_to_clear': 10}
+                'time_to_clear': 10,
+                "; password_strength - Password strength": None,
+                'password_strength': 5}
 
             parser['BROWSER'] = {
                 "; browser_name - Time to wait to clear clipboard with password": None,

@@ -6,7 +6,10 @@
 
 from pathlib import Path
 from datetime import datetime
+
+import click
 import pyzipper
+from sap.utilities import print_message, message_type_warning
 
 
 class Backup:
@@ -32,6 +35,7 @@ class Backup:
         Create backup file
         """
         pwd = str.encode(self.password)
+        message = ''
 
         back_file_name = f'backup_{datetime.now().strftime("%Y.%m.%d-%I.%M.%S")}.zip'
         self.backup_file_path = Path(self.backup_path / back_file_name)
@@ -40,11 +44,14 @@ class Backup:
             zip_file.setpassword(pwd)
 
             # Adding files into backup archive:
-            #TODO: Проверять, что путь сущетсвует иначе будет дамп
-            #  FileNotFoundError: [WinError 3] The system cannot find the path
-            #  specified: 'z:\\db\\sap_cmd.db'
             for file in self.files:
-                zip_file.write(file, Path(file).name)
+                if Path(file).exists():
+                    zip_file.write(file, Path(file).name)
+                else:
+                    message += f"File {file} is excluded from backup. The path doesn't exist\n"
+
+            if message:
+                print_message(message, message_type_warning)
 
             zip_file.comment = self.comment.encode()
 
