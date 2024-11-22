@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 
 """Minimal setup file for tasks project."""
@@ -7,8 +7,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='sap',
-    version='3.2.0',
+    name='sap.cli',
+    version='3.7.0',
     license='MIT',
     description='Command line tool for launching SAP systems from SAPLogon',
 

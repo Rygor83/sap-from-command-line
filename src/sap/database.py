@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 
 """ Database API """
@@ -24,12 +24,11 @@ Base = declarative_base()
 class Sap(Base):
     """ Table to store information about sap systems """
     __tablename__ = 'sap'
-    system_id = Column(String(3), primary_key=True)
-    mandant_num = Column(String(3), primary_key=True)
-    user_id = Column(String(10), primary_key=True)
+    customer = Column(String(20), primary_key=True)
+    system = Column(String(3), primary_key=True)
+    client = Column(String(3), primary_key=True)
+    user = Column(String(10), primary_key=True)
     password = Column(BLOB)
-    # TODO: 'Customer' field: make it primary as for example ALM system can exists in many customer's ecosystem
-    customer = Column(String(20))
     description = Column(String(20))
     url = Column(String(250))
     only_web = Column(String(1))
@@ -100,9 +99,9 @@ class SapDB():
 
     def add(self, sap_system):  # type (namedtuple) -> list
         """Add a system to database """
-        record = Sap(system_id=sap_system.system,
-                     mandant_num=str(sap_system.mandant).zfill(3),
-                     user_id=sap_system.user,
+        record = Sap(system=sap_system.system,
+                     client=str(sap_system.client).zfill(3),
+                     user=sap_system.user,
                      password=sap_system.password,
                      customer=sap_system.customer,
                      description=sap_system.description,
@@ -121,9 +120,9 @@ class SapDB():
     def query_system(self, sap_system):
         """ Query system from database """
 
-        query = self.session.query(Sap.system_id,
-                                   Sap.mandant_num,
-                                   Sap.user_id,
+        query = self.session.query(Sap.system,
+                                   Sap.client,
+                                   Sap.user,
                                    Sap.password,
                                    Sap.language,
                                    Sap.customer,
@@ -131,16 +130,16 @@ class SapDB():
                                    Sap.url,
                                    Sap.autotype,
                                    Sap.only_web).order_by(asc(Sap.customer),
-                                                          asc(Sap.system_id),
-                                                          asc(Sap.mandant_num),
-                                                          asc(Sap.user_id))
+                                                          asc(Sap.system),
+                                                          asc(Sap.client),
+                                                          asc(Sap.user))
         if sap_system.system:
             # noinspection PyUnresolvedReferences
-            query = query.filter(Sap.system_id.ilike(f"%{sap_system.system}%"))
-        if sap_system.mandant:
-            query = query.filter(Sap.mandant_num.ilike(f"%{sap_system.mandant}%"))
+            query = query.filter(Sap.system.ilike(f"%{sap_system.system}%"))
+        if sap_system.client:
+            query = query.filter(Sap.client.ilike(f"%{sap_system.client}%"))
         if sap_system.user:
-            query = query.filter(Sap.user_id.ilike(f"%{sap_system.user}%"))
+            query = query.filter(Sap.user.ilike(f"%{sap_system.user}%"))
         if sap_system.customer:
             query = query.filter(Sap.customer.ilike(f"%{sap_system.customer}%"))
         if sap_system.description:
@@ -156,8 +155,8 @@ class SapDB():
         query = self.session.query(Sap)
         try:
             # noinspection PyUnresolvedReferences
-            result = query.filter(Sap.system_id == sap_system.system, Sap.mandant_num == sap_system.mandant,
-                                  Sap.user_id == sap_system.user).one()
+            result = query.filter(Sap.system == sap_system.system, Sap.client == sap_system.client,
+                                  Sap.user == sap_system.user).one()
         except NoResultFound:
             return None
 
@@ -178,8 +177,8 @@ class SapDB():
         query = self.session.query(Sap)
         try:
             # noinspection PyUnresolvedReferences
-            result = query.filter(Sap.system_id == sap_system.system, Sap.mandant_num == sap_system.mandant,
-                                  Sap.user_id == sap_system.user).one()
+            result = query.filter(Sap.system == sap_system.system, Sap.client == sap_system.client,
+                                  Sap.user == sap_system.user).one()
         except NoResultFound:
             return result
 

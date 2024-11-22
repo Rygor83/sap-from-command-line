@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2024.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 
 """ Config file management """
@@ -152,7 +152,7 @@ class Config:
                 "; time_to_clear - Time to wait to clear clipboard with password": None,
                 'time_to_clear': 10,
                 "; password_strength - Password strength": None,
-                'password_strength': 5}
+                'password_strength': 0}
 
             parser['BROWSER'] = {
                 "; browser_name - Time to wait to clear clipboard with password": None,

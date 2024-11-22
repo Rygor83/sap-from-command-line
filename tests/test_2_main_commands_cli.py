@@ -22,7 +22,7 @@ PASSWORD = '12345678'
 UPDATED_PASSWORD = '1029384756'
 
 sap_system_1 = sap.Sap_system(system='ZZZ',
-                              mandant='999',
+                              client='999',
                               user='USER25',
                               password=PASSWORD,
                               language='EN',
@@ -32,7 +32,7 @@ sap_system_1 = sap.Sap_system(system='ZZZ',
                               autotype='',
                               only_web='yes', )
 sap_system_2 = sap.Sap_system(system='YYY',
-                              mandant='998',
+                              client='998',
                               user='USER21',
                               password=PASSWORD,
                               language='EN',
@@ -42,7 +42,7 @@ sap_system_2 = sap.Sap_system(system='YYY',
                               autotype='{USER}{TAB}{PASS}{ENTER}',
                               only_web='yes', )
 sap_system_3 = sap.Sap_system(system='XXX',
-                              mandant='100',
+                              client='100',
                               user='USER15',
                               password=PASSWORD,
                               language='EN',
@@ -52,7 +52,7 @@ sap_system_3 = sap.Sap_system(system='XXX',
                               autotype='{USER}{TAB}{PASS}{ENTER}',
                               only_web='yes', )
 sap_system_1_updated = sap.Sap_system(system='ZZZ',
-                                      mandant='999',
+                                      client='999',
                                       user='USER25',
                                       password=UPDATED_PASSWORD,
                                       language='EN',
@@ -62,7 +62,7 @@ sap_system_1_updated = sap.Sap_system(system='ZZZ',
                                       autotype='',
                                       only_web='no', )
 sap_system_2_updated = sap.Sap_system(system='YYY',
-                                      mandant='998',
+                                      client='998',
                                       user='USER21',
                                       password=PASSWORD,
                                       language='EN',
@@ -73,7 +73,7 @@ sap_system_2_updated = sap.Sap_system(system='YYY',
                                       only_web='no', )
 
 non_existing_system = Sap_system(system='BBB',
-                                 mandant='',
+                                 client='',
                                  user='',
                                  password='',
                                  language='',
@@ -103,7 +103,7 @@ def test_add_system_1(runner, temp_start_cli, mocker):
                            args=["--config_path", temp_start_cli,
                                  "add",
                                  "-system", sap_system_1.system,
-                                 "-mandant", sap_system_1.mandant,
+                                 "-client", sap_system_1.client,
                                  "-user", sap_system_1.user,
                                  "-password", sap_system_1.password,
                                  "-language", sap_system_1.language,
@@ -128,7 +128,7 @@ def test_add_system_2_with_url(runner, temp_start_cli, mocker):
                            args=["--config_path", temp_start_cli,
                                  "add",
                                  "-system", sap_system_2.system,
-                                 "-mandant", sap_system_2.mandant,
+                                 "-client", sap_system_2.client,
                                  "-user", sap_system_2.user,
                                  "-password", sap_system_2.password,
                                  "-language", sap_system_2.language,
@@ -151,7 +151,7 @@ def test_add_system_3_verbose(runner, temp_start_cli, mocker):
                            args=["--config_path", temp_start_cli,
                                  "add",
                                  "-system", sap_system_3.system,
-                                 "-mandant", sap_system_3.mandant,
+                                 "-client", sap_system_3.client,
                                  "-user", sap_system_3.user,
                                  "-password", sap_system_3.password,
                                  "-language", sap_system_3.language,
@@ -177,7 +177,7 @@ def test_add_system_1_no_config_exists(runner, tmp_path, mocker):  # , temp_star
                            args=["--config_path", tmp_path,
                                  "add",
                                  "-system", sap_system_1.system,
-                                 "-mandant", sap_system_1.mandant,
+                                 "-client", sap_system_1.client,
                                  "-user", sap_system_1.user,
                                  "-password", sap_system_1.password,
                                  "-language", sap_system_1.language,
@@ -204,7 +204,7 @@ def test_add_system_1_no_database_exists(runner, tmp_path, mocker, config_tmp_pa
                            args=["--config_path", tmp_path,
                                  "add",
                                  "-system", sap_system_1.system,
-                                 "-mandant", sap_system_1.mandant,
+                                 "-client", sap_system_1.client,
                                  "-user", sap_system_1.user,
                                  "-password", sap_system_1.password,
                                  "-language", sap_system_1.language,
@@ -240,14 +240,14 @@ def test_list_existing_systems_show_passwords_cli(runner, temp_start_cli, mocker
     assert flat_actual(result.output) == flat_expected(*[sap_system_1, sap_system_2, sap_system_3])
 
 
-def test_list_existing_system_with_system_mandant_cli(runner, temp_start_cli, mocker):
+def test_list_existing_system_with_system_client_cli(runner, temp_start_cli, mocker):
     """
-    Test LIST command: list system with specific system and mandant
-    'sap list system_id mandant'
+    Test LIST command: list system with specific system and client
+    'sap list system_id client'
     """
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli,
-                           args=["--config_path", temp_start_cli, "list", sap_system_1.system, sap_system_1.mandant])
+                           args=["--config_path", temp_start_cli, "list", sap_system_1.system, sap_system_1.client])
     assert flat_actual(result.output) == flat_expected(sap_system_1)
 
 
@@ -261,20 +261,20 @@ def test_list_existing_system_with_system_only_cli(runner, temp_start_cli, mocke
     assert flat_actual(result.output) == flat_expected(sap_system_1)
 
 
-def test_list_existing_system_with_mandant_only_cli(runner, temp_start_cli, mocker):
+def test_list_existing_system_with_client_only_cli(runner, temp_start_cli, mocker):
     """
-    Test LIST command: list system with specific mandant
-    'sap list % mandant'
+    Test LIST command: list system with specific client
+    'sap list % client'
     """
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
-    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "%", sap_system_1.mandant])
+    result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "%", sap_system_1.client])
     assert flat_actual(result.output) == flat_expected(sap_system_1)
 
 
-def test_list_existing_system_with_only_partial_mandant_cli(runner, temp_start_cli, mocker):
+def test_list_existing_system_with_only_partial_client_cli(runner, temp_start_cli, mocker):
     """
-    Test LIST command: list system with specific partial mandant
-    'sap list % mandant'
+    Test LIST command: list system with specific partial client
+    'sap list % client'
     """
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "list", "%", "99"])
@@ -398,7 +398,7 @@ def test_pw_no_existing_system_cli(runner, temp_start_cli, mocker):
     """
 
     non_existing_system = 'BBB'
-    sap_system_bbb = Sap_system(non_existing_system, mandant='', user='', password='', language='', customer='',
+    sap_system_bbb = Sap_system(non_existing_system, client='', user='', password='', language='', customer='',
                                 description='', url='', autotype='', only_web='')
 
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
@@ -419,7 +419,7 @@ def test_run_existing_system_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'open_sap', new=stub_open_sap)  # do not open sap, but print command parameters
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "run", sap_system_2.system])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=1')
 
 
 def test_run_existing_system_with_user_cli(runner, temp_start_cli, mocker):
@@ -433,7 +433,7 @@ def test_run_existing_system_with_user_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'open_sap', new=stub_open_sap)  # do not open sap, but print command parameters
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "run", "-u", sap_system_2.user])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=1')
 
 
 def test_run_existing_system_new_window_cli(runner, temp_start_cli, mocker):
@@ -447,7 +447,7 @@ def test_run_existing_system_new_window_cli(runner, temp_start_cli, mocker):
     mocker.patch.object(sap.utilities, 'open_sap', new=stub_open_sap)  # do not open sap, but print command parameters
     result = runner.invoke(sap_cli, args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-n"])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=0')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=0')
 
 
 def test_run_existing_system_english_language_cli(runner, temp_start_cli, mocker):
@@ -464,7 +464,7 @@ def test_run_existing_system_english_language_cli(runner, temp_start_cli, mocker
     result = runner.invoke(sap_cli,
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-l", language])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language={language} -maxgui -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language={language} -maxgui -reuse=1')
 
 
 def test_run_existing_system_external_user_cli(runner, temp_start_cli, mocker):
@@ -483,7 +483,7 @@ def test_run_existing_system_external_user_cli(runner, temp_start_cli, mocker):
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-eu"],
                            input=f"{external_user}\n{external_password}\n")
     assert str(result.output).replace("\n", "") == (
-        f'Enter external user id: Warning: Password input may be echoed.Enter password for external user: "path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={external_user} -pw={external_password} -language=RU -maxgui -reuse=1')
+        f'Enter external user id: Warning: Password input may be echoed.Enter password for external user: "path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={external_user} -pw={external_password} -language=RU -maxgui -reuse=1')
 
 
 def test_run_existing_system_with_transaction_cli(runner, temp_start_cli, mocker):
@@ -500,7 +500,7 @@ def test_run_existing_system_with_transaction_cli(runner, temp_start_cli, mocker
     result = runner.invoke(sap_cli,
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-t", transaction_code])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command={transaction_code} -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command={transaction_code} -reuse=1')
 
 
 def test_run_existing_system_with_transaction_and_parameter_cli(runner, temp_start_cli, mocker):
@@ -520,7 +520,7 @@ def test_run_existing_system_with_transaction_and_parameter_cli(runner, temp_sta
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-t",
                                  transaction_code, "-p", view_name])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command="*{transaction_code} VIEWNAME={view_name};" -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command="*{transaction_code} VIEWNAME={view_name};" -reuse=1')
 
 
 def test_run_existing_system_with_transaction_and_parameter_show_log_cli(runner, temp_start_cli, mocker):
@@ -540,7 +540,7 @@ def test_run_existing_system_with_transaction_and_parameter_show_log_cli(runner,
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system,
                                  "-t", transaction_code, "-p", view_name])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command="*{transaction_code} VIEWNAME={view_name};" -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=transaction -command="*{transaction_code} VIEWNAME={view_name};" -reuse=1')
 
 
 def test_run_existing_system_with_system_command_cli(runner, temp_start_cli, mocker):
@@ -557,7 +557,7 @@ def test_run_existing_system_with_system_command_cli(runner, temp_start_cli, moc
     result = runner.invoke(sap_cli,
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-s", system_command])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=SystemCommand -command={system_command} -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=SystemCommand -command={system_command} -reuse=1')
 
 
 def test_run_existing_system_with_report_cli(runner, temp_start_cli, mocker):
@@ -574,7 +574,7 @@ def test_run_existing_system_with_report_cli(runner, temp_start_cli, mocker):
     result = runner.invoke(sap_cli,
                            args=["--config_path", temp_start_cli, "run", sap_system_2.system, "-r", report_name])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=report -command={report_name} -reuse=1')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -type=report -command={report_name} -reuse=1')
 
 
 def test_run_web_existing_system_cli(runner, temp_start_cli, mocker):
@@ -612,7 +612,7 @@ def test_run_web_no_existing_system_cli(runner, temp_start_cli, mocker):
     Test RUN command: Request for a non-existent system's web version
     'sap run system_id -w'
     """
-    non_existing_sap_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
+    non_existing_sap_system = Sap_system(system='BBB', client='', user='', password='', customer='', description='',
                                          url='', autotype='')
 
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
@@ -634,7 +634,7 @@ def test_debug_existing_system_cli(runner, temp_start_cli, mocker):
     result = runner.invoke(sap_cli,
                            args=["--config_path", temp_start_cli, "debug", sap_system_2.system])
     assert str(result.output).replace("\n", "") == (
-        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.mandant} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=1 -command=/H -type=SystemCommand')
+        f'"path to sapshcut.exe file." -system={sap_system_2.system} -client={sap_system_2.client} -user={sap_system_2.user} -pw={sap_system_2.password} -language=RU -maxgui -reuse=1 -command=/H -type=SystemCommand')
 
 
 def test_debug_no_existing_system_cli(runner, temp_start_cli, mocker):
@@ -643,7 +643,7 @@ def test_debug_no_existing_system_cli(runner, temp_start_cli, mocker):
     'sap debug non_existent_system_id'
     """
 
-    non_existing_sap_system = Sap_system(system='BBB', mandant='', user='', password='', customer='', description='',
+    non_existing_sap_system = Sap_system(system='BBB', client='', user='', password='', customer='', description='',
                                          url='', autotype='')
 
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
@@ -696,10 +696,10 @@ def test_logon_wrong_saplogon_path_cli(runner, temp_start_cli, mocker):
         'following path: path to saplogon.exe file.Aborted.')
 
 
-def test_update_requesting_system_mandant_cli(runner, temp_start_cli, mocker):
+def test_update_requesting_system_client_cli(runner, temp_start_cli, mocker):
     """
     Test UPDATE command: updating specific system
-    'sap update system_id mandant'
+    'sap update system_id client'
     """
     mocker.patch.object(sap.utilities, 'print_system_list', new=stub_print_system_list)
     result = runner.invoke(sap_cli, args=["-path", temp_start_cli, "update", "zzz", "999"],

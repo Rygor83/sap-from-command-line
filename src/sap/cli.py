@@ -1,23 +1,22 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2024.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 
 """ Command line interface for sap-from-command-line tool """
+# TODO: use typing for type hints
+#  import typing
 
-import typing
 import ctypes
 import os
 from pathlib import Path
 import sys
 from contextlib import contextmanager
 import logging
-import time
 import click_log
 import click
 import pyperclip
 
 import rich_click as click  # rich help output. Do not delete it as it works in background
-from click import Abort
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -26,10 +25,9 @@ from sap import utilities
 from sap.api import Sap_system, Obj_structure, Parameter
 from sap.config import create_config, open_config, open_folder
 from sap.crypto import Crypto
-from sap.database import SapDB, database_exists
+from sap.database import SapDB
 from sap.api import DEBUG_FILE_NAME, SAPLOGON_INI
 from sap.exceptions import ConfigDoesNotExists, WrongPath, ConfigExists, EncryptionKeysAlreadyExist, DatabaseExists
-from sap.exceptions import DatabaseDoesNotExists
 from sap.backup import Backup
 
 if (sys.version_info[0] < 3) or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
@@ -54,7 +52,9 @@ log_level = ['--log_level', '-l']
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option('-path', '--config_path', 'config_path', help="Path to external sap_config.ini folder", type=click.Path())
-@click.version_option(version=sap.__version__)
+@click.version_option(version=sap.__version__,
+                      prog_name='sap.cli',
+                      message="%(prog)s %(version)s. Windows Command line tool for launching SAP systems from SAPlogon for SAP consultants and advanced SAP users.")
 @click_log.simple_verbosity_option(logger, *log_level, default='ERROR')
 @click.pass_context
 def sap_cli(ctx, config_path: str):
@@ -94,11 +94,12 @@ def sap_cli(ctx, config_path: str):
     ctx.obj.database = SapDB(db_path=ctx.obj.config.db_path if ctx.obj.config.db_path else '')
 
     # Database existence check before prompting values, for example, for ADD command
-    if not Path(ctx.obj.config.db_path).exists():
+    if not Path(ctx.obj.config.db_path).exists() and not ctx.invoked_subcommand in ['config', 'shortcut', 'logon',
+                                                                                    'keys', 'db', 'backup', 'start']:
         message = f'Database does not exist or there is no possibility for connection.'
         message += f'\nCheck the following path: {ctx.obj.config.db_path}'
         utilities.print_message(message, utilities.message_type_error)
-        raise Abort
+        raise click.Abort
 
 
 @sap_cli.command("logon")
@@ -112,25 +113,25 @@ def logon(ctx, saplogon_path):
 
 @sap_cli.command("shut")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.pass_context
-def shut(ctx, system: str, mandant: str):
+def shut(ctx, system: str, client: str):
     """
     \b
     Shut down the selected system\n
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system id
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
     # SAP RUN SYS_ID -s /nex
 
-    ctx.invoke(run, system=system, mandant=mandant, system_command='/nex')
+    ctx.invoke(run, system=system, client=client, system_command='/nex')
 
 
 @sap_cli.command("run")
 @click.argument("system", required=False, type=utilities.SYSTEM_ID)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING)
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -160,7 +161,7 @@ def shut(ctx, system: str, mandant: str):
               help=f"Choose a browser to open selected SAP system: {utilities.list_of_browsers()}",
               type=utilities.BROWSER)
 @click.pass_context
-def run(ctx, system: str, mandant: int, user: str, customer: str, description: str, external_user: bool,
+def run(ctx, system: str, client: int, user: str, customer: str, description: str, external_user: bool,
         language: str, guiparm: str, snc_name: str, snc_qop: str, transaction: str, system_command: str, report: str,
         parameter: str, web: bool, timeout: int, reuse: bool, signin: bool, browser: str):
     """
@@ -169,7 +170,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system id
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
 
     if snc_name is not None and snc_qop is None or snc_name is None and snc_qop is not None:
@@ -177,7 +178,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                                 utilities.message_type_warning)
         raise click.Abort
 
-    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+    query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                               description=description,
                               url=web, verbose=False, enum=True)
     if not query_result:
@@ -206,7 +207,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
                 utilities.open_url(f"{selected_system.url}")
 
             if signin:
-                ctx.invoke(login, system=selected_system.system, mandant=selected_system.mandant,
+                ctx.invoke(login, system=selected_system.system, client=selected_system.client,
                            user=selected_system.user, customer=selected_system.customer,
                            description=selected_system.description,
                            language=language if language else selected_system.language, timeout=timeout,
@@ -214,7 +215,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
         else:
             no_system_found = Sap_system(system.upper() if system else None,
-                                         str(mandant).zfill(3) if mandant else None,
+                                         str(client).zfill(3) if client else None,
                                          user.upper() if user else None,
                                          None,
                                          None,
@@ -232,8 +233,14 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
         argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
             selected_system,
             external_user,
-            guiparm, snc_name, snc_qop,
-            transaction, parameter, report, system_command, reuse,
+            guiparm,
+            snc_name,
+            snc_qop,
+            transaction,
+            parameter,
+            report,
+            system_command,
+            reuse,
             ctx.obj.config.command_line_path,
             language)
 
@@ -253,7 +260,7 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
 
 @sap_cli.command("login")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -262,12 +269,12 @@ def run(ctx, system: str, mandant: int, user: str, customer: str, description: s
               help='Timer in seconds to wait web site to load')
 @click.option("-m", "--minimize", "minimize", show_default=True, default=True, is_flag=True)
 @click.pass_context
-def login(ctx, system: str, mandant: int, user: str, customer: str, description: str, language: str, timeout: int,
+def login(ctx, system: str, client: int, user: str, customer: str, description: str, language: str, timeout: int,
           minimize: bool):
     """
     Login to web system: enter user and password. The website has to be opened.
     """
-    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+    query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                               description=description, url="", verbose=False, enum=True)
     if not query_result:
         return
@@ -283,7 +290,7 @@ def login(ctx, system: str, mandant: int, user: str, customer: str, description:
 
 @sap_cli.command("debug", short_help="System debug: either create debug file or start system debugging")
 @click.argument("system", required=False, type=utilities.SYSTEM_ID)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -297,18 +304,18 @@ def login(ctx, system: str, mandant: int, user: str, customer: str, description:
 @click.option('-open/-not_open', "open_file", help="Open/Not Open: file with debug file", is_flag=True,
               default=True, show_default=True)
 @click.pass_context
-def debug(ctx, system: str, mandant: str, user: str, customer: str, description: str, guiparm: str,
+def debug(ctx, system: str, client: str, user: str, customer: str, description: str, guiparm: str,
           snc_name: str, snc_qop: str, file: bool, open_file: bool):
     """
     \b
     System debug
     You can:
     1. Creat debug file - to debug modal dialog box: run 'sap debug -f'
-    2. Start debugging of the opened system (the last used windows will be used): run 'sap debug <system> <mandant>'
+    2. Start debugging of the opened system (the last used windows will be used): run 'sap debug <system> <client>'
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
 
     if file:
@@ -335,7 +342,7 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
             utilities.open_url(url=str(debug_file_path), locate=True)
 
     else:
-        query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+        query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                                   description=description,
                                   url=False, verbose=False, enum=True)
         if not query_result:
@@ -350,9 +357,9 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
             argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
-                selected_system, None, guiparm, snc_name,
-                snc_qop, None, None, None, None, None,
-                ctx.obj.config.command_line_path)
+                selected_system, guiparm=guiparm, snc_name=snc_name, snc_qop=snc_qop,
+                sapshcut_exe_path=ctx.obj.config.command_line_path)
+
         except WrongPath as err:
             click.echo(f"{err}")
             raise click.Abort
@@ -368,22 +375,22 @@ def debug(ctx, system: str, mandant: str, user: str, customer: str, description:
 
 @sap_cli.command("stat")
 @click.argument("system", required=False, type=utilities.SYSTEM_ID)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.pass_context
-def stat(ctx, system: str, mandant: str, user: str, customer: str, description: str):
+def stat(ctx, system: str, client: str, user: str, customer: str, description: str):
     """
     \b
     Displays 'System: status' window \n
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system id
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
 
-    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+    query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                               description=description,
                               url=False, verbose=False, enum=True)
     # --------------------------
@@ -393,9 +400,8 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
         selected_system = utilities.choose_system(selected_sap_systems)
         try:
             argument, selected_system, command, command_type = utilities.prepare_parameters_to_launch_system(
-                selected_system, None,
-                None, None, None, None, None, None, None, None,
-                ctx.obj.config.command_line_path)
+                selected_system, sapshcut_exe_path=ctx.obj.config.command_line_path
+            )
 
         except WrongPath as err:
             click.echo(f"{err}")
@@ -413,7 +419,7 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
 @sap_cli.command("copy")
 @click.argument("command", required=True, type=click.STRING)
 @click.argument("system", required=False, type=utilities.SYSTEM_ID)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -423,7 +429,7 @@ def stat(ctx, system: str, mandant: str, user: str, customer: str, description: 
               type=click.INT, help='Timer in seconds to clear clipboard',
               cls=utilities.default_from_context('time_to_clear'))
 @click.pass_context
-def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str, description: str,
+def copy(ctx, command: str, system: str, client: int, user: str, customer: str, description: str,
          clear_clipboard: bool,
          timeout: int):
     """
@@ -434,10 +440,10 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
     1. COMMAND: What value to copy: user, password, URL
     Optional argument:
     1. SYSTEM: Request a SAP system by system id
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
 
-    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+    query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                               description=description,
                               url=False, verbose=False, enum=True)
     # --------------------------
@@ -485,13 +491,13 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
 
 
 @sap_cli.command("add")
+@click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
 @click.option("-system", prompt=True, help="System Id", type=utilities.SYSTEM_ID)
-@click.option("-mandant", prompt=True, help="Mandant/Client number", type=utilities.MANDANT)
+@click.option("-client", prompt=True, help="client/Client number", type=utilities.client)
 @click.option("-user", prompt=True, help="User")
 @click.option("-password", help="Password", prompt=True, confirmation_prompt=True, hide_input=True,
               type=utilities.PASS_REQUIREMENT)
 @click.option("-language", help="Default SAP system language", prompt=True, type=utilities.DEFAULT_LANG)
-@click.option("-customer", prompt=True, help="Customer name", type=click.STRING, default="")
 @click.option("-description", prompt=True, help="SAP system description", type=click.STRING, default="")
 @click.option("-url", prompt=True, help="SAP system Url", type=click.STRING, default="")
 @click.option("-autotype", prompt=True, help="Autotype sequence for logining to web site",
@@ -504,7 +510,7 @@ def copy(ctx, command: str, system: str, mandant: int, user: str, customer: str,
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
 @click.pass_context
-def add(ctx, system: str, mandant: str, user: str, password: str, language: str, description: str, customer: str,
+def add(ctx, system: str, client: str, user: str, password: str, language: str, description: str, customer: str,
         url: str, autotype: str, only_web: str, verbose: bool, timeout: int):
     """
     Add sap system with its parameters to db. Just run 'sap add' and follow instructions.
@@ -514,8 +520,8 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
         encrypted_password = ctx.obj.crypto.encrypto(str.encode(password))
         sap_system = Sap_system(
             str(system).upper(),
-            str(mandant).zfill(3),
-            str(user).upper(),
+            str(client).zfill(3),
+            str(user).upper() if '@' not in user else str(user),
             encrypted_password,
             str(language).upper(),
             str(customer),
@@ -532,7 +538,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
             click.echo(result)
         else:
             sap_system = Sap_system(str(system).upper() if system else None,
-                                    str(mandant) if mandant else None,
+                                    str(client) if client else None,
                                     user.upper() if user else None,
                                     None, None, None, None, None, None, None)
             result = sap.query_system(sap_system)
@@ -546,7 +552,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
 
 @sap_cli.command("update", short_help="Update record from database")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
@@ -556,7 +562,7 @@ def add(ctx, system: str, mandant: str, user: str, password: str, language: str,
 @click.option("-time", "--timeout", "timeout", help="Timeout to clear passwords from screen if '-v' option is used",
               type=click.INT, default=0)
 @click.pass_context
-def update(ctx, system: str, mandant: str, user: str, customer: str, description: str, only_web: str, verbose: bool,
+def update(ctx, system: str, client: str, user: str, customer: str, description: str, only_web: str, verbose: bool,
            timeout: int):
     """
     \b
@@ -564,10 +570,10 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system id
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
 
-    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+    query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                               description=description, only_web=only_web,
                               url=False, verbose=False, enum=True)
     # --------------------------
@@ -600,7 +606,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 
         sap_encrypted_system = Sap_system(
             str(selected_system.system).upper(),
-            str(selected_system.mandant).zfill(3),
+            str(selected_system.client).zfill(3),
             str(selected_system.user).upper(),
             ctx.obj.crypto.encrypto(str.encode(password_new)),
             str(language_new),
@@ -625,7 +631,7 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
                                             timeout=timeout if timeout else ctx.obj.config.time_to_clear)
             else:
                 no_system_found = Sap_system(system.upper() if system else None,
-                                             str(mandant).zfill(3) if mandant else None,
+                                             str(client).zfill(3) if client else None,
                                              user.upper() if user else None,
                                              None,
                                              None,
@@ -639,24 +645,24 @@ def update(ctx, system: str, mandant: str, user: str, customer: str, description
 
 @sap_cli.command("delete")
 @click.argument("system", required=False, type=click.STRING)
-@click.argument("mandant", required=False, type=utilities.MANDANT)
+@click.argument("client", required=False, type=utilities.client)
 @click.option("-u", "--user", "user", help="Request a SAP system by user")
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING)
 @click.option("-confirm", "--confirm", "confirm", help="Confirm delete command", is_flag=True, default=False,
               show_default=True)
 @click.pass_context
-def delete(ctx, system: str, mandant: str, user: str, customer: str, description: str, confirm):
+def delete(ctx, system: str, client: str, user: str, customer: str, description: str, confirm):
     """
     \b
     Delete requested record about SAP system from database\n
     \b
     Optional arguments:
     1. SYSTEM: Request a SAP system by system id
-    2. MANDANT: Request a SAP system by mandant/client
+    2. CLIENT: Request a SAP system by client/client
     """
 
-    query_result = ctx.invoke(list_systems, system=system, mandant=mandant, user=user, customer=customer,
+    query_result = ctx.invoke(list_systems, system=system, client=client, user=user, customer=customer,
                               description=description, url=False, verbose=False, enum=True)
     # --------------------------
     if query_result:
@@ -672,7 +678,7 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
                           abort=True, default=confirm)
 
         system_to_delete = Sap_system(selected_system.system,
-                                      selected_system.mandant,
+                                      selected_system.client,
                                       selected_system.user,
                                       selected_system.password,
                                       selected_system.language,
@@ -692,7 +698,7 @@ def delete(ctx, system: str, mandant: str, user: str, customer: str, description
                 utilities.print_system_list(system_to_delete, title="The following system is DELETED from database")
             else:
                 no_system_found = Sap_system(system.upper() if system else None,
-                                             str(mandant).zfill(3) if mandant else None,
+                                             str(client).zfill(3) if client else None,
                                              user.upper() if user else None,
                                              None,
                                              None,
@@ -728,7 +734,7 @@ def config(ctx):
 
 @sap_cli.command("list", short_help="Print information about SAP systems")
 @click.argument("system", required=False, type=click.STRING, default=None)
-@click.argument("mandant", required=False, type=utilities.MANDANT, default=None)
+@click.argument("client", required=False, type=utilities.client, default=None)
 @click.option("-u", "--user", "user", help="Request a SAP system by user", type=click.STRING, default=None)
 @click.option("-c", "--customer", "customer", help="Request a SAP system by customer", type=click.STRING, default=None)
 @click.option("-d", "--description", "description", help="Request a SAP system by description", type=click.STRING,
@@ -743,7 +749,7 @@ def config(ctx):
               type=click.INT, default=0)
 @click.option("-e", "--enum", "enum", help="Flag. Enumerate systems", is_flag=True, default=False, show_default=True)
 @click.pass_context
-def list_systems(ctx, system: str, mandant: int, user: str, customer: str, description: str, url: bool, only_web: str,
+def list_systems(ctx, system: str, client: int, user: str, customer: str, description: str, url: bool, only_web: str,
                  verbose: bool, timeout: int, enum: bool) -> list:
     """
     \b
@@ -751,7 +757,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
     \b
     Optional arguments:
     1. System: Request a SAP system by system id
-    2. Mandant: Request a SAP system by mandant/client\n
+    2. CLIENT: Request a SAP system by client/client\n
     \b
     If no arguments - print information about all SAP systems from database
     """
@@ -760,7 +766,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
 
     with _sap_db(ctx.obj.config):
         sap_system_sql = Sap_system(str(system).upper() if system else None,
-                                    str(mandant) if mandant else None,
+                                    str(client) if client else None,
                                     user if user else None,
                                     None,
                                     None,
@@ -773,7 +779,7 @@ def list_systems(ctx, system: str, mandant: int, user: str, customer: str, descr
 
         if not result:
             no_system_found = Sap_system(str(system).upper() if system else "",
-                                         str(mandant).zfill(3) if mandant else "",
+                                         str(client).zfill(3) if client else "",
                                          user.upper() if user else "",
                                          "",
                                          "",
@@ -891,7 +897,7 @@ def start(ctx, skip_message):
 
         click.pause('\nPress enter to open files folder and start working. Good luck.')
 
-        click.launch(ctx.obj.config.config_file_path, locate=True)
+        click.launch(str(ctx.obj.config.config_file_path), locate=True)
     else:
         click.echo(ctx.obj.config.config_file_path)
 
@@ -940,7 +946,8 @@ def backup(ctx, password, skip_message):
             try:
                 click.launch(url=back_path, locate=True)
             except TypeError as err:
-                pass
+                click.echo(click.style(f"{err}", **utilities.color_warning))
+                raise click.Abort
         else:
             click.echo(backup_obj.backup_file_path)
     else:

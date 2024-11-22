@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2022.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 
 """ sap's module API """
@@ -8,7 +8,7 @@ from collections import namedtuple
 import click
 from sap.exceptions import DatabaseDoesNotExists
 
-Sap_system = namedtuple('SAP', ['system', 'mandant', 'user', 'password', 'language', 'customer', 'description', 'url',
+Sap_system = namedtuple('SAP', ['system', 'client', 'user', 'password', 'language', 'customer', 'description', 'url',
                                 'autotype', 'only_web'])
 Sap_system.__new__.__defaults__ = (None, None, None, None, None, None, None, None, None)
 
@@ -23,8 +23,8 @@ def query_system(sap_system: Sap_system):
     #     raise TypeError('sap must be Sap object')
     # if not isinstance(sap_system.system, str) and sap_system.system is not None:
     #     raise ValueError('sap.system must be string')
-    # if not sap_system.mandant.isnumeric() and sap_system.mandant is not None:
-    #     raise ValueError('sap.mandant must contain only numbers')
+    # if not sap_system.client.isnumeric() and sap_system.client is not None:
+    #     raise ValueError('sap.client must contain only numbers')
     # if not isinstance(sap_system.user, str) and sap_system.user is not None:
     #     raise ValueError('sap.user must be str')
     # if not isinstance(sap_system.password, bytes) and sap_system.password is not None:
@@ -43,8 +43,8 @@ def add(sap_system: Sap_system):
     #     raise TypeError('sap must be Sap object')
     # if not isinstance(sap_system.system, str):
     #     raise ValueError('sap.system must be string')
-    # if not sap_system.mandant.isnumeric():
-    #     raise ValueError('sap.mandant must contain only numbers')
+    # if not sap_system.client.isnumeric():
+    #     raise ValueError('sap.client must contain only numbers')
     # if not isinstance(sap_system.user, str):
     #     raise ValueError('sap.user must be str')
     # if not isinstance(sap_system.password, bytes):
@@ -64,8 +64,8 @@ def update(sap_system: Sap_system):
     #     raise TypeError('sap must be Sap object')
     # if not isinstance(sap_system.system, str):
     #     raise ValueError('sap.system must be string')
-    # if not sap_system.mandant.isnumeric():
-    #     raise ValueError('sap.mandant must contain only numbers')
+    # if not sap_system.client.isnumeric():
+    #     raise ValueError('sap.client must contain only numbers')
     # if not isinstance(sap_system.user, str):
     #     raise ValueError('sap.user must be str')
 
@@ -78,8 +78,8 @@ def delete(sap_system: Sap_system):
     #     raise TypeError('sap must be Sap object')
     # if not isinstance(sap_system.system, str):
     #     raise ValueError('sap.system must be string')
-    # if not sap_system.mandant.isnumeric():
-    #     raise ValueError('sap.mandant must contain only numbers')
+    # if not sap_system.client.isnumeric():
+    #     raise ValueError('sap.client must contain only numbers')
     # if not isinstance(sap_system.user, str):
     #     raise ValueError('sap.user must be str')
 

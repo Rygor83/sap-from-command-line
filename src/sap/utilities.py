@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2024.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 
 """ helpful functions """
@@ -14,7 +14,7 @@ import typing
 import sap.api
 import sap.config
 from sap.api import Sap_system, Parameter
-from sap.exceptions import WrongPath, FailedRequirements, DatabaseDoesNotExists
+from sap.exceptions import WrongPath, FailedRequirements
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -22,7 +22,7 @@ from rich.table import Table
 from rich import box
 from rich.panel import Panel
 from rich.text import Text
-from rich.prompt import IntPrompt, Prompt
+from rich.prompt import IntPrompt
 from rich.progress import track
 
 from rich_click.rich_click import (
@@ -44,10 +44,18 @@ message_type_sensitive = "Sensitive"
 message_type_error = "Error"
 
 
-def prepare_parameters_to_launch_system(selected_system: Sap_system, external_user: bool = '', guiparm: str = '',
-                                        snc_name: str = '', snc_qop: str = '', transaction: str = '',
-                                        parameter: str = '', report: str = '', system_command: str = '',
-                                        reuse: bool = '', sapshcut_exe_path: str = "", language: str = ''):
+def prepare_parameters_to_launch_system(selected_system: Sap_system,
+                                        external_user: bool = '',
+                                        guiparm: str = '',
+                                        snc_name: str = '',
+                                        snc_qop: str = '',
+                                        transaction: str = '',
+                                        parameter: str = '',
+                                        report: str = '',
+                                        system_command: str = '',
+                                        reuse: bool = False,
+                                        sapshcut_exe_path: Path = "",
+                                        language: str = ''):
     """
     Constructing a string to start the system
     :param selected_system:
@@ -60,12 +68,16 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, external_us
     :param parameter:
     :param report:
     :param system_command:
+    :param reuse:
     :param sapshcut_exe_path:
     :return:
     """
 
     # TODO: переделать, чтобы у нужных параметров были дефолтные значения, а это будет означать, что можно
     #    не передавать параметры при вызове - а значит нужно будет убрать множество None
+
+    password = ''
+    user = ''
 
     try:
         check_if_path_exists(sapshcut_exe_path)
@@ -76,7 +88,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, external_us
     argument: str = ""
     argument = argument + f'"{sapshcut_exe_path}"'  # Путь до sapshcut.exe
     argument = argument + f" -system={selected_system.system}"  # Id системы
-    argument = argument + f" -client={str(selected_system.mandant).zfill(3)}"  # Номер манданта
+    argument = argument + f" -client={str(selected_system.client).zfill(3)}"  # Номер манданта
 
     if external_user:
         user = click.prompt("\nEnter external user id: ", type=click.STRING)
@@ -104,7 +116,7 @@ def prepare_parameters_to_launch_system(selected_system: Sap_system, external_us
     argument = argument + " -maxgui"  # Развернуть окно на весь экран
 
     if external_user:
-        edited_system = Sap_system(selected_system.system, selected_system.mandant, str(user).upper(), password,
+        edited_system = Sap_system(selected_system.system, selected_system.client, str(user).upper(), password,
                                    selected_system.language, selected_system.customer, selected_system.description,
                                    selected_system.url, selected_system.autotype, selected_system.only_web)
     else:
@@ -180,7 +192,7 @@ def launch_command_line_with_params(command_line_path, param: typing.List):
     # pop.wait()
 
     if pop.returncode:
-        click.echo(pop.returncode, pop.communicate()[0])
+        click.echo(pop.returncode)
 
 
 def launch_saplogon_with_params(saplogon):
@@ -198,7 +210,7 @@ def launch_saplogon_with_params(saplogon):
 
 
 def choose_system(sap_systems: list) -> Sap_system:
-    """ Choose a system you want to login """
+    """ Choose a system you want to log in """
     ans = 0
     if len(sap_systems) >= 2:
 
@@ -230,14 +242,17 @@ def choose_parameter(parameters: list):
                 f"\n[bold red]Choose a transaction with parameter.[/bold red] Available values from 1 to {str(len(parameters))}: \n>>>")
         ans = ans - 1
 
-    selected_params = Parameter(parameters[ans].transaction, parameters[ans].parameter)
+    selected_params = Parameter(*parameters[ans])
 
     return selected_params
 
 
-def print_system_list(*sap_systems: Sap_system, title, color=color_success, verbose=False, timeout=0,
-                      enum=False, command: str = '', command_type: str = '', url=False, only_web=''):
+def print_system_list(*sap_systems: Sap_system, title, color=None, verbose=False, timeout=0,
+                      enum=False, command: str = '', command_type: str = '', url=False):
     """ Print information in table style """
+
+    if color is None:
+        color = color_success
 
     row = []
 
@@ -247,73 +262,142 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
         title = title + click.style(f"with {command_type} ", **color)
         title = title + click.style(f"{str(command).upper()}", **color_sensitive)
 
-    # Table initializing
-    table = Table(title=title, box=box.SQUARE_DOUBLE_HEAD, expand=True)
+    item_numbers = len(sap_systems)
 
-    # Header
-    if enum:
-        header = ['Id', 'Customer', 'System', 'Mandant', 'Description', 'User', 'Lang']
-    else:
-        header = ['Customer', 'System', 'Mandant', 'Description', 'User', 'Lang']
-    if url:
-        header.append('URL')
-        header.append('Autotype sequence')
-        header.append('Only web')
-    if verbose:
-        header.append('Password')
+    if item_numbers > 1:
 
-    for item in header:
-        table.add_column(item)
+        # Table initializing
+        table = Table(title=title, box=box.SQUARE_DOUBLE_HEAD, expand=True)
 
-    # Rows
-    for index, sap_system in enumerate(sap_systems, start=1):
+        # Header
         if enum:
-            row.append(str(index))
-        if sap_system.customer is not None:
-            row.append(sap_system.customer)
+            header = ['Id', 'Customer', 'System', 'Client', 'Description', 'User', 'Lang']
         else:
-            row.append('')
-
-        if sap_system.system is not None:
-            row.append(sap_system.system)
-        else:
-            row.append('')
-
-        if sap_system.mandant is not None:
-            row.append(sap_system.mandant)
-        else:
-            row.append('')
-
-        if sap_system.description is not None:
-            row.append(sap_system.description)
-        else:
-            row.append('')
-
-        if sap_system.user is not None:
-            row.append(sap_system.user)
-        else:
-            row.append('')
-
-        if sap_system.language is not None:
-            row.append(sap_system.language)
-        else:
-            row.append('')
-
+            header = ['Customer', 'System', 'Client', 'Description', 'User', 'Lang']
         if url:
-            if sap_system.url is not None:
-                row.append(sap_system.url)
-                row.append(sap_system.autotype)
-                row.append(sap_system.only_web)
+            header.append('URL')
+            header.append('Autotype sequence')
+            header.append('Only web')
+        if verbose:
+            header.append('Password')
+
+        for item in header:
+            table.add_column(item)
+
+        # Rows
+        for index, sap_system in enumerate(sap_systems, start=1):
+            if enum:
+                row.append(str(index))
+            if sap_system.customer is not None:
+                row.append(sap_system.customer)
             else:
                 row.append('')
-                row.append('')
+
+            if sap_system.system is not None:
+                row.append(sap_system.system)
+            else:
                 row.append('')
 
-        if verbose and sap_system.password is not None:
-            row.append(sap_system.password)
+            if sap_system.client is not None:
+                row.append(sap_system.client)
+            else:
+                row.append('')
 
-        table.add_row(*row)
-        row.clear()
+            if sap_system.description is not None:
+                row.append(sap_system.description)
+            else:
+                row.append('')
+
+            if sap_system.user is not None:
+                row.append(sap_system.user)
+            else:
+                row.append('')
+
+            if sap_system.language is not None:
+                row.append(sap_system.language)
+            else:
+                row.append('')
+
+            if url:
+                if sap_system.url is not None:
+                    row.append(sap_system.url)
+                    row.append(sap_system.autotype)
+                    row.append(sap_system.only_web)
+                else:
+                    row.append('')
+                    row.append('')
+                    row.append('')
+
+            if verbose and sap_system.password is not None:
+                row.append(sap_system.password)
+
+            table.add_row(*row)
+            row.clear()
+
+    else:  # Only one system
+
+        # Table initializing
+        table = Table(title=title, box=box.SQUARE_DOUBLE_HEAD)
+
+        # Header
+        header = ['Field', 'Value']
+
+        for item in header:
+            table.add_column(item)
+
+        # Rows
+        for index, sap_system in enumerate(sap_systems, start=1):
+
+            row.append("Customer")
+            row.append(sap_system.customer)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("System")
+            row.append(sap_system.system)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("Client")
+            row.append(sap_system.client)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("User")
+            row.append(sap_system.user)
+            table.add_row(*row)
+            row.clear()
+
+            if verbose and sap_system.password is not None:
+                row.append("Password")
+                row.append(sap_system.password)
+                table.add_row(*row)
+                row.clear()
+
+            row.append("Description")
+            row.append(sap_system.description)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("Language")
+            row.append(sap_system.language)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("URL")
+            row.append(sap_system.url)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("Autotype sequence")
+            row.append(sap_system.autotype)
+            table.add_row(*row)
+            row.clear()
+
+            row.append("Only web")
+            row.append(sap_system.only_web)
+            table.add_row(*row)
+            row.clear()
 
     # Information output
     click.echo('\n')
@@ -330,8 +414,11 @@ def print_system_list(*sap_systems: Sap_system, title, color=color_success, verb
         click.clear()
 
 
-def print_parameters_list(*parameters: Parameter, title, color=color_success, enum=False):
+def print_parameters_list(*parameters: Parameter, title, color=None, enum=False):
     """ Print information in table style """
+
+    if color is None:
+        color = color_success
 
     row = []
 
@@ -387,17 +474,16 @@ class String_3(click.ParamType):
         if re.match("^[A-Za-z0-9]*$", value) and len(value) == 3:
             return value
 
-        self.fail(f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers - 3 chars length",
-                  param, ctx)
+        self.fail(f"{value!r} is not valid [SYSTEM] id. Must contain only letters and numbers - 3 chars length")
 
-    def fail(self, message, param, ctx):
+    def fail(self, message, **kwargs):
         raise FailedRequirements(message)
 
 
 SYSTEM_ID = String_3()
 
 
-class Mandant(click.ParamType):
+class client(click.ParamType):
     """Click check class for parameters type"""
 
     name = "Only letters and numbers. 3 chars length"
@@ -406,14 +492,13 @@ class Mandant(click.ParamType):
         if re.match(r"^\d{3}$", value):
             return value
 
-        self.fail(f"{value!r} is not valid [CLIENT] id. Must contain only numbers - 3 chars length",
-                  param, ctx)
+        self.fail(f"{value!r} is not valid [CLIENT] id. Must contain only numbers - 3 chars length")
 
-    def fail(self, message, param, ctx):
+    def fail(self, message, **kwargs):
         raise FailedRequirements(message)
 
 
-MANDANT = Mandant()
+client = client()
 
 
 class PassRequirement(click.ParamType):
@@ -426,6 +511,9 @@ class PassRequirement(click.ParamType):
         pw_req = ""
 
         if ctx.obj.config.password_strength == 1:
+            pw_req = "No requirements"
+            pw_strength = ""
+        elif ctx.obj.config.password_strength == 1:
             pw_req = "Minimum eight characters, at least one letter and one number"
             pw_strength = r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$"
         elif ctx.obj.config.password_strength == 2:
@@ -438,18 +526,21 @@ class PassRequirement(click.ParamType):
             pw_req = "Minimum eight characters, at least one uppercase letter, one lowercase letter, one number and one special character"
             pw_strength = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
         elif ctx.obj.config.password_strength == 5:
-            pw_req = "Minimum eight and maximum 10 characters, at least one uppercase letter, one lowercase letter, one number and one special character"
-            pw_strength = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,10}$"
+            pw_req = "Minimum eight characters, at least one uppercase letter, one lowercase letter, one number and one special character"
+            pw_strength = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8}$"
 
-        if re.match(pw_strength, value):
+        if ctx.obj.config.password_strength == 0:
             return value
+        else:
+            if re.match(pw_strength, value):
+                return value
 
         # TODO: sends error "Error: The value you entered was invalid", and not custom from line 429
         #  https://github.com/pallets/click/issues/2809
-        self.fail(f"Your password is week. Use {pw_req!r}", param, ctx)
+        self.fail(f"Your password is week. Use {pw_req!r}")
 
-    def fail(self, message="", param=None, ctx=None):
-        raise click.BadParameter(message, ctx, param)
+    def fail(self, message, **kwargs):
+        raise click.BadParameter(message)
 
 
 PASS_REQUIREMENT = PassRequirement()
@@ -465,12 +556,10 @@ class Browser_list(click.ParamType):
             return value
 
         self.fail(
-            f"{value!r} is not valid Browser. Must be browser from configuration file: {ctx.obj.config.browsers_list}",
-            param,
-            ctx,
+            f"{value!r} is not valid Browser. Must be browser from configuration file: {ctx.obj.config.browsers_list}"
         )
 
-    def fail(self, message, param, ctx):
+    def fail(self, message, **kwargs):
         raise FailedRequirements(message)
 
 
@@ -483,7 +572,7 @@ class Autotype_sequence(click.ParamType):
     name = "Autotype items"
 
     def convert(self, value, param, ctx):
-        autotype_list = '(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)'
+        autotype_list = '(USER|PASS|LANG|DELAY|ENTER|TAB|SPACE|SYSTEM|CLIENT)'
 
         # r'\{(USER|PASS|LANG|DELAY|ENTER|TAB|SYSTEM|CLIENT)(?: \d*)?\}'
         re_str = fr'{{{autotype_list}(?: *\d*)?}}'
@@ -494,12 +583,10 @@ class Autotype_sequence(click.ParamType):
             return value
 
         self.fail(
-            f"\n{result!r}. Wrong Autotype item(s). Choose item from the allowed: {autotype_list} and check parameters\n",
-            param,
-            ctx,
+            f"\n{result!r}. Wrong Autotype item(s). Choose item from the allowed: {autotype_list} and check parameters\n"
         )
 
-    def fail(self, message, param, ctx):
+    def fail(self, message, **kwargs):
         raise FailedRequirements(message)
 
 
@@ -522,12 +609,10 @@ class Default_language(click.ParamType):
             return value
 
         self.fail(
-            f"\n{value!r} is not valid language. Choose item from the allowed: {lang_list}\n",
-            param,
-            ctx,
+            f"\n{value!r} is not valid language. Choose item from the allowed: {lang_list}\n"
         )
 
-    def fail(self, message, param, ctx):
+    def fail(self, message, **kwargs):
         raise FailedRequirements(message)
 
 
@@ -555,23 +640,26 @@ def launch_autotype_sequence(selected_system: Sap_system, language, minimize='')
         elif item == 'PASS':
             pyautogui.write(str(selected_system.password))
         elif item == 'CLIENT':
-            pyautogui.write(str(selected_system.mandant))
+            pyautogui.write(str(selected_system.client))
         elif item == 'LANG':
             pyautogui.write(str(language if language else selected_system.language))
         elif 'DELAY' in item:
             time2wait = int(re.findall(r'\d{1,10}', item)[0])
             countdown(time2wait, 'Waiting for web site to load')
-        else:  # ENTER, TAB and other
+        else:  # ENTER, TAB, SPACE and other
             pyautogui.press(item)
 
 
 def countdown(seconds, message):
     print('\n')
-    for i in track(range(seconds), description=message):
+    for _ in track(range(seconds), description=message):
         time.sleep(1)  # Simulate work being done
 
 
 def print_message(message, message_type):
+    border_style = STYLE_ERRORS_PANEL_BORDER
+    title_align = ALIGN_ERRORS_PANEL
+
     console = Console()
 
     if message_type == message_type_error:
@@ -587,11 +675,12 @@ def print_message(message, message_type):
         border_style = STYLE_SWITCH
         title_align = ALIGN_ERRORS_PANEL
 
-    console.print(Panel(
-        Text.from_markup(message),
-        border_style=border_style,
-        title=message_type,
-        title_align=title_align)
+    console.print(
+        Panel(
+            Text.from_markup(message),
+            border_style=border_style,
+            title=message_type,
+            title_align=title_align)
     )
 
 
@@ -608,7 +697,7 @@ def default_from_context(default_name):
     """
 
     class OptionDefaultFromContext(click.Option):
-        def get_default(self, ctx):
+        def get_default(self, ctx, call=True):
             self.default = ctx.obj.config.__getattribute__(default_name)
             return super(OptionDefaultFromContext, self).get_default(ctx)
 
@@ -637,12 +726,12 @@ def open_sap(argument):
     pop.wait()
 
     if pop.returncode:
-        click.echo(pop.returncode, pop.communicate()[0])
+        click.echo(pop.returncode)
 
 
-def check_if_path_exists(path):
-    if not path.exists():
-        raise WrongPath(path.name, path)
+def check_if_path_exists(path2file: Path):
+    if not path2file.exists():
+        raise WrongPath(path2file.name, path2file)
     return True
 
 

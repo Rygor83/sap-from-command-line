@@ -1,5 +1,5 @@
 #  ------------------------------------------
-#   Copyright (c) Rygor. 2024.
+#   Copyright (c) Rygor. 2025.
 #  ------------------------------------------
 """ Custom Exceptions """
 import click.exceptions
@@ -95,8 +95,8 @@ class EncryptionKeysAlreadyExist(Exception):
 class FailedRequirements(click.exceptions.BadParameter):
     """ Exception. Public key already exists """
 
-    def __init__(self, message="", ctx=None, param=None):
-        super().__init__(self.message, ctx, param)
+    def __init__(self, message, **kwargs):
+        super().__init__(message, **kwargs)
 
     def format_message(self) -> str:
         return self.message
